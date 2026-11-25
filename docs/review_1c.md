@@ -235,3 +235,66 @@ I ran `state.record_calls`, `record_sheet`, `mark_do_not_call`, `cooldown_until`
 1. **R1 (High):** persisted `dnc_rebuilt` marker and gate; first run included. `state.py:111-119`.
 2. **R2 (Medium):** `normalise_sf_id` at state's API boundary and on load.
 3. R3 to R6 are low; can be done in the same pass.
+
+---
+
+# Final re-review (2026-11-25): worker commit `0886379` (R1 to R6), main `321ad78`, ranker `670eecc`
+
+Offline, read-only, synthetic data. Merged `origin/phase1/1c-state` and `origin/main` into this branch; ranker run from a scratch copy of `670eecc`.
+
+**FINAL VERDICT: PASS.** R1 is closed. Two Medium/Low points below are recommendations, not blockers; the one to act on before Phase 3 live writes is M1 (the rebuild marker cannot tell a complete history from a partial one).
+
+## 1. Tests
+`pytest tests -q`: **334 passed**. `-W error`: **334 passed**.
+
+## 2. R1: persisted Do Not Call gate (`state.py:120-155, 316-330`): FIXED
+
+| Attack | Result |
+|---|---|
+| Corrupt file, dry run saves the reset state, live run loads it | **Blocked** (marker absent in the saved file). This was the R1 hole. |
+| Healthy old v2 file with no marker, `require_healthy(live=True)` before `mark_dnc_rebuilt` | Blocked; `live=False` only logs |
+| `mark_dnc_rebuilt` then save then load | Passes; marker survives `record_calls`, `record_sheet`, `record_sent_emails` |
+| Marker present, file later truncated | Moved to `.corrupt-1`, marker gone, live blocked |
+| Delete `state.json` (is_new) / empty file / old v1 file | All blocked |
+| Hand-edited marker: `at='yes'`, `at=True`, `at=12345`, `at=''`, `at=[...]`, `calls='5'`, `calls=True/False`, `calls=5.0`, `calls=None` | File reset (fail closed), live blocked |
+| `calls=-5`, `calls=0`, only one of the two fields, `at=null` | Loads, **live blocked** (`dnc_is_rebuilt` needs a date and calls > 0) |
+| `calls=10**18`, future date `2099-01-01`, `calls=1` with a valid date | **Passes** (see below) |
+| Valid marker, EMPTY DNC list, 0 accounts | **Trusted, passes.** No false alarm, and (as expected) no cross-check is possible: a legitimate "nobody was DNC" file looks identical. |
+| `mark_dnc_rebuilt(calls_seen)` with 0, -1, True, False, 1.0, "5", None | ValueError. `1` and `10**9` accepted. |
+
+Not a flaw, just the limits: nothing can detect a file hand-edited with a plausible marker, so the gate is protection against bugs and omissions, not against tampering. A future date is accepted; harmless.
+
+**M1 (MEDIUM, recommendation) `state.py:127-136`: a partial history can be marked as complete.** The code relies entirely on the runner to (a) page `listCalls` to the very end (`docs/state_notes.md` step 3 says so clearly and notes that pages are ordered by id, not time) and (b) pass the true total. `calls_seen=1` from a single page is accepted; `calls_seen` counts duplicates within a page; a reset State can be marked without checks. The documentation is clear enough for a careful runner but gives a lazy or buggy one no tripwire. Cheap cross-checks:
+1. Make the runner pass `reached_last_page=True` taken from the final page's `hasMore == false`, required keyword, rejected otherwise.
+2. Store the earliest `started_at` seen (from `state.seen_calls`) in the marker and log it at every run; a rebuild whose oldest call is only days old is a red flag.
+3. A consistency check that does not need trust: after the rebuild, `calls_seen` must be at least `len(state.seen_calls)`, and for a rebuild on a state that already holds calls it must not be smaller than before.
+4. Optional second source: a listCalls query filtered to the Do Not Call disposition id, with every returned call id checked against the state's DNC ids. UNVERIFIED that Nooks supports that filter (`connector_notes.md` only confirms owner and `filter_time_gte`).
+
+**L1 (LOW) `state.py` save path:** `save_state(State(), dir)` over a populated, marked file silently replaces it (DNC lists gone, marker gone, no `.corrupt` copy since it is a normal overwrite). Fails closed (live blocked until rebuilt) but loses history until then. Recommend refusing, or keeping a one-deep `state.json.prev`, when the new state has fewer DNC entries than the file on disk. This also covers F6.
+
+## 3. R2: Salesforce ids (`_sf`, `_norm_accounts`, load merge): FIXED
+Tried all four mixes (15/18-char on prospect, on `accounts_by_id` keys, on queries). Stored key is always the 15-char form; nooks and zoominfo ids are captured whichever form `accounts_by_id` uses. `is_in_cooldown`, `was_in_last_sheet`, `last_sheet_ids`, `record_sheet`, `record_sent_emails`, `cooldown_until`, `last_touched`, `cooldown_until_by` behave identically for 15 and 18-char queries (outputs keyed 15-char). Odd ids pass through unchanged (`FAKE-1`, `abc`, a 17-char id, an 18-char with a space); `None` and `""` return None. Old file with both forms of the same account: merged on load into one entry, keeping the newer call, the later connect (even when it sat on the older-call entry), and alternate ids; duplicate sheet ids are collapsed. Caveat: lookups into the returned dicts by raw 18-char key (`cooldown_until(...)[sf18]`) still miss, as the notes say; the ranker normalises (below).
+
+## 4. R3: malformed dates: FIXED, with one adjustment
+A bad, missing or impossible stored date (`"junk"`, `123`, `"2026-13-45"`) no longer drops the cooldown; it is rebuilt from the stored instant and a warning is added (junk date plus junk instant gives no cooldown and a warning). **L2 (LOW) `state.py:276-285`:** the fallback uses the UTC date of the instant, so a Sydney 08:50 AEDT call (instant 11-01 21:50Z) gives until 11-04 instead of 11-05, one day short. Use the account's zone (default Sydney, `DEFAULT_TZ`) instead of UTC; it fails open by one day only on already-damaged files.
+
+## 5. Residual F4 (national-format DNC phone)
+The worker's reading is right but the problem sits upstream. `state.py` only sees `CallRecord.to_e164`, which `call_from_nooks` builds with `normalise_phone(row["to"])` and no country. For `0400 000 010`, `normalise_phone` returns **None**, so state receives no number at all (a raw value reaches state only if a caller bypasses the loader). The prospect-id path still blocks linked calls; an unlinked DNC call with a national-format `to` would record nothing. **Likelihood: low.** The fixtures and `connector_notes.md` show `to` as E.164 (`+61400000001`), and the loader rules say `to` is normalised. Defaulting to Australia is not safe either (I checked: `021 123 4567`, an NZ-style mobile, would parse as `+61211234567`). Recommendation: do not default; have `call_from_nooks` (or the runner) log every Do Not Call call whose `to` yields no E.164, so a human sees it, and rely on the prospect-id and email-hash paths. Not a blocker.
+
+## 6. End to end with the real ranker (`670eecc`, normalises SF ids)
+Five synthetic accounts (Sydney, Melbourne, Auckland) run through `record_calls`, `record_sheet`, `mark_do_not_call`, `cooldown_until`, `last_sheet_ids` into `rank_accounts`, with four 15/18-char mixes between accounts, prospects and state. All four gave identical results:
+- Cooldown account (Sydney 08:50 call on 11-10, until 11-13): -30 penalty with the first window on 11-11, none on 11-13. Auckland account the same, on its own local date.
+- Account on the last sheet: `skipped: on last sheet`.
+- Account whose only prospects are a Do Not Call prospect and a duplicate with the same email (dotted plus `+tag`): `skipped: all prospects blocked`.
+- No exceptions, no id mismatches.
+
+## 7. New code, other observations
+- `require_healthy(state, live=True)` replaces `rebuilt_from_history`; callers using the old keyword get a TypeError, which is loud and safe.
+- `_merge_accounts`, `_local_or_utc`, `mark_dnc_rebuilt` and the marker parsing read clean; no new fail-open path found. A malformed DNC list or marker value still resets the whole file (fail closed), and `load_warnings` only covers non-DNC entries.
+- Module docstring and `docs/state_notes.md` are updated and match the behaviour.
+
+## Remaining (none blocking)
+1. M1 cross-checks on `mark_dnc_rebuilt`, before the first live run (Phase 3).
+2. L1 refuse or back up an overwrite that shrinks the DNC lists.
+3. L2 use the account zone, not UTC, in the date fallback.
+4. Log Do Not Call calls whose `to` cannot be normalised.
