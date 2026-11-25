@@ -1,0 +1,524 @@
+{
+ "_note": "SYNTHETIC 85-row role/hiring table from the 1e review (docs/review_1e.md), invented text only. Rows 76, 77, 85 relabelled per coordinator decision H2.",
+ "rows": [
+  {
+   "n": 1,
+   "type": "Executive Move",
+   "description": "Example Co appointed Jordan Fake as Chief Product Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 2,
+   "type": "Executive Move",
+   "description": "Example Co named a new VP of Digital Experience, Sam Placeholder.",
+   "expected": "keep"
+  },
+  {
+   "n": 3,
+   "type": "New Hire",
+   "description": "Example Co hired a Head of CX to lead its customer programme.",
+   "expected": "keep"
+  },
+  {
+   "n": 4,
+   "type": "New Hire",
+   "description": "Pat Sample joins Example Co as Director, Customer Success.",
+   "expected": "keep"
+  },
+  {
+   "n": 5,
+   "type": "Executive Move",
+   "description": "Example Co welcomes a new CTO and co-founder, Alex Invented.",
+   "expected": "keep"
+  },
+  {
+   "n": 6,
+   "type": "Executive Move",
+   "description": "Example Co has appointed a Chief Digital and Information Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 7,
+   "type": "New Hire",
+   "description": "Example Co has hired a Head of Digital Workplace.",
+   "expected": "keep"
+  },
+  {
+   "n": 8,
+   "type": "New Hire",
+   "description": "Example Co has hired a Product Owner for its mobile app.",
+   "expected": "keep"
+  },
+  {
+   "n": 9,
+   "type": "New Hire",
+   "description": "Example Co has hired a UX lead.",
+   "expected": "keep"
+  },
+  {
+   "n": 10,
+   "type": "Executive Move",
+   "description": "Example Co appointed a Group Head of Customer Support.",
+   "expected": "keep"
+  },
+  {
+   "n": 11,
+   "type": "Executive Move",
+   "description": "Example Co appoints Chief Technology Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 12,
+   "type": "Management Move",
+   "description": "Example Co promoted Lee Fake to Chief Experience Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 13,
+   "type": "Executive Move",
+   "description": "Example Co has a new Chief Information Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 14,
+   "type": "Management Move",
+   "description": "Example Co has appointed a General Manager, Digital.",
+   "expected": "keep"
+  },
+  {
+   "n": 15,
+   "type": "New Hire",
+   "description": "Example Co hires Senior Product Manager for its platform.",
+   "expected": "keep"
+  },
+  {
+   "n": 16,
+   "type": "Executive Move",
+   "description": "Example Co has a new Head of Product.",
+   "expected": "keep"
+  },
+  {
+   "n": 17,
+   "type": "Executive Move",
+   "description": "Example Co appoints Vice President of Engineering.",
+   "expected": "keep"
+  },
+  {
+   "n": 18,
+   "type": "New Hire",
+   "description": "Example Co hired Director of Product Design.",
+   "expected": "keep"
+  },
+  {
+   "n": 19,
+   "type": "Executive Move",
+   "description": "Example Co appoints Chief Customer Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 20,
+   "type": "New Hire",
+   "description": "Example Co has hired a Head of Customer Experience.",
+   "expected": "keep"
+  },
+  {
+   "n": 21,
+   "type": "Executive Move",
+   "description": "Example Co names a new Head of Digital Transformation.",
+   "expected": "keep"
+  },
+  {
+   "n": 22,
+   "type": "Executive Move",
+   "description": "Example Co appoints Head of Technology.",
+   "expected": "keep"
+  },
+  {
+   "n": 23,
+   "type": "New Hire",
+   "description": "Example Co has hired a Customer Experience Manager.",
+   "expected": "keep"
+  },
+  {
+   "n": 24,
+   "type": "New Hire",
+   "description": "Example Co hired a Head of Customer Service and Support.",
+   "expected": "keep"
+  },
+  {
+   "n": 25,
+   "type": "Executive Move",
+   "description": "Example Co appointed a Chief Operating Officer who will oversee digital.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 26,
+   "type": "New Hire",
+   "description": "Example Co welcomes a new Engineering Manager.",
+   "expected": "keep"
+  },
+  {
+   "n": 27,
+   "type": "New Hire",
+   "description": "Example Co hires a Principal Product Manager.",
+   "expected": "keep"
+  },
+  {
+   "n": 28,
+   "type": "Executive Move",
+   "description": "Example Co appoints a VP Product.",
+   "expected": "keep"
+  },
+  {
+   "n": 29,
+   "type": "Executive Move",
+   "description": "Example Co appoints a Head of Mobile.",
+   "expected": "keep"
+  },
+  {
+   "n": 30,
+   "type": "Executive Move",
+   "description": "Example Co has a new Chief Data Officer.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 31,
+   "type": "Executive Move",
+   "description": "Example Co appoints Head of Digital Channels.",
+   "expected": "keep"
+  },
+  {
+   "n": 32,
+   "type": "New Hire",
+   "description": "Example Co hired an Enterprise Applications Manager.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 33,
+   "type": "New Hire",
+   "description": "Example Co hired a Product Operations lead.",
+   "expected": "keep"
+  },
+  {
+   "n": 34,
+   "type": "Executive Move",
+   "description": "Example Co appointed a Head of Employee Experience.",
+   "expected": "keep"
+  },
+  {
+   "n": 35,
+   "type": "Management Move",
+   "description": "Example Co appointed a Head of Customer Success.",
+   "expected": "keep"
+  },
+  {
+   "n": 36,
+   "type": "Executive Move",
+   "description": "Example Co appointed a Chief Product and Technology Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 37,
+   "type": "Executive Move",
+   "description": "Example Co appointed a Chief Digital Officer.",
+   "expected": "keep"
+  },
+  {
+   "n": 38,
+   "type": "New Hire",
+   "description": "Example Co hired a Digital Product Manager.",
+   "expected": "keep"
+  },
+  {
+   "n": 39,
+   "type": "New Hire",
+   "description": "Example Co hired a Senior Software Engineer.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 40,
+   "type": "Executive Move",
+   "description": "Example Co appoints Head of IT.",
+   "expected": "keep"
+  },
+  {
+   "n": 41,
+   "type": "Executive Move",
+   "description": "Example Co appoints Director of IT Operations.",
+   "expected": "keep"
+  },
+  {
+   "n": 42,
+   "type": "Executive Move",
+   "description": "Example Co appointed Chief Financial Officer Kim Fake.",
+   "expected": "drop"
+  },
+  {
+   "n": 43,
+   "type": "New Hire",
+   "description": "Example Co hired a Product Marketing Manager.",
+   "expected": "drop"
+  },
+  {
+   "n": 44,
+   "type": "New Hire",
+   "description": "Example Co has a new Head of Procurement.",
+   "expected": "drop"
+  },
+  {
+   "n": 45,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring 40 Customer Service Representatives.",
+   "expected": "drop"
+  },
+  {
+   "n": 46,
+   "type": "Executive Move",
+   "description": "Example Co CEO steps down after eight years.",
+   "expected": "drop"
+  },
+  {
+   "n": 47,
+   "type": "Hiring Plans",
+   "description": "Example Co is seeking nurse practitioners across its clinics.",
+   "expected": "drop"
+  },
+  {
+   "n": 48,
+   "type": "New Hire",
+   "description": "Example Co hired an IT support technician.",
+   "expected": "drop"
+  },
+  {
+   "n": 49,
+   "type": "Executive Move",
+   "description": "Example Co appoints a Chief Information Security Officer.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 50,
+   "type": "New Hire",
+   "description": "Example Co hired a Digital Marketing Manager.",
+   "expected": "drop",
+   "note": "reviewer judgement call (counted)"
+  },
+  {
+   "n": 51,
+   "type": "Executive Move",
+   "description": "Example Co appoints a new Chief Executive Officer.",
+   "expected": "drop"
+  },
+  {
+   "n": 52,
+   "type": "Executive Move",
+   "description": "Example Co appoints Chief People Officer.",
+   "expected": "drop"
+  },
+  {
+   "n": 53,
+   "type": "New Hire",
+   "description": "Example Co appoints Head of Legal.",
+   "expected": "drop"
+  },
+  {
+   "n": 54,
+   "type": "New Hire",
+   "description": "Example Co appoints Head of Sales.",
+   "expected": "drop"
+  },
+  {
+   "n": 55,
+   "type": "New Hire",
+   "description": "Example Co hires a Sales Director for the product range.",
+   "expected": "drop"
+  },
+  {
+   "n": 56,
+   "type": "New Hire",
+   "description": "Example Co hires Head of Product Supply and Logistics.",
+   "expected": "drop"
+  },
+  {
+   "n": 57,
+   "type": "New Hire",
+   "description": "Example Co names a Head of Product Compliance.",
+   "expected": "drop"
+  },
+  {
+   "n": 58,
+   "type": "Executive Move",
+   "description": "Example Co appoints a Chief Marketing Officer.",
+   "expected": "drop"
+  },
+  {
+   "n": 59,
+   "type": "Executive Move",
+   "description": "Example Co appoints Chief Risk Officer who will support the board.",
+   "expected": "drop"
+  },
+  {
+   "n": 60,
+   "type": "New Hire",
+   "description": "Example Co hired a Facilities Manager.",
+   "expected": "drop"
+  },
+  {
+   "n": 61,
+   "type": "New Hire",
+   "description": "Example Co appoints a Head of Supply Chain Technology Procurement.",
+   "expected": "drop"
+  },
+  {
+   "n": 62,
+   "type": "Executive Move",
+   "description": "Example Co appoints Chair of the Board and former product executive.",
+   "expected": "drop"
+  },
+  {
+   "n": 63,
+   "type": "New Hire",
+   "description": "Example Co hires Social Media Manager for product campaigns.",
+   "expected": "drop"
+  },
+  {
+   "n": 64,
+   "type": "Executive Move",
+   "description": "Example Co appoints a new Chief Financial Officer; she previously led digital at a bank.",
+   "expected": "drop"
+  },
+  {
+   "n": 65,
+   "type": "New Hire",
+   "description": "Example Co has appointed a Director of Support Services (aged care).",
+   "expected": "drop"
+  },
+  {
+   "n": 66,
+   "type": "New Hire",
+   "description": "Example Co hired a Warehouse Manager.",
+   "expected": "drop"
+  },
+  {
+   "n": 67,
+   "type": "New Hire",
+   "description": "Example Co appoints a Head of Product Development, Manufacturing.",
+   "expected": "drop"
+  },
+  {
+   "n": 68,
+   "type": "New Hire",
+   "description": "Example Co appoints Technology Procurement Director.",
+   "expected": "drop"
+  },
+  {
+   "n": 69,
+   "type": "New Hire",
+   "description": "Example Co welcomes a Customer Support Officer.",
+   "expected": "drop"
+  },
+  {
+   "n": 70,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring a Senior Product Manager and two UX designers.",
+   "expected": "keep"
+  },
+  {
+   "n": 71,
+   "type": "Open Position",
+   "description": "Example Co is hiring mobile app developers.",
+   "expected": "keep"
+  },
+  {
+   "n": 72,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring more open roles in Medical & Health.",
+   "expected": "drop"
+  },
+  {
+   "n": 73,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring more open roles in Legal.",
+   "expected": "drop"
+  },
+  {
+   "n": 74,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring delivery drivers.",
+   "expected": "drop"
+  },
+  {
+   "n": 75,
+   "type": "Open Position",
+   "description": "Example Co has open roles for warehouse staff.",
+   "expected": "drop"
+  },
+  {
+   "n": 76,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring a nurse to support its new digital health app.",
+   "expected": "drop",
+   "note": "reviewer expected keep; relabelled drop per coordinator H2 (weak words like digital/app/product launch do not rescue a nurse/paralegal/medical hire without a buyer role)"
+  },
+  {
+   "n": 77,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring paralegals to support a product launch.",
+   "expected": "drop",
+   "note": "reviewer expected keep; relabelled drop per coordinator H2 (weak words like digital/app/product launch do not rescue a nurse/paralegal/medical hire without a buyer role)"
+  },
+  {
+   "n": 78,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring a Legal counsel for its product team.",
+   "expected": "keep"
+  },
+  {
+   "n": 79,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring accountants and payroll staff.",
+   "expected": "drop"
+  },
+  {
+   "n": 80,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring support staff for the hospital ward.",
+   "expected": "drop"
+  },
+  {
+   "n": 81,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring apprentices and warehouse support staff.",
+   "expected": "drop"
+  },
+  {
+   "n": 82,
+   "type": "Open Position",
+   "description": "Example Co is hiring drivers for its delivery platform.",
+   "expected": "drop"
+  },
+  {
+   "n": 83,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring a Customer Success Manager.",
+   "expected": "keep"
+  },
+  {
+   "n": 84,
+   "type": "Hiring Plans",
+   "description": "Example Co is hiring finance analysts.",
+   "expected": "drop"
+  },
+  {
+   "n": 85,
+   "type": "Hiring Plans",
+   "description": "Example Co is recruiting Medical & Health staff for its new patient app.",
+   "expected": "drop",
+   "note": "reviewer expected keep; relabelled drop per coordinator H2 (weak words like digital/app/product launch do not rescue a nurse/paralegal/medical hire without a buyer role)"
+  }
+ ]
+}
