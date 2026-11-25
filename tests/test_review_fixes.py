@@ -228,4 +228,4 @@ def test_signal_validation():
     with pytest.raises(ValueError):
         Signal("A", SignalKind.NONE, 1.5, "s", None, "x")
     assert {k.value for k in SignalKind} == {"funding", "exec_move", "new_hire", "ma", "product_launch",
-                                             "partnership", "project_pain", "hiring_plan", "none"}
+                                             "partnership", "project_pain", "hiring_plan", "intent", "none"}
