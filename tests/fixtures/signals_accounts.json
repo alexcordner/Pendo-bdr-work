@@ -1,0 +1,30 @@
+{
+  "_note": "SYNTHETIC accounts for tests/test_signals.py",
+  "accounts": [
+    {
+      "zoominfo_id": "FAKE-ZI-2001",
+      "sf_account_id": "FAKE-SIG-A1",
+      "name": "Gamma Apps Pty Ltd"
+    },
+    {
+      "zoominfo_id": "FAKE-ZI-2002",
+      "sf_account_id": "FAKE-SIG-A2",
+      "name": "Delta Retail Ltd"
+    },
+    {
+      "zoominfo_id": "FAKE-ZI-2003",
+      "sf_account_id": "FAKE-SIG-A3",
+      "name": "Beta Health Pty Ltd"
+    },
+    {
+      "zoominfo_id": "FAKE-ZI-2004",
+      "sf_account_id": "FAKE-SIG-A4",
+      "name": "Fictional Capital Partners"
+    },
+    {
+      "zoominfo_id": null,
+      "sf_account_id": "FAKE-SIG-A5",
+      "name": "No ZoomInfo Id Ltd"
+    }
+  ]
+}

@@ -1,0 +1,804 @@
+{
+  "_note": "SYNTHETIC scoops (search_scoops shape) for tests/test_signals.py. Fixed today = 2026-11-25. Ids FAKE-ZI-*, no real companies.",
+  "data": [
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "Beta Health is hiring for more open roles in Medical & Health.",
+        "id": "SIG-01",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "SIG-01",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "Delta Retail is hiring more open roles in Legal.",
+        "id": "SIG-02",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "SIG-02",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2004",
+          "name": "Fictional Capital Partners"
+        },
+        "description": "Fictional Capital Partners invested in Gamma Apps.",
+        "id": "SIG-03",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Funding"
+          }
+        ]
+      },
+      "id": "SIG-03",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps raised $8 million; Fictional Capital Partners invested in the round.",
+        "id": "SIG-04",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Funding"
+          }
+        ]
+      },
+      "id": "SIG-04",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "<Person> was appointed Chief Executive Officer.",
+        "id": "SIG-05",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Executive Moves"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Executive Move"
+          }
+        ]
+      },
+      "id": "SIG-05",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps Digital announced the CEO will step down.",
+        "id": "SIG-06",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Executive Moves"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Executive Move"
+          },
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-06",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "<Person> was appointed VP of Product.",
+        "id": "SIG-07",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Executive Moves"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Executive Move"
+          }
+        ]
+      },
+      "id": "SIG-07",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "<Person> joins as Head of Customer Experience.",
+        "id": "SIG-08",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-08",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "<Person> has been hired as Chief Technology Officer.",
+        "id": "SIG-09",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-09",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "<Person> joined as IT Director.",
+        "id": "SIG-10",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-10",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "The company said it will welcome a new Head of Finance.",
+        "id": "SIG-11",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-11",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "<Person> joins as Product Marketing Manager.",
+        "id": "SIG-12",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "New Hire"
+          }
+        ]
+      },
+      "id": "SIG-12",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "According to an internal source, the company is rolling out a new intranet.",
+        "id": "SIG-13",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Project"
+          },
+          {
+            "id": "FAKE-T",
+            "topic": "Digital Workplace"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Project"
+          }
+        ]
+      },
+      "id": "SIG-13",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "According to an internal source, the company is rebuilding its app.",
+        "id": "SIG-14",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "FAKE-T",
+            "topic": "Product Development"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Pain Point"
+          }
+        ]
+      },
+      "id": "SIG-14",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "According to an internal source, the company is replacing its ERP.",
+        "id": "SIG-15",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Project"
+          },
+          {
+            "id": "FAKE-T",
+            "topic": "Finance"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Project"
+          }
+        ]
+      },
+      "id": "SIG-15",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "According to an internal source, the company has a pain point.",
+        "id": "SIG-16",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Pain Point"
+          }
+        ]
+      },
+      "id": "SIG-16",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps announced the launch of a customer portal.",
+        "id": "SIG-17",
+        "originalPublishedDate": "2026-10-11T00:00:00Z",
+        "publishedDate": "2026-10-11T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Product Launch"
+          }
+        ]
+      },
+      "id": "SIG-17",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps announced the launch of a partner portal.",
+        "id": "SIG-18",
+        "originalPublishedDate": "2026-10-10T00:00:00Z",
+        "publishedDate": "2026-10-10T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Product Launch"
+          }
+        ]
+      },
+      "id": "SIG-18",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-9999",
+          "name": "Unknown Co Pty Ltd"
+        },
+        "description": "Unknown Co has secured $2 million in funding.",
+        "id": "SIG-19",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Funding"
+          }
+        ]
+      },
+      "id": "SIG-19",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "Delta Retail reported quarterly earnings.",
+        "id": "SIG-20",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Earnings"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Earnings"
+          }
+        ]
+      },
+      "id": "SIG-20",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "Beta Health is hiring nurses, drivers and warehouse staff.",
+        "id": "SIG-21",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "SIG-21",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "Delta Retail plans to hire in customer success.",
+        "id": "SIG-22",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Hiring Plans"
+          },
+          {
+            "id": "FAKE-T",
+            "topic": "Customer Success"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "SIG-22",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps announced a new mobile app.",
+        "id": "SIG-23",
+        "originalPublishedDate": "2026-11-27T00:00:00Z",
+        "publishedDate": "2026-11-27T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Product Launch"
+          }
+        ]
+      },
+      "id": "SIG-23",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps launched a second product line.",
+        "id": "SIG-24",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Product Launch"
+          }
+        ]
+      },
+      "id": "SIG-24",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps launched a loyalty app.",
+        "id": "SIG-25",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Product Launch"
+          }
+        ]
+      },
+      "id": "SIG-25",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "Delta Retail is a partner of a payments provider.",
+        "id": "SIG-26",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Partnerships"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Partnership"
+          }
+        ]
+      },
+      "id": "SIG-26",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2001",
+          "name": "Gamma Apps Pty Ltd"
+        },
+        "description": "Gamma Apps acquired Tiny Co.",
+        "id": "SIG-27",
+        "originalPublishedDate": "2026-11-05T00:00:00Z",
+        "publishedDate": "2026-11-05T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Mergers & Acquisitions (M&A)"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Mergers & Acquisitions (M&A)"
+          }
+        ]
+      },
+      "id": "SIG-27",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "Delta Retail is hiring a Senior Product Manager.",
+        "id": "SIG-28",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Open Position"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Open Position"
+          }
+        ]
+      },
+      "id": "SIG-28",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2003",
+          "name": "Beta Health Pty Ltd"
+        },
+        "description": "Beta Health is hiring in Finance.",
+        "id": "SIG-29",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Open Position"
+          },
+          {
+            "id": "FAKE-T",
+            "topic": "Finance"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Open Position"
+          }
+        ]
+      },
+      "id": "SIG-29",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-2002",
+          "name": "Delta Retail Ltd"
+        },
+        "description": "x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x x ",
+        "id": "SIG-30",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T",
+            "topic": "Partnerships"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y",
+            "type": "Partnership"
+          }
+        ]
+      },
+      "id": "SIG-30",
+      "type": "Scoop"
+    }
+  ]
+}
