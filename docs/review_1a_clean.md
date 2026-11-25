@@ -89,3 +89,58 @@ All 18 fixture JSON files parse.
 1. Fix the wrong expected output in `tests/fixtures/phone_formats.json` (the NZ `0200000102` vector).
 
 Optional: rename "Funds", jitter the real-looking duration lists, add 19s and 21s No Answer rows, and mark which decisions Alex actually confirmed.
+
+---
+
+# Re-check of `phase1/1a-clean` @ `bc3db39`
+
+Merged the updated `phase1/1a-clean` into this review branch first. Read-only, no live calls, denylist kept outside the repo. No real values quoted below.
+
+**Verdict: FAIL on one item (5).** Items 1, 2, 3, 4 and 6 pass.
+
+| # | Item | Result |
+|---|---|---|
+| 1 | Phone vectors | PASS |
+| 2 | Call fixture shape and no real durations | PASS |
+| 3 | New cases present | PASS |
+| 4 | Confirmed vs defaults in `decisions.md` | PASS |
+| 5 | Notes distinguish real behaviour from fixture mix | **FAIL** |
+| 6 | Leak grep and JSON validity | PASS |
+
+## 1. Phone vectors: PASS
+I implemented the stated rule (keep a leading `+`; `00` -> `+`; strip other non-digits; 61/64 with at least 11 digits get `+`; leading `0` takes the account country's code) and ran all 7 vectors. All 7 match, including `0200000102` with a New Zealand account -> `+64200000102`.
+
+## 2. Call fixture: PASS
+- 40 calls. Left Voicemail: 4. Do Not Call: 1. Null prospect: 8 (all `from: external`).
+- Long "No Answer" calls (over 30s): 8, at 35 to 63s. This is within the intended 34 to 64s band, just not identical to it. "No Answer" at 19s and 21s are present, so decision 8's 20-second boundary is covered. Short "No Answer" calls from 0 to 8s are present.
+- Real-duration check: none of the 8 long "No Answer" durations equals any real one in the old branch (zero overlaps). One Left Voicemail duration coincides numerically with a real one (a single value). That is not identifying, so no action.
+
+## 3. New cases: PASS
+- Empty dot-stripped Gmail result: `empty_result_example` is in `gmail_search_sent.json`, with estimate 0 and no threads.
+- Scoops: `Open Position` (with a Product Management topic) and `Management Move` (with a Digital Transformation topic) are present, 14 scoops in total.
+- Noise row renamed "Fake Funds Placeholder".
+
+## 4. Decisions split: PASS
+"Confirmed by Alex" holds exactly three items: account scope (Assigned_SDR__c, ANZ, non-customers), the never-contact rule (Do Not Call history or `HasOptedOutOfEmail`), and the synthetic-data approach. Items 4 to 11 are under "Defaults in force, not yet confirmed". That matches what the coordinator told me was confirmed.
+
+## 5. Real behaviour vs fixture mix: FAIL
+`docs/connector_notes.md` line 87 now reads, in substance: "under 10s about 60%, 10 to 30s about 12%, over 30s about 28% (fixture shape; fortnight real mix was similar)".
+
+The problem:
+- The 60 / 12 / 28 split is the fixture's composition, but it appears in the "Duration shares" sentence as if it were the real pattern.
+- The real pattern is roughly two-thirds under 10s, under 10% between 10 and 30s, and about a quarter over 30s (week and fortnight both). The "12%" middle bucket is materially different from the real under-10% figure, and "fortnight real mix was similar" is not accurate for that bucket.
+- The sentence still carries "a fortnight gave 68/7/25", which contradicts the numbers beside it. A reader (or 1f's ranker author) cannot tell which numbers describe Alex's behaviour and which describe test data.
+
+Suggested fix: split into two sentences.
+- **Real behaviour (rounded):** "Alex's real call lengths: roughly two-thirds under 10s, under 10% between 10 and 30s, about a quarter over 30s."
+- **Fixture composition:** "The synthetic `nooks_calls_sample.json` is a different mix on purpose (about 60/12/28); do not use it to calibrate thresholds."
+
+## 6. Leak grep and JSON: PASS
+- Denylist: 23 entries matched, as before. 21 are generic Nooks disposition names or topic words and placeholder URLs, and the other 2 are the plain words "Acquire" and "Funds" inside synthetic strings or this review. Zero hits for real company names, domains, ids, numbers, names or scoop text.
+- Emails: `user@example.com`, `first.last@example.com`, `firstlast@example.com`, `firstlast@example.org`, and Alex's own address (already on main).
+- UUIDs: 0. SF-style ids: 0. 7+ digit runs outside placeholder patterns: 0. Phones: only the fake `+61 400 000 0xx` and `+64 9-000 01xx` families.
+- URLs: only `example.com` hosts.
+- All 18 fixture JSON files parse with `python -m json.tool`.
+
+## Required to reach FINAL PASS
+1. Rewrite the duration-share sentence in `docs/connector_notes.md` (line 87) so real rounded behaviour and fixture composition are separate, as suggested above.
