@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import re
 import sys
@@ -156,32 +157,35 @@ def _nooks_end(last: dict):
     return None
 
 
-def _zoominfo_complete(pages: list) -> bool:
-    """Every ``meta.page`` sequence in the pages (one per type fetched) must be complete: page numbers run
-    1..total without a gap, the last page of each sequence has number == total, and (when ``meta.totalResults`` is
-    given) the rows of the sequence add up to it. The FINAL page must end a sequence."""
-    expected, seq_rows, seq_total, seq_pages_total, ok = None, 0, None, None, True
+def _zoominfo_complete(pages: list, page_size: int = 100) -> bool:
+    """ZoomInfo ``search_scoops`` pages, one sequence per type fetched. REAL behaviour (first live dry run):
+    ``meta.page.total`` is the ROW COUNT of that page (100 on a full page), NOT a page count, and
+    ``meta.totalResults`` DRIFTS between pages, so neither is used. A sequence is complete when its page numbers
+    (``meta.page.number``) run 1, 2, 3 ... without a gap, every page but the last is FULL (``page_size`` rows), no id
+    repeats inside the sequence, and the last page is SHORT (fewer than ``page_size`` rows, an empty page included).
+    The FINAL page of the manifest must end a sequence. The same scoop may appear in two sequences (several types)."""
+    expected, ok, seen = None, True, set()
     for n, raw in enumerate(pages, 1):
         pg = _page_dict(raw)
         meta = pg.get("meta") if isinstance(pg.get("meta"), dict) else {}
         info = meta.get("page") if isinstance(meta.get("page"), dict) else {}
-        num, total = info.get("number"), info.get("total")
-        if not isinstance(num, int) or not isinstance(total, int):
-            raise MergeError(f"cannot derive reached_last_page: page {n} has no meta.page.number / total")
-        rows = len(extract_rows(pg))
-        if expected is not None and num != 1 and (total != seq_pages_total or meta.get("totalResults") != seq_total):
-            raise MergeError(f"page {n}: meta.page.total / meta.totalResults changed within one sequence")
+        num = info.get("number")
+        if not isinstance(num, int) or isinstance(num, bool):
+            raise MergeError(f"cannot derive reached_last_page: page {n} has no meta.page.number")
+        rows = extract_rows(pg)
+        ids = _row_ids(pg, ("id",))
         if num == 1:
-            if expected is not None:               # a new sequence began before the old one ended
+            if expected is not None:                    # a new type began before the previous one ended
                 ok = False
-            expected, seq_rows, seq_total, seq_pages_total = 1, 0, meta.get("totalResults"), total
+            expected, seen = 1, set()
         elif expected is None or num != expected:
-            ok = False
-        seq_rows += rows
+            ok = False                                  # gap, repeat, or a sequence that does not start at page 1
+        for v in ids:
+            if v in seen:
+                raise MergeError(f"zoominfo: id repeated inside one type's pages (page {n}): a page was given twice")
+            seen.add(v)
         expected = num + 1
-        if num >= total:                           # sequence ends here
-            if isinstance(seq_total, int) and seq_rows < seq_total:
-                ok = False
+        if len(rows) < page_size:                       # a short or empty page ends the sequence
             expected = None
     return ok and expected is None
 
@@ -251,20 +255,23 @@ def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expe
                     ``hasMore`` is used when a page has that instead.
       salesforce    FINAL page ``done`` is true AND it holds fewer than ``sf_limit`` rows (keyset pages: ``done`` is
                     true on every page, so a full page may have more behind it).
-      zoominfo      every page sequence is complete (see ``_zoominfo_complete``).
+      zoominfo      every page sequence is complete (see ``_zoominfo_complete``: gapless page numbers, full pages,
+                    the end is a SHORT or EMPTY page; totals are NOT used, they drift). --expect-pages is optional.
     Without the evidence this is a MergeError: it never returns True on a guess."""
     if kind not in PAGING_KINDS:
         raise MergeError(f"unknown paging kind {kind!r}")
     if not pages:
         raise MergeError("no pages: cannot derive reached_last_page")
-    if expect_pages is None:
+    if expect_pages is None and kind != "zoominfo":     # ZoomInfo's page count is unknown up front: optional there
         raise MergeError("--expect-pages N is MANDATORY with --derive-last-page: N is the number of page calls you "
                          "made (a missing middle page cannot be seen in the pages themselves)")
-    if len(pages) != expect_pages:
+    if expect_pages is not None and len(pages) != expect_pages:
         raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {expect_pages}: "
                          "a page is missing or extra")
     if kind == "zoominfo":
-        return _zoominfo_complete(pages)
+        if expect_pages is not None and len(pages) != expect_pages:
+            raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {expect_pages}")
+        return _zoominfo_complete(pages, page_size or 100)
     last = _page_dict(pages[-1])
     if kind == "salesforce":
         if not isinstance(last.get("done"), bool):
@@ -304,6 +311,12 @@ def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expe
     return end
 
 
+def ids_hash(ids) -> str:
+    """Short checksum of a list of row ids (sorted, newline-joined, sha256, 12 hex characters). The session computes
+    the same value from the ids it SAW so a transcription error in an inline result is detected."""
+    return hashlib.sha256("\n".join(sorted(str(i) for i in ids)).encode("utf-8")).hexdigest()[:12]
+
+
 def merge_pages(pages: list, *, id_field: str = "id", allow_no_id: bool = False,
                 rows_key: str | None = None) -> tuple[list, dict]:
     """pages: list of already-parsed page values (page order). Returns (rows, stats)."""
@@ -321,6 +334,7 @@ def merge_pages(pages: list, *, id_field: str = "id", allow_no_id: bool = False,
         for row in page_rows:
             stats["rows_in"] += 1
             rid = _row_id(row, id_field)
+            stats.setdefault("_ids", []).append(rid)
             if rid is None:
                 if not allow_no_id:
                     raise MergeError(f"page {n}: a row has no {id_field!r} (or Id/id); use --allow-no-id to keep such rows")
@@ -424,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="set reached_last_page from the pages (see --paging); same as --last-page-reached auto")
     ap.add_argument("--paging", choices=PAGING_KINDS, default="auto",
                     help="rule for --derive-last-page: nooks (links.next null), salesforce (done and a short page), "
-                         "zoominfo (meta.page sequences complete); auto = nooks")
+                         "zoominfo (gapless meta.page.number, ends on a short or empty page); auto = nooks")
     ap.add_argument("--sf-limit", type=int, default=2000, help="LIMIT used for Salesforce keyset pages")
     ap.add_argument("--expect-pages", type=int, default=None,
                     help="number of pages the session fetched (its own call count); a different manifest length "
@@ -437,6 +451,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--meta-json", type=Path, default=None,
                     help="JSON object whose keys are added to meta (e.g. window_days, searched_address_hashes, "
                          "hash_salt); it can never replace the keys this script computes")
+    ap.add_argument("--verify-rows", type=int, default=None,
+                    help="rows the session SAW (before de-duplication); a different count exits 2 and writes nothing. "
+                         "For results that came back INLINE and were saved by hand")
+    ap.add_argument("--verify-ids-hash", default=None,
+                    help="12-hex checksum of the row ids the session saw (see docs/fetch_runbook.md); a mismatch exits 2")
     ap.add_argument("--id-field", default="id")
     ap.add_argument("--rows-key", default=None)
     ap.add_argument("--allow-no-id", action="store_true")
@@ -458,6 +477,14 @@ def main(argv: list[str] | None = None) -> int:
         elif args.expect_pages is not None and args.expect_pages != len(pages):
             raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {args.expect_pages}")
         extra = read_meta_json(args.meta_json) if args.meta_json else {}
+        if args.verify_rows is not None and args.verify_rows != stats["rows_in"]:
+            raise MergeError(f"--verify-rows says {args.verify_rows} rows but the pages hold {stats['rows_in']}: "
+                             "the inline result was not saved completely")
+        if args.verify_ids_hash is not None:
+            got = ids_hash([i for i in stats.get("_ids", []) if i is not None])
+            if got != args.verify_ids_hash.strip().lower():
+                raise MergeError(f"--verify-ids-hash {args.verify_ids_hash} does not match the saved row ids ({got}): "
+                                 "a row id was changed, lost or mistyped when the inline result was written")
     except MergeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

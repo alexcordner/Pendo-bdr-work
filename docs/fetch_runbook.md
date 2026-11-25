@@ -66,7 +66,7 @@ WHERE Account.Assigned_SDR__c = '<SF_USER_ID>' AND Account.Current_Customer__c =
 ORDER BY Id LIMIT 2000
 ```
 
-Optionally add `AND (Account.BillingCountry IN ('Australia','New Zealand') OR Account.HQ_Country__c IN ('Australia','New Zealand'))` to shrink it. Contact has NO `DoNotCall` or `Do_Not_Call__c` field (INVALID_FIELD). `Sales_Opt_Out_Email__c` has an UNVERIFIED meaning: it is fetched and COUNTED only (it does not block anyone). Same loop, same stop rule (a page under 2000 rows). Probe: `MobilePhone` ~29%, `Phone` ~91%, either ~94%, `HasOptedOutOfEmail` ~24%. A partial contact list pushes accounts into `needs_prospect`: record `reached_last_page` honestly.
+Optionally add `AND (Account.BillingCountry IN ('Australia','New Zealand') OR Account.HQ_Country__c IN ('Australia','New Zealand'))` to shrink it. Contact has NO `DoNotCall` or `Do_Not_Call__c` field (INVALID_FIELD). `Sales_Opt_Out_Email__c` has an UNVERIFIED meaning: it is fetched and COUNTED only (it does not block anyone). Same loop, same stop rule (a page under 2000 rows). Probe (first page): `MobilePhone` ~29%, `Phone` ~91%, either ~94%; the REAL full run found `HasOptedOutOfEmail` true for 6.5% of contacts (1,674 of 25,810), not the probe's ~24%. A partial contact list pushes accounts into `needs_prospect`: record `reached_last_page` honestly.
 
 ## 4. Nooks call history → `nooks_calls.json`, `nooks_dispositions.json`
 
@@ -87,14 +87,14 @@ Known limits, also stated in every log header: (a) **Do Not Call is visible only
 
 ## 6. ZoomInfo scoops → `zoominfo_scoops.json`
 
-`search_scoops` is free (credits must stay 0). `userIntent` (10 to 500 chars) on every call. Verified: `pageSize` max 100 (~60 KB per page, spills); `meta.totalResults` is a free count (call with `pageSize=1` first and log it); `meta.page.total` is the page count; the employee filter works. Countries `Australia` and `New Zealand`, `employeeRangeMax=2000`. **Fetch ONLY the buyer types, ONE CALL SEQUENCE PER TYPE** so each count can be logged (90-day AU+NZ counts from the probe in brackets):
+`search_scoops` is free (credits must stay 0). `userIntent` (10 to 500 chars) on every call. Verified: `pageSize` max 100 (~60 KB per page, spills); `meta.totalResults` is an APPROXIMATE count (REAL run: it DRIFTS between pages, Executive Move read 458 / 435 / 437 / 383 while 400 rows came back, Partnership said 53 and returned 62; log it, never rely on it); **`meta.page.total` is the ROW COUNT of that page (100 on a full page), NOT a page count**; the page number is `meta.page.number`; the employee filter works. Countries `Australia` and `New Zealand`, `employeeRangeMax=2000`. **Fetch ONLY the buyer types, ONE CALL SEQUENCE PER TYPE** so each count can be logged (90-day AU+NZ counts from the probe in brackets):
 
 | Window | Types |
 |---|---|
 | last **90 days** (people moves) | `Executive Move` (~1k), `New Hire` (~220), `Management Move` (0: optional, expect nothing) |
 | last **45 days** | `Mergers & Acquisitions (M&A)` (~700), `Funding` (~270), `Partnership` (~250), `Product Launch` (~35) |
 
-**Skip `Open Position`** (~10k rows, noise) and `Hiring Plans` / `Project` / `Pain Point` in Phase 2. Funding attaches to the investee (company = the company that raised; investors only in the description; the investor-verb rule still applies). The date-filter parameter name is UNVERIFIED: read the schema. Page each type to its end (`meta.page.number == meta.page.total`), merge ALL types into one file with `merge_pages.py` (a scoop with several types, e.g. "Executive Move" plus "Left Company", is de-duplicated by scoop id), and put the per-type totals into `run_meta.scoop_counts_by_type`. `reached_last_page` for the merged file is `true` only if every type ended.
+**Skip `Open Position`** (~10k rows, noise) and `Hiring Plans` / `Project` / `Pain Point` in Phase 2. Funding attaches to the investee (company = the company that raised; investors only in the description; the investor-verb rule still applies). Page each type until a SHORT page (fewer than `pageSize` rows) or an EMPTY page after at least one page: that is the end of the type (the page count is unknown up front). Merge ALL types into one file with `merge_pages.py` (a scoop with several types, e.g. "Executive Move" plus "Left Company", is de-duplicated by scoop id), and put the per-type totals into `run_meta.scoop_counts_by_type`. Merge with `--derive-last-page --paging zoominfo --page-size 100` (`--expect-pages` is optional here, because the page count is unknown): it requires, per type, gapless `meta.page.number` 1, 2, 3 ..., full pages before the last one, no repeated id inside a type, and a short or empty last page; totals are NOT used. `reached_last_page` for the merged file is `true` only if every type ended.
 
 Join: scoop `company.id` equals `DOZISF__ZoomInfo_Id__c` (~98% filled). Only ~30% of scoop companies are in Alex's book; unmatched scoops are normal and the log reports `scoops matched to your book: X of Y`. **Do not call `search_companies`** and **never enrich or redeem**.
 
@@ -116,7 +116,7 @@ Needed to avoid emailing someone emailed in the last 7 days; not needed for the 
 | Nooks `listProspects` (lazy only) | `filter_crmId=<Contact id>` (single value) or `filter_id=<uuid,uuid,...>`; `page_size=100` |
 | Salesforce `soqlQuery` | the query text only (no other parameter) |
 | Salesforce `getUserInfo` | none |
-| ZoomInfo `search_scoops` | `userIntent` (10 to 500 chars), `country="Australia,New Zealand"`, scoop type names verbatim (`Executive Move`, `New Hire`, `Management Move`, `Mergers & Acquisitions (M&A)`, `Funding`, `Partnership`, `Product Launch`), `employeeRangeMax=2000`, `pageSize=100` (`pageSize=1` for a free count: read `meta.totalResults`), date window parameter per the schema (UNVERIFIED name) |
+| ZoomInfo `search_scoops` | `userIntent` (10 to 500 chars), `country="Australia,New Zealand"`, scoop type names verbatim (`Executive Move`, `New Hire`, `Management Move`, `Mergers & Acquisitions (M&A)`, `Funding`, `Partnership`, `Product Launch`), `employeeRangeMax=2000`, `pageSize=100`, page parameter `page` (1-based), date window `publishedStartDate=<YYYY-MM-DD>` (90 days back for people moves, 45 for the rest), types in **`scoopTypes` as an ARRAY** (one type per sequence), `pageSize=1` gives an approximate count in `meta.totalResults` |
 | Gmail `search_threads` | `query="in:sent to:<ADDR> newer_than:7d"`, `view=THREAD_VIEW_METADATA_ONLY` |
 
 ## 7c. Spill-safe handling (never read a page into context)
@@ -128,11 +128,25 @@ Never `Read`, `cat` or print a spilled file. Results over ~20 to 30k characters 
 python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d.get('data',[])), bool((d.get('links') or {}).get('next')))" "<spilled file>"
 # Nooks: the next cursor value, only when you need to pass it (this prints the cursor, not data)
 python3 -I -c "import json,sys; print((json.load(open(sys.argv[1])).get('links') or {}).get('next'))" "<spilled file>"
-# ZoomInfo (search_scoops): rows, page number / total, totalResults
+# ZoomInfo (search_scoops): rows on the page, meta.page ({number, total=ROW COUNT}), approximate totalResults
 python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('meta',{}); print(len(d.get('data',[])), m.get('page'), m.get('totalResults'))" "<spilled file>"
 ```
 
 (the Salesforce snippet is in section 2). A tool result that came back INLINE (small) is written to a scratch file with `Write` and added to the manifest the same way; do not paste rows into a command.
+
+## 7c2. Short results come back INLINE (they are not spilled)
+
+Real finding from the first live dry run: only results over ~20 to 30k characters are spilled. **Small results WILL come back inline into your context**: the last (short) page of every source, the dispositions, the tasks, and several ZoomInfo pages. A session that re-types such a result by hand can lose or change a row (one page lost a field). Rules:
+
+1. Save an inline result with the file-writing tool, copying the exact JSON of the tool result VERBATIM (every field, every row, never a summary, never re-formatted by memory). If you cannot copy it verbatim, refetch the page instead.
+2. Before merging, note two facts from what you SAW: the number of rows, and the ids of those rows. Compute the checksum from the ids as shown in the result (ids only, short to type):
+
+```bash
+python3 -I -c "import hashlib,sys; print(hashlib.sha256('\n'.join(sorted(sys.argv[1:])).encode()).hexdigest()[:12])" ID1 ID2 ID3 ...
+```
+
+3. Merge with `--verify-rows <rows seen> --verify-ids-hash <checksum>` (the count is of rows BEFORE de-duplication, ids are the `id` / `Id` values): a lost row, a changed or mistyped id exits 2 and writes nothing. Re-save the page and try again. (The checks cannot see a changed non-id field: copy verbatim.)
+4. Keep every hand-off minimal. A full core fetch was 63 connector calls in about 11.7 minutes, most of it model turns between pages with the cursor or last id hand-copied each time: copy only the one cursor / last id per page (the snippets above print exactly that), do not summarise or comment pages in between, and do not re-read earlier pages.
 
 ## 7d. Stop / retry rule per source
 
@@ -172,11 +186,11 @@ python scripts/merge_pages.py --manifest manifest_calls.json --name nooks_calls 
 ```
 
 - `--name` is the file stem from `docs/intake_schema.md` (`sf_accounts`, `sf_contacts`, `nooks_calls`, `nooks_dispositions`, `nooks_prospects`, `nooks_accounts`, `nooks_tasks`, `zoominfo_scoops`, `gmail_sent`).
-- Omit both `--derive-last-page` and `--last-page-reached` for non-paged sources (`nooks_dispositions`, `gmail_sent`, `nooks_prospects`). For paged ones use `--derive-last-page --paging nooks|salesforce|zoominfo` (the script reads the pages and decides; `zoominfo` requires every per-type page sequence to run 1..total with no gap and the rows to add up to `meta.totalResults`) or, as a last resort, `--last-page-reached true|false` exactly as you SAW it. The two options cannot be combined.
+- Omit both `--derive-last-page` and `--last-page-reached` for non-paged sources (`nooks_dispositions`, `gmail_sent`, `nooks_prospects`). For paged ones use `--derive-last-page --paging nooks|salesforce|zoominfo` (the script reads the pages and decides; `zoominfo` requires every per-type sequence to run page 1, 2, 3 ... with no gap, full pages before the last, and a SHORT or EMPTY last page; totals are not used) or, as a last resort, `--last-page-reached true|false` exactly as you SAW it. The two options cannot be combined.
 - `--id-field Id` is not needed: `Id` is accepted as a fallback. `--allow-no-id` keeps rows with no id (default: error).
 - With no evidence for the chosen `--paging` rule the script exits 2 and writes nothing (it never defaults to `true`).
-- **`--expect-pages N` is MANDATORY with `--derive-last-page` (the script refuses without it).** N is the number of page calls YOU made for that source; a page missing from the middle of the manifest cannot be seen in the pages themselves. How to get N: **Nooks** has no total-count field, so N is simply your own call count (the chain is then checked by cursor continuity below); **Salesforce**: run `SELECT COUNT() ...` first with the same WHERE (without `Id >`/`LIMIT`), then N = ceil(count / 2000), or at least your own call count; **ZoomInfo**: N = `meta.page.total` of the first page of each type, summed over the types (the `meta.page` object, there is no `totalPages`). Write N into the command, never infer it from the manifest.
-- What `--derive-last-page` checks by default (order-agnostic, so a server ordering quirk cannot stall every run): no id repeated anywhere in the manifest (a page given twice, overlapping pages); every non-final Nooks page has a next cursor, holds exactly `--page-size` rows (default 100) and its cursor (base64 `{"id": ...}` inside `links.next`, where decodable) names the page's LAST row id; every non-final Salesforce page holds exactly `--sf-limit` rows; each ZoomInfo sequence runs 1..total with constant `meta.page.total` and `meta.totalResults` and its rows add up. `--strict-order` additionally requires ids strictly ascending across the manifest: off by default because mixed-case Salesforce ids and the server's real ordering are unverified; use it only to investigate.
+- **`--expect-pages N` is MANDATORY with `--derive-last-page` (the script refuses without it).** N is the number of page calls YOU made for that source; a page missing from the middle of the manifest cannot be seen in the pages themselves. How to get N: **Nooks** has no total-count field, so N is simply your own call count (the chain is then checked by cursor continuity below); **Salesforce**: run `SELECT COUNT() ...` first with the same WHERE (without `Id >`/`LIMIT`), then N = ceil(count / 2000), or at least your own call count; **ZoomInfo**: not needed (`--expect-pages` is optional there: `meta.page.total` is a row count, not a page count, so the page count is unknown up front; you may still pass your own call count). Write N into the command, never infer it from the manifest.
+- What `--derive-last-page` checks by default (order-agnostic, so a server ordering quirk cannot stall every run): no id repeated anywhere in the manifest (a page given twice, overlapping pages); every non-final Nooks page has a next cursor, holds exactly `--page-size` rows (default 100) and its cursor (base64 `{"id": ...}` inside `links.next`, where decodable) names the page's LAST row id; every non-final Salesforce page holds exactly `--sf-limit` rows; each ZoomInfo sequence has gapless page numbers, full pages before the last, no repeated id and a short or empty last page. `--strict-order` additionally requires ids strictly ascending across the manifest: off by default because mixed-case Salesforce ids and the server's real ordering are unverified; use it only to investigate.
 - `--meta-json FILE` adds keys to `meta` (e.g. `window_days`, `searched_address_hashes`, `hash_salt` for Gmail); it never overrides the keys the script computes.
 - Understood page envelopes: a bare list; `{"data": [...]}` (Nooks, ZoomInfo); `{"records": [...]}` (Salesforce); `{"threads": [...]}` (Gmail); `{"results"}`, `{"items"}`, `{"rows"}`; any object with exactly one list value; and an MCP text wrapper (`[{"type":"text","text":"<json>"}]` or `{"content":[...]}`) holding one of those. Anything else is an error and nothing is written.
 - It de-duplicates by id (first wins), keeps order, and prints only counts. Read that line; it is the only output.

@@ -1267,3 +1267,13 @@ def test_recent_call_ids_refuses_unsafe_out(world, cfg, tmp_path, monkeypatch, c
     raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id)
     assert rci.main(["--raw-dir", str(raw), "--out", str(tmp_path / "loose.json"), "--now", NOW.isoformat()]) == 2
     assert not (tmp_path / "loose.json").exists()
+
+
+def test_runbook_carries_the_real_zoominfo_and_inline_findings():
+    text = (ROOT / "docs" / "fetch_runbook.md").read_text()
+    for needle in ("publishedStartDate", "scoopTypes", "ROW COUNT of that page", "DRIFTS", "SHORT page", "--verify-rows",
+                   "--verify-ids-hash", "VERBATIM", "63 connector calls", "6.5%", "WILL come back inline"):
+        assert needle in text, needle
+    assert "`meta.page.total` is the page count" not in text and "meta.totalPages" not in text
+    schema = (ROOT / "docs" / "intake_schema.md").read_text()
+    assert "6.5%" in schema and "ROW COUNT of the page" in schema
