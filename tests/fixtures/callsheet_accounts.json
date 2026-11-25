@@ -1,0 +1,120 @@
+[
+ {
+  "n": 1,
+  "name": "Alpha Digital Pty Ltd",
+  "tz": "Australia/Sydney",
+  "state": "New South Wales",
+  "city": "Sydney",
+  "emp": 400,
+  "title": "Head of Product",
+  "first": "Pat1",
+  "sdr": true,
+  "scoop": {
+   "days": 3,
+   "kind": "exec_move"
+  },
+  "flags": []
+ },
+ {
+  "n": 2,
+  "name": "Bravo Software Pty Ltd",
+  "tz": "Australia/Perth",
+  "state": "Western Australia",
+  "city": "Perth",
+  "emp": 120,
+  "title": "Head of Product",
+  "first": "Pat2",
+  "sdr": false,
+  "scoop": {
+   "days": 10,
+   "kind": "funding"
+  },
+  "flags": []
+ },
+ {
+  "n": 3,
+  "name": "Charlie Retail Ltd",
+  "tz": "Pacific/Auckland",
+  "state": null,
+  "city": "Auckland",
+  "emp": 260,
+  "title": "Head of Product",
+  "first": "Pat3",
+  "sdr": false,
+  "scoop": null,
+  "flags": []
+ },
+ {
+  "n": 4,
+  "name": "Delta Health Pty Ltd",
+  "tz": "Australia/Brisbane",
+  "state": "Queensland",
+  "city": "Brisbane",
+  "emp": 75,
+  "title": "Head of Product",
+  "first": "Pat4",
+  "sdr": false,
+  "scoop": null,
+  "flags": []
+ },
+ {
+  "n": 5,
+  "name": "Echo Logistics Pty Ltd",
+  "tz": "Australia/Sydney",
+  "state": "New South Wales",
+  "city": null,
+  "emp": null,
+  "title": "Head of Product",
+  "first": "Pat5",
+  "sdr": false,
+  "scoop": null,
+  "flags": []
+ },
+ {
+  "n": 6,
+  "name": "Foxtrot Bank Pty Ltd",
+  "tz": "Australia/Sydney",
+  "state": "New South Wales",
+  "city": "Sydney",
+  "emp": 900,
+  "title": "Head of Product",
+  "first": "Pat6",
+  "sdr": false,
+  "scoop": {
+   "days": 5,
+   "kind": "product_launch"
+  },
+  "flags": []
+ },
+ {
+  "n": 7,
+  "name": "Golf Media Pty Ltd",
+  "tz": "Australia/Melbourne",
+  "state": "Victoria",
+  "city": "Melbourne",
+  "emp": 30,
+  "title": "Head of Product",
+  "first": "Pat7",
+  "sdr": false,
+  "scoop": null,
+  "flags": [
+   "possible_duplicate"
+  ]
+ },
+ {
+  "n": 8,
+  "name": "Hotel Travel Pty Ltd",
+  "tz": "Australia/Sydney",
+  "state": "New South Wales",
+  "city": null,
+  "emp": 600,
+  "title": "Head of Product",
+  "first": "Pat8",
+  "sdr": false,
+  "scoop": {
+   "days": 40,
+   "kind": "partnership"
+  },
+  "flags": []
+ }
+]
