@@ -1,0 +1,38 @@
+{
+  "_note": "SYNTHETIC search_intent live shape (JSON:API-style). Replaces the guessed flat rows in signals_intent.json. Fake values only.",
+  "data": [
+    {
+      "attributes": {
+        "audienceStrength": "B",
+        "category": "User Experience",
+        "company": {
+          "hasOtherTopicConsumption": true,
+          "id": "900000001",
+          "name": "Example Pty Ltd",
+          "website": "www.example.com.au"
+        },
+        "signalDate": "2026-11-21T00:00:00Z",
+        "signalScore": 78,
+        "spikesInDateRange": 1,
+        "topic": "Digital Experience"
+      },
+      "id": "FAKE-TOPIC-ID#900000001#20261121",
+      "type": "Intent"
+    }
+  ],
+  "meta": {
+    "page": {
+      "number": 1,
+      "total": 5
+    },
+    "totalResults": 2600,
+    "topicsRequested": [
+      "Digital Experience"
+    ],
+    "fieldResolution": {
+      "country": {
+        "summary": "The \"country\" filter was applied using: \"Australia\", \"New Zealand\"."
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "_note": "SYNTHETIC search_scoops live shape incl. meta.totalResults (usable as a free count with pageSize=1), multi-type scoops and contacts without title. Fake values.",
+  "data": [
+    {
+      "attributes": {
+        "company": {
+          "id": "900000002",
+          "name": "Example Funding Co"
+        },
+        "description": "Example Funding Co has secured $5 million in additional funding. Investors included Fake Capital.",
+        "id": "90000001",
+        "link": "https://example.com/news/1",
+        "linkText": "See details",
+        "originalPublishedDate": "2026-11-24T08:00:00Z",
+        "publishedDate": "2026-11-24T08:00:00Z",
+        "topics": [
+          {
+            "id": "117",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "2",
+            "type": "Funding"
+          }
+        ]
+      },
+      "id": "90000001",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "900000003",
+          "name": "Example Media Ltd"
+        },
+        "contacts": [
+          {
+            "firstName": "Pat",
+            "id": 9000000001,
+            "lastName": "Example"
+          }
+        ],
+        "description": "Example Media Ltd Pat Example, Chief People Officer, will be leaving the organization, effective 2026-11-27.",
+        "id": "90000002",
+        "link": "https://example.com/news/2",
+        "linkText": "See details",
+        "originalPublishedDate": "2026-11-24T00:00:00Z",
+        "publishedDate": "2026-11-24T00:00:00Z",
+        "topics": [
+          {
+            "id": "14",
+            "topic": "Executive Moves"
+          },
+          {
+            "id": "100",
+            "topic": "Left Company"
+          }
+        ],
+        "types": [
+          {
+            "id": "16",
+            "type": "Left Company"
+          },
+          {
+            "id": "19",
+            "type": "Executive Move"
+          }
+        ]
+      },
+      "id": "90000002",
+      "type": "Scoop"
+    }
+  ],
+  "meta": {
+    "page": {
+      "number": 1,
+      "total": 1
+    },
+    "totalResults": 2,
+    "fieldResolution": {
+      "country": {
+        "summary": "The \"country\" filter was applied using: \"Australia\", \"New Zealand\"."
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "_note": "SYNTHETIC soqlQuery keyset page (ORDER BY Id LIMIT 2000): totalSize equals page size, done true, no nextRecordsUrl. Next page = same query with Id > <last Id>. Fake values.",
+  "totalSize": 2,
+  "done": true,
+  "records": [
+    {
+      "attributes": {
+        "type": "Account",
+        "url": "/services/data/v68.0/sobjects/Account/FAKE1"
+      },
+      "Id": "FAKE-ACC-1",
+      "Name": "Example Pty Ltd",
+      "Website": "example.com.au",
+      "BillingCountry": null,
+      "BillingState": null,
+      "HQ_Country__c": "AUSTRALIA",
+      "DOZISF__ZoomInfo_Id__c": "900000001",
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "ZoomInfo_Employee_Count__c": 120
+    },
+    {
+      "attributes": {
+        "type": "Account",
+        "url": "/services/data/v68.0/sobjects/Account/FAKE2"
+      },
+      "Id": "FAKE-ACC-2",
+      "Name": "Example Ltd",
+      "Website": null,
+      "BillingCountry": "New Zealand",
+      "BillingState": "Auckland",
+      "HQ_Country__c": "New Zealand",
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Current_Customer__c": false,
+      "SDR_Target__c": true,
+      "ZoomInfo_Employee_Count__c": null
+    }
+  ]
+}
