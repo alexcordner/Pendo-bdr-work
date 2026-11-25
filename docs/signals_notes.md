@@ -22,7 +22,10 @@ Module: `src/signals.py`. Offline, deterministic, no LLM. Tests: `tests/test_sig
 | funding, product_launch, ma, project_pain | 45 |
 | partnership, hiring_plan, intent | 30 |
 
-`KIND_MAX_AGE_DAYS`. A kept scoop is exactly at the limit on its last day and dropped one day later ('Dropped: expired, 46 days old (limit 45 for funding)'). `config.signals.max_age_days` is now only the default for a kind missing from the table; every kind is listed, so it caps nothing today (flag for the coordinator: the config key could be removed or turned into the by-kind table).
+`KIND_MAX_AGE_DAYS`. A kept scoop is exactly at the limit on its last day and dropped one day later ('Dropped: expired, 46 days old (limit 45 for funding)'). 
+**Two different age settings, do not mix them up:**
+- `KIND_MAX_AGE_DAYS` (this module) decides when a scoop is DROPPED by `filter_scoops` ('Dropped: expired...'). `config.signals.max_age_days` is used here only for a kind missing from that table (none today).
+- `config.signals.max_age_days` (45) is also the RANKER's recency horizon: `ranker.py` gives recency points `1 - age / max_age_days`, floored at 0. So an exec move 60 days old is still a kept signal (limit 90) but earns zero recency points. That is a separate use of the same config key, not something signals.py controls. Earlier versions of this note said the config value 'caps nothing'; that was wrong for the ranker. Option for later (coordinator): have the ranker use `signals.max_age_for(kind, config)` of the best signal, or rename the key to `recency_horizon_days`.
 **Phase 2b: the scoop pull window must be 90 days for people-move scoops** (Executive Move, New Hire, Management Move), otherwise the 90-day limit is never used. That is the caller's job; this module only filters what it is given.
 Minimum strength floor `MIN_STRENGTH_FLOOR = 0.10`: a signal weaker than that is dropped with the reason 'faded below floor (0.09 < 0.10, N days old)'. With the default tables every kind is still at or above 0.10 on its last allowed day (exec_move 0.225, new_hire 0.1625, funding 0.1585, partnership 0.1672, hiring 0.2043), so the floor only bites on ambiguous roles, low intent scores or when the tables are tuned.
 
@@ -90,3 +93,19 @@ Both sides are compared as stripped strings, so int ids and padded strings match
 
 ## Verdict reasons
 Every `ScoopVerdict.reason` is a call-sheet sentence: 'Kept: Executive Move, role 'VP of Product', 5 days ago', 'Kept: Product Launch, today (future-dated, treated as today)', 'Dropped: generic hiring note (matches drop keyword 'medical & health', no buyer-role context)', 'Dropped: expired, 46 days old (limit 45 for product_launch)', 'Dropped: faded below floor (...)'. `verdict_summary(v)` returns it as one whitespace-collapsed line. `ScoopVerdict.ambiguous` carries the role-ambiguity flag (Signal has no field for it, so the flag lives on the verdict and in the strength).
+
+## Round 4 fixes (branch phase1/1e-fixes)
+- **Shared ZoomInfo ids:** `scoops_to_signals` takes `Mapping[str, Account | list[Account]]`. Every account in a list gets its own copy of the signal (same kind, strength, source, date, evidence; only `sf_account_id` differs). `trigger_radar` and `intent_to_signals` do the same (earlier: first account only). An empty list counts as unmatched.
+- **Ambiguity travels with the signal:** a kept ambiguous role gets the suffix ` (role ambiguous: check it is a digital product role)` on `Signal.evidence`; `signals.is_ambiguous(signal)` tests for it. The suffix always fits inside `EVIDENCE_MAX_CHARS` (the description is shortened). The shared `Signal` model has no flag field, so this is the minimal carrier; a real field would be cleaner.
+- **Investor notes (general):** investor wording now covers invest(ed/ment), participated in, led/co-led a round / investment / Series / seed, took/taken/acquired a stake in, backed/backing. If the company comes before the verb in the same clause (no 'raised/secured/received' between) it is the investor: dropped. If it comes after ('Fund Y led a round in <company>') it is the investee: kept. Otherwise kept only if money received is mentioned (raised, secured, received, closed, funding, Series X, seed). 'Backed by' alone is not a funding event; 'raised $5M, backed by Fund Z' is. 'Round' and 'backed by' no longer count as money received.
+- **Role context:** a role preceded within 2 filler words by former / formerly / previously / ex-, or right after replaces / replacing / succeeds (optionally 'the former'), is not the new leader; 'She succeeds Jane as Chief Digital Officer' still counts. Any description that mentions board, chair or non-executive rejects every role in it ('The Board welcomed a new Chief Digital Officer' is dropped: a known false negative).
+- **CIO:** the acronym is rejected when its sentence mentions investment, portfolio, funds / assets under management, assets, superannuation or AUM (Chief Investment Officer). The spelled-out 'Chief Information Officer' is unaffected.
+- **Hiring path:** the non-buyer word list applies to hiring-role phrases, and bare `product` is a weak keyword ('Product Compliance Officer', 'Product Safety Auditor' drop; 'Product Manager / Owner / Designer / Lead / Team' still count).
+- **Chief X and Y Officer:** parsed generally; counts when X or Y is a buyer domain word or 'information' ('Chief Customer and Digital Officer', 'Chief Product and Growth Officer'); 'Chief Risk and Compliance Officer' does not. Hyphenated free words are allowed ('Head of E-commerce Product').
+
+### Held-out round 3 (`signals_heldout3.json`, reviewer's 170 rows, judge rows excluded, T169/T170 relabelled drop as the reviewer agreed)
+| | Precision | Recall |
+|---|---|---|
+| Before this round | 86.8% (59 TP, 9 FP) | 96.7% (2 FN) |
+| After | 100% | 100% |
+Caution: like round 2, round 3 now drove the fixes, so it is a regression guard, not a fresh estimate. The fixes are general rules (verbs, former/board/CIO context, negative list in hiring), but fresh vocabulary will still cost precision. Not tuned: the reviewer's judge rows (industry context such as store or depot operations, mine automation, REIT deals, sponsorships), which regex cannot settle; the ambiguity flag and the visible 'Kept:' reason are the answer there.

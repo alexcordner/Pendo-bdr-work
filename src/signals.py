@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from typing import NamedTuple
+from typing import Mapping, NamedTuple, Sequence
 
 from src.config import Config
 from src.models import Account, Scoop, Signal, SignalKind
@@ -54,7 +54,8 @@ COMBINE_DAMPING = 0.5
 
 #: Longest a scoop of each kind stays useful (days). People moves are a long buying window, so 90; partnerships,
 #: hiring notes and intent fade faster. ``config.signals.max_age_days`` is only the default for a kind missing here
-#: (today every kind is listed, so the config value caps nothing). The caller must PULL scoops far enough back:
+#: (today every kind is listed, so it never drops a scoop here). NOTE: the ranker ALSO reads
+#: config.signals.max_age_days as its recency horizon (recency points = 1 - age / max_age_days); that is a separate use. The caller must PULL scoops far enough back:
 #: a 90-day window for people-move scoops (Phase 2b), otherwise the 90-day limit never gets used.
 KIND_MAX_AGE_DAYS: dict[SignalKind, int] = {
     SignalKind.EXEC_MOVE: 90, SignalKind.NEW_HIRE: 90,
@@ -134,15 +135,29 @@ _DOMAIN = (r"product|digital|customer\s+experience|cx|customer\s+success|custome
 _SEP = r"[\s,/&:-]+"
 _TITLE_THEN_DOMAIN = re.compile(
     rf"(?<!\w)(?:{_TITLE})(?!\w){_SEP}(?:(?:of|and)\s+)?(?:(?:global|regional|senior|group|apac|anz|asia\s+pacific)\s+)?"
-    rf"(?:(?!(?:for|of|and|to|the|its|a|an|in|at|with|on)\b)\w+[\s-]+)?(?:{_DOMAIN})(?!\w)", _FLAGS)
+    rf"(?:(?!(?:for|of|and|to|the|its|a|an|in|at|with|on)\b)\w+(?:-\w+)*[\s-]+)?(?:{_DOMAIN})(?!\w)", _FLAGS)
 _DOMAIN_THEN_TITLE = re.compile(
     rf"(?<!\w)(?:{_DOMAIN})(?!\w){_SEP}(?:\w+{_SEP}){{0,1}}(?:{_TITLE})(?!\w)", _FLAGS)
 # Acronyms and phrases that name a role on their own. 'IT' is matched case-sensitively so the pronoun 'it' never counts.
 _ROLE_ACRONYMS = re.compile(
     r"(?<!\w)(?:CTO|CPO|CDO|CIO|CXO)(?!\w)"
     r"|(?i:chief\s+(?:technology|information|product|digital|experience|customer)\s+officer)"
-    r"|(?i:chief\s+(?:information|technology|digital|product)\s+and\s+\w+\s+officer)")
+    )
+# "Chief X and Y Officer" in general: counts when X or Y is a buyer domain word ("Chief Customer and Digital Officer",
+# "Chief Information and Technology Officer"); "Chief Risk and Compliance Officer" does not.
+_CHIEF_AND = re.compile(r"(?<!\w)chief\s+((?:[\w-]+\s+){1,2}?and\s+(?:[\w-]+\s+){1,2}?)officer(?!\w)", _FLAGS)
+_CHIEF_AND_DOMAIN = re.compile(rf"(?<!\w)(?:{_DOMAIN}|information)(?!\w)", _FLAGS)
 _IT_ROLE = re.compile(r"(?<!\w)(?:(?i:head|director|manager|lead|chief|vp|svp)[\s,]+(?:(?i:of)\s+)?IT(?!\w)|IT\s+(?i:director|manager|head|lead)(?!\w))")
+# CIO also abbreviates Chief Investment Officer: not a buyer when the sentence is about investments or assets.
+_CIO_INVESTMENT = re.compile(
+    r"(?<!\w)(?:invest\w*|portfolios?|funds?\s+under\s+management|assets?(?:\s+under\s+management)?|superannuation|aum)(?!\w)", _FLAGS)
+# A role named as someone else's past or predecessor post ("a former CIO", "replaces the former Head of Digital",
+# "previously Chief Product Officer at a retailer") is not the new leader.
+_FORMER_BEFORE = re.compile(
+    r"(?:(?:former|formerly|previously|ex-?)[\s-]+(?:(?:the|a|an|as|was|at|of|its|interim|acting)\s+){0,2}"
+    r"|(?:replaces|replacing|replaced|succeeds|succeeding)\s+(?:the\s+)?(?:(?:former|outgoing|departing)\s+)?)$", _FLAGS)
+# Board roles are not buyers, and a buyer title in a board note is background ("appointed to its Board; previously CPO").
+_BOARD = re.compile(r"(?<!\w)(?:board|chair\w*|non-?\s?executive|non-?\s?exec)(?!\w)", _FLAGS)
 # Someone else's role: "Executive Assistant to the CTO", "PA to the Head of Product".
 _ASSISTANT_BEFORE = re.compile(
     r"(?:assistant|\bPA|\bEA|secretary|chief\s+of\s+staff)\s+(?:to|for)\s+(?:the\s+|its\s+|our\s+|a\s+)?$", _FLAGS)
@@ -206,10 +221,19 @@ def role_match(description: str) -> RoleMatch:
     ``ambiguous`` is True for a kept 'product' role when the rest of the description sounds like retail / food /
     manufacturing (_INDUSTRY_CONTEXT): keep it, but the caller should say so and weaken the signal."""
     text = description
-    for rx in (_ROLE_ACRONYMS, _IT_ROLE, _TITLE_THEN_DOMAIN, _DOMAIN_THEN_TITLE):
+    if _BOARD.search(text):
+        return RoleMatch(None)
+    for rx in (_ROLE_ACRONYMS, _CHIEF_AND, _IT_ROLE, _TITLE_THEN_DOMAIN, _DOMAIN_THEN_TITLE):
         for m in rx.finditer(text):
-            if _ASSISTANT_BEFORE.search(text[max(0, m.start() - 30):m.start()]):
+            before = re.split(r"[.;]", text[max(0, m.start() - 40):m.start()])[-1]
+            if _ASSISTANT_BEFORE.search(text[max(0, m.start() - 30):m.start()]) or _FORMER_BEFORE.search(before):
                 continue
+            if rx is _CHIEF_AND and not _CHIEF_AND_DOMAIN.search(m.group(1)):
+                continue
+            if m.group(0) == "CIO" or m.group(0).upper() == "CIO":
+                sentence = next((x for x in re.split(r"(?<=[.;])\s+", text) if m.group(0) in x), text)
+                if _CIO_INVESTMENT.search(sentence):
+                    continue
             if _NEGATIVE.search(m.group(0) + " " + " ".join(_tail_words(text, m.end(), 3))):
                 continue
             is_product = bool(re.search(r"(?<!\w)product", m.group(0), _FLAGS))
@@ -236,33 +260,65 @@ _HIRING_CONTEXT = re.compile(
     r"customer\s+(?:success|experience)|mobile\s+(?:app\s+)?(?:developers?|engineers?)|"
     r"digital\s+(?:product|experience|transformation|workplace)|software\s+(?:engineers?|developers?)|"
     r"engineering\s+(?:managers?|leads?|team)|cto)(?!\w)", _FLAGS)
-#: Weak keywords from config keywords_keep: never enough on their own for a hiring note.
-WEAK_KEEP_KEYWORDS = frozenset({"support", "app", "platform", "engineering", "mobile", "launch", "transformation"})
+#: Weak keywords from config keywords_keep: never enough on their own for a hiring note. A bare 'product' is weak too
+#: ("Product Compliance Officer", "Product Safety Auditor"); 'product manager / owner / team...' is in _HIRING_CONTEXT.
+WEAK_KEEP_KEYWORDS = frozenset({"support", "app", "platform", "engineering", "mobile", "launch", "transformation", "product"})
 
 
 def hiring_context(description: str) -> str | None:
     """Buyer-role context in a hiring note: a relevant role, or a strong role phrase. None if absent."""
-    m = _HIRING_CONTEXT.search(description)
-    return " ".join(m.group(0).split()) if m else relevant_role(description)
+    for m in _HIRING_CONTEXT.finditer(description):
+        # same non-buyer word list as people moves: "Product Manager, Legal Operations" is not a buyer role
+        if not _NEGATIVE.search(m.group(0) + " " + " ".join(_tail_words(description, m.end(), 3))):
+            return " ".join(m.group(0).split())
+    return relevant_role(description)
 
 
-_INVEST_VERB = re.compile(r"(?<!\w)invest(?:ed|s|ing|ment)(?!\w)", _FLAGS)
-_FUNDING_RECEIVED = re.compile(r"(?<!\w)(?:raised|secured|received|closed|funding|series\s+[a-z]|seed|backed\s+by|round)(?!\w)", _FLAGS)
+# Investor-side wording. A Funding scoop that says the company PUT money in (or backs someone) is about the
+# investor, not a company that received funding.
+_INVESTOR_VERB = re.compile(
+    r"(?<!\w)(?:invest(?:ed|s|ing|ment)"
+    r"|participat(?:ed|es|ing)\s+in"
+    r"|(?:co-)?(?:led|leads|leading)\s+(?:an?|the)\b[^.;]{0,40}?(?:round|investment|raise|funding|series\s+[a-z]|seed)"
+    r"|(?:taken|took|takes|taking|acquired|acquires|buys|bought)\s+an?\s+(?:\w+\s+)?stake\s+in"
+    r"|(?:back|backed|backs|backing)(?!\s+by))(?!\w)", _FLAGS)
+_BACKED_BY = re.compile(r"(?<!\w)backed\s+by(?!\w)", _FLAGS)
+# Words that say the company itself received money. 'round' and 'backed by' are deliberately NOT here: investors
+# also 'participate in a round'.
+_FUNDING_RECEIVED = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes|funding|series\s+[a-z]|seed)(?!\w)", _FLAGS)
+_RECEIVED_VERB = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes)(?!\w)", _FLAGS)
+
+
+def _funding_drop_reason(scoop: Scoop) -> str | None:
+    """Why a Funding scoop is not about a company that received money, or None when it is.
+    1. No investor wording: a normal funding note (kept).
+    2. The company is the grammatical subject of the investor verb (name, then the verb, in one clause, with no
+       'raised/secured/received' in between): the company is the investor (dropped).
+    3. The company comes AFTER the verb ('Fund Y led a round in <company>'): it is the investee (kept).
+    4. Otherwise: kept only if something says money was received.
+    'Backed by' with no money received is not a funding event (dropped)."""
+    text = scoop.description or ""
+    name = re.sub(r"[^\w&' -]", "", scoop.company_name).strip().split(" ")[0] if scoop.company_name.strip() else ""
+    m = _INVESTOR_VERB.search(text)
+    if not m:
+        if _BACKED_BY.search(text) and not _FUNDING_RECEIVED.search(text):
+            return "not a funding event: only says the company is backed by an investor, no funds received"
+        return None
+    if name:
+        for nm in re.finditer(rf"(?<!\w){re.escape(name)}(?!\w)", text[:m.start()], _FLAGS):
+            between = text[nm.end():m.start()]
+            if len(between) <= 60 and not re.search(r"[;:\n]|\.\s", between) and not _RECEIVED_VERB.search(between):
+                return "investor note: the company is the one investing, not a company that received funding"
+        if re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text[m.end():m.end() + 80], _FLAGS):
+            return None
+    if _FUNDING_RECEIVED.search(text):
+        return None
+    return "investor note: about the investor, not a company that received funding"
 
 
 def _is_investor_note(scoop: Scoop) -> bool:
-    """True when a Funding scoop is about the INVESTOR, not the funded company ('X invested in Y').
-    Rule: the investment verb is present and either the scoop company is its grammatical subject
-    (company name, then the verb, in the same clause) or nothing says the company received money."""
-    text = scoop.description
-    if not _INVEST_VERB.search(text):
-        return False
-    name = re.sub(r"[^\w&' -]", "", scoop.company_name).strip().split(" ")[0] if scoop.company_name.strip() else ""
-    if name and re.search(rf"(?<!\w){re.escape(name)}(?!\w)(?:(?!\.\s)[^;:\n]){{0,60}}?(?<!\w)invest(?:ed|s|ing)(?!\w)", text, _FLAGS):
-        return True
-    if name and re.search(rf"invest(?:ed|s|ing|ment)(?:\s+(?:\$[\d.,]+\s*\w*|an?\s+\w+))?\s+in\s+(?:the\s+)?{re.escape(name)}(?!\w)", text, _FLAGS):
-        return False       # the company is the investee: it received the money
-    return not _FUNDING_RECEIVED.search(text)
+    """True when a Funding scoop is dropped by _funding_drop_reason (kept for older callers and tests)."""
+    return _funding_drop_reason(scoop) is not None
 
 
 # ---------------------------------------------------------------- date helpers
@@ -380,8 +436,9 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
         return False, "hiring note with no relevant topic, buyer role or strong keyword" + extra, False
 
     if kind is SignalKind.FUNDING:
-        if _is_investor_note(scoop):
-            return False, "investor note: about the investor, not a company that received funding", False
+        why = _funding_drop_reason(scoop)
+        if why:
+            return False, why, False
     return True, "", False
 
 
@@ -450,11 +507,23 @@ def _key(value) -> str:
     return "" if value is None else str(value).strip()
 
 
-def _trim_evidence(text: str) -> str:
+def _trim_evidence(text: str, reserve: int = 0) -> str:
+    """Whitespace-collapsed text of at most EVIDENCE_MAX_CHARS - reserve characters (ellipsis when cut)."""
     text = " ".join((text or "").split())
-    if len(text) <= EVIDENCE_MAX_CHARS:
+    limit = EVIDENCE_MAX_CHARS - reserve
+    if len(text) <= limit:
         return text
-    return text[: EVIDENCE_MAX_CHARS - 1].rstrip() + "…"
+    return text[: limit - 1].rstrip() + "…"
+
+
+#: Appended to Signal.evidence of a kept people move whose 'product' role may be physical goods. The shared Signal
+#: model has no flag field, so the warning travels with the text the opener would quote. Use is_ambiguous(signal).
+AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
+
+
+def is_ambiguous(signal: Signal) -> bool:
+    """True when the signal's role was flagged ambiguous (see AMBIGUOUS_SUFFIX)."""
+    return signal.evidence.endswith(AMBIGUOUS_SUFFIX)
 
 
 def _signal_sort_key(sig: Signal):
@@ -462,7 +531,8 @@ def _signal_sort_key(sig: Signal):
     return (-sig.strength, -ts, sig.kind.value, sig.source)
 
 
-def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dict[str, Account],
+def scoops_to_signals(verdicts: list[ScoopVerdict],
+                      accounts_by_zoominfo_id: Mapping[str, Account | Sequence[Account]],
                       config: Config, today: date | datetime) -> SignalBatch:
     """Turn KEPT verdicts into Signals joined to accounts by ``Scoop.company_id == Account.zoominfo_id``.
 
@@ -470,30 +540,39 @@ def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dic
     module constants KIND_BASE_WEIGHT, RECENCY_HALF_LIFE_DAYS and KIND_HALF_LIFE_DAYS. A repeated scoop id is used once.
     Join keys are compared as stripped strings, so ' 123 ' and 123 both match '123'.
     Several scoops on one account all become signals; use ``best_signal`` / ``combined_strength``.
+    A mapping value may be one Account or a list of Accounts that share the ZoomInfo id (accounts.group_by_zoominfo_id):
+    every account in the list gets its own copy of the signal (same kind, strength, source, date and evidence; only
+    ``sf_account_id`` differs). An empty list counts as no match. A kept role flagged ambiguous gets AMBIGUOUS_SUFFIX
+    on its evidence (``is_ambiguous(signal)``).
     """
     signals: list[Signal] = []
     unmatched: list[Scoop] = []
     seen: set[str] = set()
-    accounts_by_zoominfo_id = {_key(k): a for k, a in accounts_by_zoominfo_id.items() if _key(k)}
+    lookup: dict[str, list[Account]] = {}
+    for k, v in accounts_by_zoominfo_id.items():
+        if _key(k):
+            lookup[_key(k)] = [v] if isinstance(v, Account) else list(v)
     for v in verdicts:
         if not v.keep or v.scoop.id in seen:
             continue
         seen.add(v.scoop.id)
         s = v.scoop
-        acct = accounts_by_zoominfo_id.get(_key(s.company_id))
-        if acct is None:
+        accts = lookup.get(_key(s.company_id)) or []
+        if not accts:
             unmatched.append(s)
             continue
-        signals.append(Signal(
-            sf_account_id=acct.sf_account_id,
-            kind=v.kind,
-            strength=_strength(v.kind, age_days(s.published_date, today), v.ambiguous),
-            source=f"{SOURCE_PREFIX}:{s.id}",
-            source_date=s.published_date,
-            evidence=_trim_evidence(s.description),
-            zoominfo_id=_key(s.company_id),
-        ))
-    signals.sort(key=_signal_sort_key)
+        for acct in accts:
+            signals.append(Signal(
+                sf_account_id=acct.sf_account_id,
+                kind=v.kind,
+                strength=_strength(v.kind, age_days(s.published_date, today), v.ambiguous),
+                source=f"{SOURCE_PREFIX}:{s.id}",
+                source_date=s.published_date,
+                evidence=(_trim_evidence(s.description, len(AMBIGUOUS_SUFFIX)) + AMBIGUOUS_SUFFIX) if v.ambiguous
+                else _trim_evidence(s.description),
+                zoominfo_id=_key(s.company_id),
+            ))
+    signals.sort(key=lambda x: (*_signal_sort_key(x), x.sf_account_id or ""))
     unmatched.sort(key=lambda sc: (sc.company_id, sc.id))
     return SignalBatch(signals, unmatched)
 
@@ -562,25 +641,27 @@ def trigger_radar(scoops: list[Scoop], accounts: list[Account], config: Config, 
     Sort: combined strength desc, then newest best-signal date, then account name (case-insensitive),
     then sf_account_id / zoominfo_id so the order never depends on input order.
     ``top_n=None`` returns everything; ``top_n=0`` returns nothing. Accounts without a trigger are not listed
-    (use ``no_trigger_signal`` when you need an explicit "none"). If two accounts share a zoominfo_id the first wins.
+    (use ``no_trigger_signal`` when you need an explicit "none"). Accounts that share a zoominfo_id all get an entry
+    (the same scoops attach to each).
     """
     if top_n is not None and top_n < 0:
         raise ValueError(f"top_n must be >= 0 or None, got {top_n}")
-    by_zi: dict[str, Account] = {}
+    by_zi: dict[str, list[Account]] = {}
     for a in accounts:
-        if _key(a.zoominfo_id) and _key(a.zoominfo_id) not in by_zi:
-            by_zi[_key(a.zoominfo_id)] = a
+        if _key(a.zoominfo_id):
+            by_zi.setdefault(_key(a.zoominfo_id), []).append(a)
     batch = scoops_to_signals(filter_scoops(scoops, config, today), by_zi, config, today)
 
-    grouped: dict[str, list[Signal]] = {}
+    grouped: dict[tuple[str, str], list[Signal]] = {}
     for sig in batch.signals:
-        grouped.setdefault(sig.zoominfo_id or "", []).append(sig)
+        grouped.setdefault((sig.zoominfo_id or "", sig.sf_account_id or ""), []).append(sig)
 
     entries: list[RadarEntry] = []
-    for zi, sigs in grouped.items():
+    for (zi, sf), sigs in grouped.items():
         sigs.sort(key=_signal_sort_key)
         best = best_signal(sigs)
-        entries.append(RadarEntry(by_zi[zi], best, combined_strength(sigs), _why(best, len(sigs), today), tuple(sigs)))
+        acct = next(a for a in by_zi[zi] if (a.sf_account_id or "") == sf)
+        entries.append(RadarEntry(acct, best, combined_strength(sigs), _why(best, len(sigs), today), tuple(sigs)))
 
     def key(e: RadarEntry):
         ts = e.signal.source_date.timestamp() if e.signal.source_date else float("-inf")
@@ -632,10 +713,10 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
     ``skipped`` as (row, reason) when a list is passed, so nothing disappears silently.
     """
     skipped = skipped if skipped is not None else []
-    by_zi = {}
+    by_zi: dict[str, list[Account]] = {}
     for a in accounts:
-        if _key(a.zoominfo_id) and _key(a.zoominfo_id) not in by_zi:
-            by_zi[_key(a.zoominfo_id)] = a
+        if _key(a.zoominfo_id):
+            by_zi.setdefault(_key(a.zoominfo_id), []).append(a)
     best: dict[tuple[str, str], tuple[float, dict]] = {}
     lo, hi = INTENT_SCORE_RANGE
     for row in rows:
@@ -680,12 +761,13 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
         if strength < MIN_STRENGTH_FLOOR:
             skipped.append((row, f"faded below floor ({strength:.2f} < {MIN_STRENGTH_FLOOR:.2f})"))
             continue
-        out.append(Signal(
-            sf_account_id=by_zi[cid].sf_account_id, kind=SignalKind.INTENT, strength=strength,
-            source=f"{INTENT_SOURCE_PREFIX}:{cid}:{topic.lower()}", source_date=when,
-            evidence=(f"ZoomInfo intent (UNVERIFIED shape): interest signal, not a dated event. "
-                      f"Researching '{topic}', score {int(score)}, audience {aud}"),
-            zoominfo_id=cid,
-        ))
+        for acct in by_zi[cid]:        # accounts sharing a ZoomInfo id each get the signal
+            out.append(Signal(
+                sf_account_id=acct.sf_account_id, kind=SignalKind.INTENT, strength=strength,
+                source=f"{INTENT_SOURCE_PREFIX}:{cid}:{topic.lower()}", source_date=when,
+                evidence=(f"ZoomInfo intent (UNVERIFIED shape): interest signal, not a dated event. "
+                          f"Researching '{topic}', score {int(score)}, audience {aud}"),
+                zoominfo_id=cid,
+            ))
     out.sort(key=_signal_sort_key)
     return out

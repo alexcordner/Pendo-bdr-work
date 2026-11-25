@@ -15,6 +15,13 @@ from tests.conftest import load_fixture
 
 
 # ---------------------------------------------------------------- helpers
+def _d(st):
+    """state_to_dict without last_run (run counts legitimately differ between a run and its replay)."""
+    d = S.state_to_dict(st)
+    d.pop("last_run")
+    return d
+
+
 def _dt(v):
     return parse_utc(v) if v else None
 
@@ -129,7 +136,7 @@ def test_replay_same_calls_is_idempotent(config, scenario):
     prospects, calls, _ = scenario
     once = S.record_calls(S.State(), calls, prospects, config=config)
     twice = S.record_calls(once, calls, prospects, config=config)
-    assert S.state_to_dict(once) == S.state_to_dict(twice)
+    assert _d(once) == _d(twice)
     assert twice.report["record_calls"]["new"] == 0
     assert twice.report["record_calls"]["duplicate"] == once.report["record_calls"]["new"]
     assert twice.prospects["FAKE-P1"].call_count == once.prospects["FAKE-P1"].call_count == 2
@@ -381,14 +388,15 @@ def test_email_alone_starts_no_call_cooldown(config):
 # ---------------------------------------------------------------- sheet history
 def test_sheet_roundtrip_and_last_sheet():
     st = S.record_sheet(S.State(), date(2026, 11, 24), ["A", "B", None])
-    assert S.was_in_last_sheet(st, "A") and not S.was_in_last_sheet(st, "C")
+    assert S.was_in_last_sheet(st, "A", date(2026, 11, 25)) and not S.was_in_last_sheet(st, "C", date(2026, 11, 25))
     assert st.sheets[-1]["account_ids"] == ["A", "B"]
+    assert st.report["record_sheet"] == {"recorded": 2, "dropped_no_id": 1}
 
 
 def test_sheet_only_newest_last_sheet_counts():
     st = S.record_sheet(S.State(), date(2026, 11, 23), ["A"])
     st = S.record_sheet(st, date(2026, 11, 24), ["B"])
-    assert S.was_in_last_sheet(st, "B") and not S.was_in_last_sheet(st, "A")
+    assert S.was_in_last_sheet(st, "B", date(2026, 11, 25)) and not S.was_in_last_sheet(st, "A", date(2026, 11, 25))
 
 
 def test_sheet_keeps_last_three():
@@ -407,12 +415,12 @@ def test_sheet_same_date_replaces_and_dedupes():
 def test_sheet_backfill_does_not_displace_newest():
     st = S.record_sheet(S.State(), date(2026, 11, 24), ["NEW"])
     st = S.record_sheet(st, date(2026, 11, 20), ["OLD"])
-    assert S.was_in_last_sheet(st, "NEW") and not S.was_in_last_sheet(st, "OLD")
+    assert S.was_in_last_sheet(st, "NEW", date(2026, 11, 25)) and not S.was_in_last_sheet(st, "OLD", date(2026, 11, 25))
 
 
 def test_was_in_last_sheet_empty_state_and_none():
-    assert not S.was_in_last_sheet(S.State(), "A")
-    assert not S.was_in_last_sheet(S.record_sheet(S.State(), date(2026, 11, 24), ["A"]), None)
+    assert not S.was_in_last_sheet(S.State(), "A", date(2026, 11, 25))
+    assert not S.was_in_last_sheet(S.record_sheet(S.State(), date(2026, 11, 24), ["A"]), None, date(2026, 11, 25))
 
 
 # ---------------------------------------------------------------- email history
@@ -463,7 +471,7 @@ def test_never_emailed_and_bad_address():
 def test_record_sent_emails_idempotent():
     s1 = S.record_sent_emails(S.State(), [sent_email("M1")], [pros()])
     s2 = S.record_sent_emails(s1, [sent_email("M1")], [pros()])
-    assert S.state_to_dict(s1) == S.state_to_dict(s2)
+    assert _d(s1) == _d(s2)
     assert s2.report["record_sent_emails"]["duplicate"] == 1
 
 
@@ -472,7 +480,7 @@ def test_record_sent_emails_guards_missing_ids_and_unknown_recipient():
     st = S.record_sent_emails(S.State(), [bad, sent_email("M9", addr="stranger@example.com")], [pros()])
     assert st.report["record_sent_emails"]["skipped_no_key"] == 1
     assert "FAKE-ACC-1" not in st.accounts and len(st.emails) == 1
-    assert "stranger@example.com" not in json.dumps(S.state_to_dict(st))   # no raw email at rest
+    assert "stranger@example.com" not in json.dumps(_d(st))   # no raw email at rest
 
 
 def test_scenario_emails(scenario):
@@ -507,7 +515,7 @@ def test_round_trip_save_load(config, scenario, tmp_path):
     st = S.record_sheet(st, date(2026, 11, 24), ["FAKE-ACC-1"])
     S.save_state(st, tmp_path)
     back = S.load_state(tmp_path)
-    assert S.state_to_dict(back) == S.state_to_dict(st)
+    assert _d(back) == _d(st)
     assert back.accounts["FAKE-ACC-2"].last_connect_at == st.accounts["FAKE-ACC-2"].last_connect_at
     assert back.dnc_prospect_ids == {"FAKE-P6"} and back.dnc_phones == {"+61400000016"}
 
@@ -524,7 +532,7 @@ def test_file_is_valid_json_with_version(tmp_path):
 
 def test_missing_file_gives_empty_state(tmp_path, caplog):
     st = S.load_state(tmp_path / "nope")
-    assert S.state_to_dict(st) == S.state_to_dict(S.State())
+    assert _d(st) == _d(S.State())
 
 
 def test_corrupt_file_gives_empty_state_warns_and_is_kept(tmp_path, caplog):
@@ -651,13 +659,16 @@ def test_reset_state_saved_then_reloaded_stays_unhealthy(tmp_path):
         S.require_healthy(again)                        # but the marker is missing: still unhealthy
 
 
-def test_marker_persists_across_save_load(tmp_path):
-    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 120)
+def test_marker_persists_across_save_load(config, tmp_path):
+    calls = [call(f"C{i}", when=f"2026-11-0{i}T01:00:00Z") for i in range(1, 4)]
+    st = rec(calls, config=config)
+    st = S.mark_dnc_rebuilt(st, date(2026, 11, 25), 3, reached_last_page=True)
     S.require_healthy(st)
     S.save_state(st, tmp_path)
     back = S.load_state(tmp_path)
     S.require_healthy(back)
-    assert back.dnc_rebuilt_at == "2026-11-25" and back.dnc_rebuilt_calls == 120
+    assert back.dnc_rebuilt_at == "2026-11-25" and back.dnc_rebuilt_calls == 3
+    assert back.dnc_rebuilt_earliest == "2026-11-01" and not back.dnc_rebuilt_empty
 
 
 def test_rebuild_after_reset_clears_gate(config, scenario, tmp_path):
@@ -665,28 +676,86 @@ def test_rebuild_after_reset_clears_gate(config, scenario, tmp_path):
     st = S.load_state(tmp_path)
     prospects, calls, _ = scenario
     st = S.record_calls(st, calls, prospects, config=config)
-    st = S.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"])
+    st = S.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"], reached_last_page=True)
     S.require_healthy(st)
-    assert "FAKE-P6" in st.dnc_prospect_ids
+    assert "FAKE-P6" in st.dnc_prospect_ids and st.dnc_rebuilt_earliest == "2026-10-01"
 
 
-@pytest.mark.parametrize("n", [0, -1, None, True, "5", 1.5])
-def test_rebuild_from_zero_or_bad_count_rejected(n):
+@pytest.mark.parametrize("n", [-1, None, True, "5", 1.5])
+def test_rebuild_bad_count_rejected(n):
     with pytest.raises(ValueError):
-        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), n)
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), n, reached_last_page=True)
+
+
+def test_rebuild_from_zero_calls_rejected_without_confirmation():
+    with pytest.raises(ValueError, match="empty_history_confirmed"):
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 0, reached_last_page=True)
+    with pytest.raises(ValueError):
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=False)
+
+
+def test_rebuild_from_zero_calls_allowed_only_when_confirmed_and_last_page(tmp_path):
+    with pytest.raises(ValueError):                      # confirmed but did not reach the last page
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 0, reached_last_page=False, empty_history_confirmed=True)
+    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
+    assert S.dnc_is_rebuilt(st) and st.dnc_rebuilt_empty and st.dnc_rebuilt_earliest is None
+    S.require_healthy(st)
+    S.save_state(st, tmp_path)
+    back = S.load_state(tmp_path)
+    assert S.dnc_is_rebuilt(back) and back.dnc_rebuilt_empty
+    S.require_healthy(back)
+
+
+def test_empty_confirmation_rejected_when_calls_already_recorded(config):
+    st = rec([call("C1")], config=config)
+    with pytest.raises(ValueError, match="already holds"):
+        S.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
+
+
+def test_partial_history_reached_last_page_false_rejected(config):
+    st = rec([call("C1")], config=config)
+    with pytest.raises(ValueError, match="last page"):
+        S.mark_dnc_rebuilt(st, date(2026, 11, 25), 1, reached_last_page=False)
+    for bad in (None, 1, "yes"):
+        with pytest.raises(ValueError):
+            S.mark_dnc_rebuilt(st, date(2026, 11, 25), 1, reached_last_page=bad)
+
+
+def test_reached_last_page_is_required_keyword():
+    with pytest.raises(TypeError):
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 1)
+
+
+def test_calls_seen_must_cover_distinct_recorded_calls(config):
+    st = rec([call("C1"), call("C2"), call("C3")], config=config)
+    with pytest.raises(ValueError, match="partial"):
+        S.mark_dnc_rebuilt(st, date(2026, 11, 25), 2, reached_last_page=True)
+    assert S.dnc_is_rebuilt(S.mark_dnc_rebuilt(st, date(2026, 11, 25), 3, reached_last_page=True))
+
+
+def test_nonzero_count_with_no_calls_recorded_rejected():
+    with pytest.raises(ValueError, match="not been run"):
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 5, reached_last_page=True)
+
+
+def test_earliest_call_includes_unmatched_calls(config):
+    st = rec([call("C1", when="2026-11-10T01:00:00Z"),
+              call("C2", pid=None, to="+61400000555", when="2026-09-01T01:00:00Z")], config=config)
+    assert st.earliest_call_at == _dt("2026-09-01T01:00:00Z")
+    assert S.mark_dnc_rebuilt(st, date(2026, 11, 25), 2, reached_last_page=True).dnc_rebuilt_earliest == "2026-09-01"
 
 
 def test_marker_not_set_by_record_calls_or_other_steps(config, scenario):
     prospects, calls, sent = scenario
     st = S.record_calls(S.State(), calls, prospects, config=config)
     st = S.record_sent_emails(S.record_sheet(st, date(2026, 11, 24), ["A"]), sent, prospects)
-    assert not S.dnc_is_rebuilt(st)
+    assert not S.dnc_is_rebuilt(st) and st.dnc_rebuilt_at is None
     with pytest.raises(S.StateResetError):
         S.require_healthy(st)
 
 
 def test_marker_survives_record_steps(config):
-    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 3)
+    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
     st = S.record_calls(st, [call("C1")], [pros()], config=config)
     st = S.record_sheet(st, date(2026, 11, 25), ["A"])
     assert S.dnc_is_rebuilt(st)
@@ -924,7 +993,7 @@ def test_equal_timestamps_order_independent(config):
     b = call("C-B", disp="No Answer", dur=3, when="2026-11-10T01:00:00Z")
     one = rec([a, b], config=config)
     two = rec([b, a], config=config)
-    assert S.state_to_dict(one) == S.state_to_dict(two)
+    assert _d(one) == _d(two)
     assert one.accounts["FAKE-ACC-1"].last_call_key == "C-B"
 
 
@@ -933,18 +1002,18 @@ def test_ties_across_batches_order_independent(config):
     b = call("C-B", disp="No Answer", dur=3, when="2026-11-10T01:00:00Z")
     x = rec([b], state=rec([a], config=config), config=config)
     y = rec([a], state=rec([b], config=config), config=config)
-    assert S.state_to_dict(x) == S.state_to_dict(y)
+    assert _d(x) == _d(y)
 
 
 def test_shuffled_inputs_give_identical_state(config, scenario):
     import random
     prospects, calls, _ = scenario
-    ref = S.state_to_dict(S.record_calls(S.State(), calls, prospects, config=config))
+    ref = _d(S.record_calls(S.State(), calls, prospects, config=config))
     rnd = random.Random(7)
     for _ in range(20):
         shuffled = calls[:]
         rnd.shuffle(shuffled)
-        assert S.state_to_dict(S.record_calls(S.State(), shuffled, prospects, config=config)) == ref
+        assert _d(S.record_calls(S.State(), shuffled, prospects, config=config)) == ref
 
 
 # ---- F11: undated emails expire
@@ -1020,8 +1089,8 @@ def test_cooldown_until_and_last_touched_keyed_canonically(config, stored, looku
 def test_sheet_both_id_forms(stored, lookup):
     st = S.record_sheet(S.State(), date(2026, 11, 24), [stored, lookup, None])
     assert st.sheets[-1]["account_ids"] == [ID15]               # deduped across forms
-    assert S.was_in_last_sheet(st, lookup) and S.was_in_last_sheet(st, stored)
-    assert S.last_sheet_ids(st) == {ID15}
+    assert S.was_in_last_sheet(st, lookup, date(2026, 11, 25)) and S.was_in_last_sheet(st, stored, date(2026, 11, 25))
+    assert S.last_sheet_ids(st, date(2026, 11, 25)) == {ID15}
 
 
 def test_accounts_by_id_18_char_keys_supply_timezone(config):
@@ -1060,7 +1129,7 @@ def test_none_and_blank_ids_everywhere(config):
     st = S.State()
     assert not S.is_in_cooldown(st, None, date(2026, 11, 1), config)
     assert not S.is_in_cooldown(st, "  ", date(2026, 11, 1), config)
-    assert not S.was_in_last_sheet(S.record_sheet(st, date(2026, 11, 1), [None, "", " "]), None)
+    assert not S.was_in_last_sheet(S.record_sheet(st, date(2026, 11, 1), [None, "", " "]), None, date(2026, 11, 2))
 
 
 def test_file_with_mixed_id_forms_migrates_on_load(config, tmp_path):
@@ -1077,7 +1146,7 @@ def test_file_with_mixed_id_forms_migrates_on_load(config, tmp_path):
     assert list(st.accounts) == [ID15]
     a = st.accounts[ID15]
     assert a.last_call_date == "2026-11-12" and a.last_outcome == "connect" and a.zoominfo_id == "Z1"
-    assert S.was_in_last_sheet(st, ID15)
+    assert S.was_in_last_sheet(st, ID15, date(2026, 11, 25))
     assert S.cooldown_until(st, config)[ID15] == date(2026, 11, 26)
 
 
@@ -1124,3 +1193,256 @@ def test_load_logs_summary_count(tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger="src.state"):
         _load(tmp_path, {"last_call_date": "junk"})
     assert "malformed entr" in caplog.text
+
+
+# ================================================================= 1g integration review fixes
+RUN = date(2026, 11, 25)
+
+
+# ---- H1: same-night rerun
+def test_same_night_sheet_is_not_last_nights_sheet():
+    st = S.record_sheet(S.State(), RUN, ["A", "B"])
+    assert S.last_sheet_ids(st, RUN) == set()
+    assert not S.was_in_last_sheet(st, "A", RUN)
+
+
+def test_last_sheet_ignores_today_and_future_uses_previous_night():
+    st = S.record_sheet(S.State(), date(2026, 11, 24), ["YESTERDAY"])
+    st = S.record_sheet(st, RUN, ["TODAY"])
+    st = S.record_sheet(st, date(2026, 11, 26), ["TOMORROW"])
+    assert S.last_sheet_ids(st, RUN) == {"YESTERDAY"}
+    assert S.last_sheet_ids(st, date(2026, 11, 27)) == {"TOMORROW"}
+    assert S.last_sheet_ids(st, date(2026, 11, 24)) == set()
+
+
+def test_rerecording_same_date_replaces_not_appends():
+    st = S.record_sheet(S.State(), RUN, ["A"])
+    st = S.record_sheet(st, RUN, ["B", "C"])
+    assert st.sheets == [{"run_date": "2026-11-25", "account_ids": ["B", "C"]}]
+
+
+def test_run_date_is_required_for_last_sheet():
+    with pytest.raises(TypeError):
+        S.last_sheet_ids(S.State())
+    with pytest.raises(TypeError):
+        S.was_in_last_sheet(S.State(), "A")
+
+
+def test_two_runs_same_night_see_same_last_sheet():
+    base = S.record_sheet(S.State(), date(2026, 11, 24), ["A"])
+    first = S.last_sheet_ids(base, RUN)
+    after_first = S.record_sheet(base, RUN, ["B"])
+    assert S.last_sheet_ids(after_first, RUN) == first == {"A"}
+
+
+# ---- L1: shrink guard and .prev backup
+def _populated(config, tmp_path):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    st = S.mark_dnc_rebuilt(st, RUN, 1, reached_last_page=True)
+    S.save_state(st, tmp_path)
+    return st
+
+
+def test_save_empty_state_over_populated_file_refused(config, tmp_path):
+    _populated(config, tmp_path)
+    before = (tmp_path / S.STATE_FILENAME).read_text()
+    with pytest.raises(S.StateShrinkError) as e:
+        S.save_state(S.State(), tmp_path)
+    assert "Do Not Call prospect ids" in str(e.value) and "marker" in str(e.value)
+    assert (tmp_path / S.STATE_FILENAME).read_text() == before
+    assert [p.name for p in tmp_path.iterdir()] == [S.STATE_FILENAME]       # no temp or .prev left behind
+
+
+def test_fewer_dnc_phones_or_emails_or_accounts_refused(config, tmp_path):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    S.save_state(st, tmp_path)
+    for field_name, empty in (("dnc_phones", set()), ("dnc_emails", set()), ("dnc_prospect_ids", set())):
+        smaller = S.load_state(tmp_path)
+        setattr(smaller, field_name, empty)
+        with pytest.raises(S.StateShrinkError):
+            S.save_state(smaller, tmp_path)
+    fewer = S.load_state(tmp_path)
+    fewer.accounts = {}
+    with pytest.raises(S.StateShrinkError, match="accounts"):
+        S.save_state(fewer, tmp_path)
+
+
+def test_lost_marker_alone_refused(config, tmp_path):
+    _populated(config, tmp_path)
+    st = S.load_state(tmp_path)
+    st.dnc_rebuilt_at = None
+    with pytest.raises(S.StateShrinkError, match="marker"):
+        S.save_state(st, tmp_path)
+
+
+def test_allow_shrink_overrides_and_keeps_backup(config, tmp_path):
+    _populated(config, tmp_path)
+    before = (tmp_path / S.STATE_FILENAME).read_text()
+    S.save_state(S.State(), tmp_path, allow_shrink=True)
+    assert (tmp_path / "state.json.prev").read_text() == before
+    assert json.loads((tmp_path / S.STATE_FILENAME).read_text())["dnc_prospect_ids"] == []
+
+
+def test_normal_growing_save_succeeds_and_rotates_one_prev(config, tmp_path):
+    st = rec([call("C1")], config=config)
+    S.save_state(st, tmp_path)
+    assert not (tmp_path / "state.json.prev").exists()                      # nothing to back up the first time
+    first = (tmp_path / S.STATE_FILENAME).read_text()
+    st2 = rec([call("C2", when="2026-11-11T01:00:00Z")], state=st, config=config)
+    S.save_state(st2, tmp_path)
+    second = (tmp_path / S.STATE_FILENAME).read_text()
+    assert (tmp_path / "state.json.prev").read_text() == first
+    S.save_state(rec([call("C3", when="2026-11-12T01:00:00Z")], state=st2, config=config), tmp_path)
+    assert (tmp_path / "state.json.prev").read_text() == second            # one rotating copy, replaced
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["state.json", "state.json.prev"]
+
+
+def test_save_over_unreadable_file_is_not_blocked(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text("garbage", encoding="utf-8")
+    S.save_state(S.State(), tmp_path)                                       # nothing trustworthy to compare with
+    assert (tmp_path / "state.json.prev").read_text() == "garbage"
+
+
+def test_failed_save_leaves_no_prev_tmp_and_old_file(config, tmp_path, monkeypatch):
+    st = rec([call("C1")], config=config)
+    S.save_state(st, tmp_path)
+    before = (tmp_path / S.STATE_FILENAME).read_text()
+    real = os.replace
+    calls_ = {"n": 0}
+
+    def flaky(src, dst):
+        calls_["n"] += 1
+        if str(dst).endswith(S.STATE_FILENAME):
+            raise OSError("boom")
+        return real(src, dst)
+    monkeypatch.setattr(os, "replace", flaky)
+    with pytest.raises(OSError):
+        S.save_state(rec([call("C2", when="2026-11-11T01:00:00Z")], state=st, config=config), tmp_path)
+    monkeypatch.undo()
+    assert (tmp_path / S.STATE_FILENAME).read_text() == before
+    assert not [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]
+
+
+# ---- L2: fallback date uses the account zone
+def test_fallback_date_uses_stored_account_zone(config, tmp_path):
+    c = call("C1", when="2026-11-24T23:00:00Z")                              # Wed 10:00 Sydney
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert st.accounts["FAKE-ACC-1"].tz == "Australia/Sydney"
+    raw = S.state_to_dict(st)
+    raw["accounts"]["FAKE-ACC-1"]["last_call_date"] = "garbage"
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    bad = S.load_state(tmp_path)
+    assert bad.accounts["FAKE-ACC-1"].last_call_date == "2026-11-25"         # not the UTC date 11-24
+    assert S.cooldown_until(bad, config)["FAKE-ACC-1"] == date(2026, 11, 28)
+    assert any("Australia/Sydney" in w for w in bad.load_warnings)
+
+
+def test_fallback_date_uses_auckland_when_stored(config, tmp_path):
+    c = call("C1", when="2026-11-24T20:00:00Z")                              # Wed 09:00 Auckland (NZDT)
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Pacific/Auckland")}, config=config)
+    raw = S.state_to_dict(st)
+    raw["accounts"]["FAKE-ACC-1"]["last_call_date"] = 5
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    assert S.load_state(tmp_path).accounts["FAKE-ACC-1"].last_call_date == "2026-11-25"
+
+
+def test_fallback_defaults_to_sydney_when_no_zone_stored(tmp_path):
+    raw = {"version": 2, "accounts": {"A": {"last_call_at": "2026-11-24T23:00:00+00:00", "last_call_date": "junk"}}}
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    assert S.load_state(tmp_path).accounts["A"].last_call_date == "2026-11-25"
+
+
+def test_invalid_stored_zone_falls_back_to_sydney(tmp_path):
+    raw = {"version": 2, "accounts": {"A": {"last_call_at": "2026-11-24T23:00:00+00:00", "last_call_date": "junk",
+                                            "tz": "Mars/Base"}}}
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert st.accounts["A"].last_call_date == "2026-11-25" and st.accounts["A"].tz is None
+
+
+# ---- L4: counts persisted
+def test_last_run_counts_saved_and_reloaded(config, scenario, tmp_path):
+    prospects, calls, sent = scenario
+    st = S.record_calls(S.State(), calls, prospects, config=config)
+    st = S.record_sent_emails(st, sent, prospects, today=RUN)
+    st = S.record_sheet(st, RUN, ["A", None])
+    S.save_state(st, tmp_path)
+    back = S.load_state(tmp_path)
+    assert back.last_run["record_calls"]["new"] == 6 and back.last_run["record_calls"]["unmatched"] == 1
+    assert back.last_run["record_calls"]["unmatched_reasons"] == {"no_match": 1}
+    assert back.last_run["record_sent_emails"]["new"] == 2
+    assert back.last_run["record_sheet"] == {"recorded": 1, "dropped_no_id": 1}
+
+
+def test_last_run_has_counts_only_no_ids_or_pii(config, scenario, tmp_path):
+    prospects, calls, sent = scenario
+    st = S.record_sent_emails(S.record_calls(S.State(), calls, prospects, config=config), sent, prospects)
+    S.save_state(st, tmp_path)
+    text = json.dumps(json.loads((tmp_path / S.STATE_FILENAME).read_text())["last_run"])
+    assert "FAKE-C6" not in text and "unmatched_call_ids" not in text and "example.com" not in text
+
+
+def test_last_run_survives_a_save_without_new_report(config, tmp_path):
+    st = rec([call("C1")], config=config)
+    S.save_state(st, tmp_path)
+    again = S.load_state(tmp_path)                       # empty report this run
+    S.save_state(again, tmp_path)
+    assert S.load_state(tmp_path).last_run["record_calls"]["new"] == 1
+
+
+def test_malformed_last_run_ignored_with_warning(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps({"version": 2, "last_run": "x"}), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert not st.was_reset and st.last_run == {} and "malformed last_run" in st.load_warnings
+
+
+# ---- L5: performance
+def test_record_calls_20k_calls_is_fast(config):
+    import time
+    prospects = [Prospect(nooks_id=f"P{i}", sf_contact_id=None, sf_account_id=f"A{i}", nooks_account_id=None,
+                          name="x", phone_e164=f"+6140{i:07d}") for i in range(2000)]
+    base = _dt("2026-10-01T00:00:00Z")
+    calls = [CallRecord(nooks_id=f"C{i}", prospect_id=f"P{i % 2000}", disposition_name="No Answer", duration_s=5,
+                        started_at=base.replace(minute=i % 60), to_e164=None) for i in range(20000)]
+    t = time.perf_counter()
+    st = S.State()
+    for i in range(0, len(calls), 1000):                 # 20 pages of 1000
+        st = S.record_calls(st, calls[i:i + 1000], prospects, config=config)
+    elapsed = time.perf_counter() - t
+    assert len(st.seen_calls) == 20000
+    assert elapsed < 2.0, elapsed                        # target < 1 s; slack for a busy CI box
+
+
+def test_clone_is_independent_of_original(config):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    st = S.record_sent_emails(st, [sent_email()], [pros()])
+    cp = S._clone(st)
+    cp.accounts["FAKE-ACC-1"].last_outcome = "x"
+    cp.dnc_phones.add("+1")
+    cp.emails[next(iter(cp.emails))]["new"] = {}
+    cp.sheets.append({})
+    cp.report["record_calls"]["new"] = 99
+    assert st.accounts["FAKE-ACC-1"].last_outcome != "x" and "+1" not in st.dnc_phones
+    assert "new" not in st.emails[next(iter(st.emails))] and st.sheets == []
+    assert st.report["record_calls"]["new"] == 1
+
+
+# ---- L6: None ids counted and warned
+def test_record_sheet_none_ids_counted_and_logged(caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        st = S.record_sheet(S.State(), RUN, ["A", None, "", "  ", "B"])
+    assert st.report["record_sheet"] == {"recorded": 2, "dropped_no_id": 3}
+    assert "3 account(s) with no usable id" in caplog.text
+
+
+def test_record_calls_no_account_warns(config, caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        rec([call("C1", pid="FAKE-GHOST")], config=config)
+    assert "no Salesforce account" in caplog.text
+
+
+def test_sent_email_without_account_counted(caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        st = S.record_sent_emails(S.State(), [sent_email("M1", addr="stranger@example.com")], [pros()])
+    assert st.report["record_sent_emails"]["no_account"] == 1
+    assert "no recipient with a Salesforce account" in caplog.text

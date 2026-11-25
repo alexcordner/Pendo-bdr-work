@@ -107,3 +107,56 @@ Searched all seven modules by regex and by AST (`test_l_*`): no occurrence of `s
 - Real call volume per window (3-minute slot is a default), public holidays (not modelled anywhere), and behaviour at the real ~12k-account scale. The 3,000 run is linear-looking; I did not test 12k.
 - Whether Nooks marks Do Not Call at the prospect level for dispositions logged by OTHER reps; `listCalls` is filtered to Alex's owner id, so DNC set by a teammate would be invisible (Phase 2 risk 3).
 - `-W error` is clean for the new tests; I did not test Python 3.11 (this box runs 3.13), though nothing used 3.12+ syntax.
+
+
+---
+
+# Final reconcile (branch `phase1/1g-final`)
+
+Origin/main 8d74800 plus the four owner branches (1c `840095d`, 1d `b84e88f`, 1e `7b88cde`, 1f `3a74df2`) plus the integration tests, reconciled by hand. Result: **1,196 passed, 0 xfail** (`python -m pytest tests/ -q -W error`). Verdict now: **PASS** for Phase 1, with N2 as the one known gap to fix or accept before the checkpoint.
+
+## Status of the original findings
+
+| # | Finding | Status | Guard |
+|---|---|---|---|
+| H1 | Same-night rerun replaced the sheet | FIXED: `last_sheet_ids(state, run_date)` ignores the sheet for `run_date`; run_date is required | `test_d_same_night_rerun_is_stable`, `..._skips_nothing_from_the_same_run`, `test_contract_signatures_require_the_new_arguments` |
+| H2 | Ranker let intent be the trigger / two combination formulas | FIXED: ranker uses `signals.best_signal` and `combined_strength` | `test_fixed_h2_*`, `test_m_ranker_uses_the_single_signals_combination_formula` |
+| M1 | Email touch dropped an account only without call history | FIXED: `touched` is ignored whenever `cooldown_until` is given (even empty) | `test_fixed_m1_*`, `test_contract_accounts_ignore_touched_when_cooldown_until_is_given` |
+| M2 | Night run dropped an account due tomorrow | FIXED for one timezone: `call_date` argument; see N2 for the multi-zone gap | `test_c_night_run_uses_the_first_call_date_not_the_run_date` |
+| M3 | No ceiling for low-confidence accounts | FIXED: score capped at 60, itemised, reasons say so; flags shown as reasons | `test_h_low_confidence_has_a_score_ceiling` |
+| L1 | Scoop age read differently in signals and ranker | FIXED: ranker uses `signals.age_days` | `test_fixed_l1_*` |
+| L2 | Duplicate ZoomInfo id: one account got the trigger | FIXED: `accounts.group_by_zoominfo_id`, `scoops_to_signals` takes lists | `test_h_duplicate_zoominfo_id_trigger_reaches_every_duplicate` |
+| L3 | Empty history could never go live | FIXED: `empty_history_confirmed=True` | `test_contract_new_seat_with_no_calls_needs_explicit_confirmation` |
+| L4 | `State.report` not persisted | FIXED: counts saved as `last_run` (no ids) | `test_contract_state_last_run_counts_survive_save_and_load` |
+| L5 | `record_calls` deep-copied state per page | MOSTLY FIXED: field-level copy; see N1 for what remains | `test_j_record_calls_paging_is_cheap_at_20k` |
+| L6 | None ids silently dropped | PARTLY FIXED: counted and warned (`dropped_no_id`); still keyed by SF id | `test_contract_accounts_without_a_salesforce_id_are_counted_not_silent` |
+| L7 | Run log named no skipped account | FIXED: named lists with limits | `test_contract_run_log_names_every_skipped_needs_prospect_and_spilled_account` |
+| L8 | Cooldown penalty dead code | NOT DEAD any more: see N2 | `test_known_gap_n2_*` |
+| 1c M1 | Partial history accepted as full | FIXED: `reached_last_page` plus count check | `test_n_1c_M1_partial_history_is_rejected` |
+| 1c L1 | `save_state` could silently wipe DNC | FIXED: `StateShrinkError`, `.prev` backup, `allow_shrink=True` | `test_n_1c_L1_*` |
+| 1c L2 | UTC-date fallback | FIXED: account zone, else Sydney | `test_n_1c_L2_*` |
+| 1e `max_age_days` | Not only a fallback | DOCUMENTED correctly in `signals_notes.md`; behaviour unchanged (ranker recency horizon 45) | `test_n_1e_*` |
+| 1f personas | Product Owner / Engineering Manager unmatched | UNCHANGED, by design: config choice for Alex | `test_n_1f_*` |
+| Docs | accounts docstring, state_notes plus-addressing, ranker_notes 7.5, max_age_days claim | FIXED | `test_m_*` |
+
+## New findings after the merge
+
+| # | Sev | Where | What | Repro |
+|---|---|---|---|---|
+| N1 | L | `state.py` `record_calls` (`_phone_key` -> `loaders.normalise_phone`) | It builds a phone map of EVERY prospect on EVERY call, so cost is pages x prospects: 12,000 accounts (16.7k prospects, 2.5k calls) take 17.9 s in state at 7 calls per page but 0.36 s at 1,000 per page. Fine if the adapter pages by 1,000+ (the documented rule); a small page size silently multiplies the cost. | `python -m tests.test_integration_pipeline --scale 12000 --call-page 7` vs `--call-page 1000`. Fix: build the phone map once per State (or cache `normalise_phone`), or have `record_calls` accept a prebuilt index. |
+| N2 | M | `accounts.build_account_list(call_date=...)` vs `ranker` per-zone call date | Accounts gets ONE `call_date` (Sydney's first usable day). On Thu 16:28 that is Friday. A Perth account whose cooldown ends Fri is kept (Fri is not before Fri), then the ranker's Perth call date is Thursday, so it applies -30 "In cooldown", but still ranks and schedules it Thursday 13:30 AWST: a task inside the cooldown. | `test_known_gap_n2_early_zone_account_in_cooldown_is_penalised_not_skipped` (pins current behaviour; flip when fixed). Fix options: in the ranker make "cooldown still active on the zone call date" a skip with a reason (preferred: one place, per-zone date), or give accounts a per-timezone `call_date` mapping. |
+| N3 | L | `accounts.build_account_list(touched, ...)` | `touched` is still a required positional argument but is ignored when `cooldown_until` is passed. Easy to misread; make it optional (default `None`) in a later cleanup. | signature |
+| N4 | L | `models.py:204`, `docs/interfaces.md` | Still say "push later inside the window when `timezone_guessed`" (rule dropped in 1f). Also interfaces.md Account table lacks `flags` / `confidence`, `RankResult` is undocumented, decision 10 (persona "substring") is stale. 1f supplied replacement wording in `ranker_notes.md`. Shared files; the coordinator is fixing two on main. | `test_m_guessed_timezone_*` |
+| N5 | L | `signals` vs `ranker` | `config.signals.max_age_days` (45) is the ranker's recency horizon while `signals.KIND_MAX_AGE_DAYS` (30 to 90) decides when a scoop expires, so exec moves 46 to 90 days old are kept but earn 0 recency points. Documented in `signals_notes.md`; consider using the best signal's own limit. | `test_n_1e_*` |
+
+Signature check across modules after the merge (all consistent): `mark_dnc_rebuilt(state, run_date, calls_seen, *, reached_last_page, empty_history_confirmed=False)`; `save_state(state, dir, *, allow_shrink=False)`; `last_sheet_ids(state, run_date)`; `was_in_last_sheet(state, id, run_date)`; `build_account_list(sf, nooks, zi, config, touched, today, blocked_account_ids, cooldown_days, cooldown_until, call_date)`; `group_by_zoominfo_id(accounts)`; `scoops_to_signals(verdicts, Mapping[str, Account | list[Account]], config, today)`; `rank_accounts(accounts, signals, prospects, cooldown_until, last_sheet_ids, config, now)`; `ranker.summarise(result, top_n=15, list_limit=25)`. Duplicate logic: none left between ranker and signals (best signal, combination, age). One remaining pair of "first usable day" definitions: accounts' `call_date` (caller-supplied, one date) and ranker's per-zone call date (N2).
+
+## Re-run: hard-rule scan and leak grep on the whole tree
+
+- `test_l_*` (all seven modules): no forbidden call names (send / reply / forward / createEmail / sendTaskEmail / createTask / any Salesforce or Nooks write tool / create_draft / soqlQuery), no network, process or SMTP imports (stdlib plus `yaml` only), the only file writes are in `state.py` (temp file, rename, `.prev` backup inside `state_dir`), no hard-coded ids, phones, emails, owner id or `pendo.io` in `src/`: PASS on the merged code.
+- Whole-tree grep of tracked files: emails other than `example.com` / placeholders only in `config/config.yaml` and `CLAUDE.md` (owner address, per project rules) and one `a@b.com` unit-test literal; no secrets/tokens; phone-like numbers only in the invented `+61 4xx` / `+64 20` / `+61 2 9000` placeholder ranges; Salesforce-id-like strings only `FAKE`/`001000000000001`/`0015g00000AbCdE`-style test literals (invented mixed-case ids for the 15/18-char tests); `state/` and `logs/` hold only `.gitkeep`.
+- PII in outputs: `test_k_*` check the run log (named world and a 500-account world) and `state.json` for every email and phone in the synthetic world: none appear raw; `state.json` holds sha256 hashes plus E.164 numbers only inside `dnc_phones`; `last_run` is counts only.
+
+## Not verified
+
+Everything against real connectors; behaviour with real data shapes; Python 3.11 (this box runs 3.13); whether a Do Not Call set by another rep is visible under the owner filter; holidays.

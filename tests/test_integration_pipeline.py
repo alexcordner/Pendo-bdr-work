@@ -365,7 +365,8 @@ def _prospect_objects(world: World, cfg: Config, accounts_by_sf: dict, accounts_
 
 def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | None = None, *, live: bool = True,
                  today: date | None = None, restyle=None, blocked=frozenset(), extra_touched=None,
-                 call_page: int = 7, mark_sheet: bool = True, pass_touched: bool = True) -> Out:
+                 call_page: int = 7, mark_sheet: bool = True, pass_touched: bool = True,
+                 call_date="auto") -> Out:
     """The nightly run exactly as 2c will do it (offline). ``restyle(key)`` re-spells every SF-id key
     handed to accounts / ranker (mixed 15/18 char test). ``today`` is the date given to accounts."""
     import time
@@ -375,6 +376,9 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
     t0 = time.perf_counter()
     run_date = now.astimezone(SYDNEY).date()
     today = today or run_date
+    if call_date == "auto":       # 2c contract: the first date a task could be due (Sydney, first usable window)
+        earliest = now.replace(second=0, microsecond=0) + timedelta(minutes=2)
+        call_date = cfg_mod.next_working_windows(cfg, "Australia/Sydney", earliest)[0].start.date()
 
     # 1. state, dispositions
     st = st_mod.load_state(state_dir)
@@ -405,7 +409,7 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
         for i in range(0, len(calls), call_page):
             st = st_mod.record_calls(st, calls[i:i + call_page], prospects, by_sf, config=cfg)
             total += st.report["record_calls"]["calls_seen"]
-        st = st_mod.mark_dnc_rebuilt(st, run_date, total)
+        st = st_mod.mark_dnc_rebuilt(st, run_date, total, reached_last_page=True)
     else:
         st = st_mod.record_calls(st, calls, prospects, by_sf, config=cfg)
     sent = []
@@ -432,8 +436,13 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
     if extra_touched:
         touched.update(extra_touched)
     cu_sf = {restyle(k): v for k, v in st_mod.cooldown_until(st, cfg).items()}
+    # touched is ignored when cooldown_until is passed (phase1/1d-fixes M1), so an explicit extra
+    # touch is expressed as the cooldown it would start.
+    for k, v in (extra_touched or {}).items():
+        cu_sf[k] = v + timedelta(days=cfg.limits.cooldown_days_no_answer)
     res = acc_mod.build_account_list(world.sf_rows, world.nooks_accounts, world.zoominfo_rows, cfg, touched, today,
-                                     blocked_account_ids={restyle(b) for b in blocked}, cooldown_until=cu_sf)
+                                     blocked_account_ids={restyle(b) for b in blocked}, cooldown_until=cu_sf,
+                                     call_date=call_date)
     t["accounts"] = time.perf_counter() - t2
 
     # 6. signals
@@ -445,7 +454,7 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
         except LoaderError as e:
             scoop_errors.append(str(e))
     verdicts = sig_mod.filter_scoops(scoops, cfg, today)
-    by_zi = {a.zoominfo_id: a for a in res.accounts if a.zoominfo_id}
+    by_zi = acc_mod.group_by_zoominfo_id(res.accounts)
     batch = sig_mod.scoops_to_signals(verdicts, by_zi, cfg, today)
     signals: dict = {}
     for s in batch.signals:
@@ -458,7 +467,7 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
     cooldown = dict(cu_sf)
     for kind in ("nooks_account_id", "zoominfo_id"):
         cooldown.update(st_mod.cooldown_until_by(st, cfg, kind))
-    last_ids = {restyle(x) for x in st_mod.last_sheet_ids(st)}
+    last_ids = {restyle(x) for x in st_mod.last_sheet_ids(st, run_date)}
     result = ranker.rank_accounts(res.accounts, signals, marked, cooldown, last_ids, cfg, now)
     t["rank"] = time.perf_counter() - t4
 
@@ -600,7 +609,7 @@ import pytest
 
 from src import config as cfg_mod
 from src.loaders import LoaderError, normalise_email_for_match
-from src.models import Signal, SignalKind
+from src.models import Account, Signal, SignalKind
 from src.state import AccountState, State, StateResetError
 
 CFG_PATH = ROOT / "config" / "config.yaml"
@@ -836,8 +845,8 @@ def test_c_no_double_counting_over_a_week_of_run_times(world, tmp_path):
             if n:
                 penalised += 1
                 assert "In cooldown" in x.reasons
-    # With one run date given to accounts and per-zone call dates in the ranker the penalty never fires
-    # (recorded in docs/review_1g.md: it is effectively dead code on the real path).
+    # With the named world (no early-zone cooldowns) the penalty never fires; the early-zone case is pinned in
+    # test_known_gap_n2_* (review_1g N2).
     assert penalised == 0
 
 
@@ -850,14 +859,17 @@ def test_c_ranker_penalty_alone_is_applied_once_and_reported(world, tmp_path):
     assert ra.score_breakdown["cooldown_penalty"] == -30.0 and "In cooldown" in ra.reasons
 
 
-def test_c_night_run_cooldown_is_one_day_conservative(world, tmp_path):
-    """KNOWN LIMITATION (review_1g M2): accounts.build_account_list takes ONE `today`. A night run (Wed 23:30)
-    that gives today=Wed drops an account whose cooldown ends Thu, although its task would be due Thu."""
+def test_c_night_run_uses_the_first_call_date_not_the_run_date(world, tmp_path):
+    """FIXED (1d call_date): a Wed 23:30 run passes call_date=Thu, so an account whose cooldown ends Thu is kept.
+    The legacy path (no call_date, today=Wed) still drops it one day early; pinned so nobody drops call_date."""
     night = datetime(2026, 11, 25, 12, 30, tzinfo=UTC)
-    a = run(world, tmp_path / "a", now=night)
-    b = run(world, tmp_path / "b", now=night, today=date(2026, 11, 26))
-    assert where(a)[name_of(world, 8)][0] == "dropped"
-    assert where(b)[name_of(world, 8)][0] == "ranked"
+    fixed = run(world, tmp_path / "a", now=night)
+    assert where(fixed)[name_of(world, 8)][0] == "ranked"
+    legacy = run(world, tmp_path / "b", now=night, call_date=None)
+    assert where(legacy)[name_of(world, 8)][0] == "dropped"
+    # and an account whose cooldown ends AFTER the call date is still dropped on the fixed path
+    again = run(world, tmp_path / "c", now=datetime(2026, 11, 24, 12, 30, tzinfo=UTC))      # call date Wed 25
+    assert where(again)[name_of(world, 8)][0] == "dropped"
 
 
 # ----------------------------------------------------------------------------- (d) sheet history
@@ -913,22 +925,20 @@ def test_d_sheet_history_keeps_three_nights(tmp_path):
     assert [s["run_date"] for s in st.sheets] == ["2026-11-27", "2026-11-28", "2026-11-29"]
 
 
-@pytest.mark.xfail(strict=False, reason="review_1g H1: last_sheet_ids does not ignore a sheet recorded for the "
-                                        "SAME run date, so a second run on the same night replaces the whole sheet")
 def test_d_same_night_rerun_is_stable(world, tmp_path):
     a = run(world, tmp_path)
     b = run(world, tmp_path)
     assert [x.account.name for x in a.result.ranked] == [x.account.name for x in b.result.ranked]
 
 
-def test_d_same_night_rerun_documents_the_hole(world, tmp_path):
-    """Pinned current behaviour of H1 so it is visible in the normal run: every account from the first run
-    is 'on last sheet' in the second run of the same night. 2c must not record the sheet in a dry run."""
+def test_d_same_night_rerun_skips_nothing_from_the_same_run(world, tmp_path):
+    """H1 fixed in state.last_sheet_ids(state, run_date): the sheet recorded for TODAY is ignored, so a second
+    run on the same night skips nothing as 'on last sheet' and ranks the same accounts."""
     a = run(world, tmp_path)
     b = run(world, tmp_path)
     assert a.result.ranked
-    assert {x.account.name for x in a.result.ranked} <= {x.account.name for x in b.result.skipped
-                                                          if x.skipped_reason == "on last sheet"}
+    assert not {x.account.name for x in b.result.skipped if x.skipped_reason == "on last sheet"} & \
+        {x.account.name for x in a.result.ranked}
 
 
 def test_d_dry_run_without_record_sheet_is_repeatable(world, tmp_path):
@@ -1185,16 +1195,23 @@ def name_of_any(out, n):
     return {15: "Oscar Analytics Pty Ltd", 16: "Papa Nooksonly Pty Ltd"}[n]
 
 
-def test_h_confidence_does_not_affect_score_documented(world, tmp_path):
-    """ranker_notes: Account.flags / confidence never change the score. So no 'low ceiling' exists for low
-    confidence accounts; they are kept off the sheet only because they have no timezone (review_1g M3)."""
+def test_h_low_confidence_has_a_score_ceiling(world, tmp_path):
+    """FIXED (1f): Account.confidence == 'low' caps the score at ranker.LOW_CONFIDENCE_CEILING (60). A strong trigger on
+    a low-confidence book account (flagged noise) cannot out-rank clean accounts; the cap is itemised."""
     out = run(world, tmp_path)
     a = next(x for x in out.result.ranked if x.account.name == "Sydney CBD")
     assert a.account.confidence == "low" and "noise_location" in a.account.flags
+    assert any(r.startswith("Flag: noise_location") for r in a.reasons) and any(r.startswith("Low-confidence record") for r in a.reasons)
+    strong = Signal(a.account.sf_account_id, SignalKind.EXEC_MOVE, 0.9, "zoominfo_scoop:S", NOW - timedelta(days=1),
+                    "new Head of Product", a.account.zoominfo_id)
+    low = ranker.rank_accounts([a.account], {a.account.sf_account_id: [strong]}, out.prospects, {}, set(), out.cfg, NOW)
     clean = _copy.deepcopy(a.account)
     clean.flags, clean.confidence = [], "normal"
-    r = ranker.rank_accounts([clean], out.signals, out.prospects, {}, set(), out.cfg, NOW)
-    assert r.ranked[0].score == a.score
+    ok = ranker.rank_accounts([clean], {clean.sf_account_id: [strong]}, out.prospects, {}, set(), out.cfg, NOW)
+    assert ok.ranked[0].score > ranker.LOW_CONFIDENCE_CEILING
+    assert low.ranked[0].score == ranker.LOW_CONFIDENCE_CEILING
+    assert "confidence_ceiling_adjustment" in low.ranked[0].score_breakdown
+    assert round(sum(low.ranked[0].score_breakdown.values()), 2) == low.ranked[0].score       # breakdown still sums
 
 
 def test_h_flagged_group_kept_flagged_and_penalised(world, tmp_path):
@@ -1327,9 +1344,23 @@ def test_j_three_thousand_accounts_cap_spill_runtime_memory(tmp_path):
     assert wall < 60 and peak < 1.5e9
 
 
-def test_j_record_calls_paging_cost_is_quadratic_but_ok_at_20k(tmp_path):
-    """record_calls deep-copies State per call (page). 20k calls in pages of 500 must stay under a few seconds;
-    pages of 100 are ~4x slower (see review_1g L-note: use large pages / one call for the DNC rebuild)."""
+def test_j_twelve_thousand_accounts_the_real_book_size(tmp_path):
+    """~12k ANZ accounts (the real book size): conservation, cap, runtime and memory ceilings."""
+    import resource
+    w = scale_world(12000, seed=7)
+    t0 = time.perf_counter()
+    out = run(w, tmp_path)
+    wall = time.perf_counter() - t0
+    check_conservation(out, w)
+    assert len(out.result.ranked) == CAP
+    assert wall < 120 and resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024 < 1500
+    ranker_section = out.log.split("== RANKER ==")[1]
+    assert len(ranker_section.splitlines()) < 200                              # ranker part of the log stays bounded
+
+
+def test_j_record_calls_paging_is_cheap_at_20k(tmp_path):
+    """FIXED (1c L5): record_calls no longer deep-copies State per page. 20k calls in pages of 100 (the worst case,
+    4.8 s before) now stay well inside a few seconds, and the result does not depend on the page size."""
     w = scale_world(300, seed=2)
     idx = build_disposition_index(w.dispositions)
     cfg_ = load_config(CFG_PATH)
@@ -1343,10 +1374,14 @@ def test_j_record_calls_paging_cost_is_quadratic_but_ok_at_20k(tmp_path):
     big = [dataclasses.replace(calls[i % len(calls)], nooks_id=f"FAKE-BIG-{i}") for i in range(20000)]
     t0 = time.perf_counter()
     st = State()
-    for i in range(0, len(big), 500):
-        st = st_mod.record_calls(st, big[i:i + 500], ps, by_sf, config=cfg_)
-    assert time.perf_counter() - t0 < 20
+    for i in range(0, len(big), 100):
+        st = st_mod.record_calls(st, big[i:i + 100], ps, by_sf, config=cfg_)
+    assert time.perf_counter() - t0 < 5
     assert len(st.seen_calls) == 20000
+    once = st_mod.record_calls(State(), big, ps, by_sf, config=cfg_)
+    a_, b_ = st_mod.state_to_dict(once), st_mod.state_to_dict(st)
+    a_.pop("last_run", None), b_.pop("last_run", None)             # counts of the LAST page differ by design
+    assert a_ == b_
 
 
 # ----------------------------------------------------------------------------- (k) logs
@@ -1377,6 +1412,20 @@ def test_k_log_has_no_raw_contact_details(world, tmp_path):
     for s in emails | phones:
         assert s not in out.log, s
     assert "@" not in out.log
+
+
+def test_k_scale_log_and_state_have_no_raw_contact_details(tmp_path):
+    w = scale_world(500, seed=9)
+    out = run(w, tmp_path)
+    blob = json.dumps(w.to_dict())
+    emails = set(re.findall(r"[\w.+-]+@[\w.-]+", blob))
+    phones = set(re.findall(r"\+\d{9,}", blob))
+    state_text = (tmp_path / "state.json").read_text()
+    assert emails and phones
+    assert not any(e in out.log or e in state_text for e in emails)
+    assert not any(ph in out.log for ph in phones)
+    assert "@" not in out.log and "@" not in state_text
+    assert set(re.findall(r"\+\d{9,}", state_text)) == set(json.loads(state_text)["dnc_phones"])
 
 
 def test_k_state_file_holds_hashed_emails_and_only_dnc_phones(world, tmp_path):
@@ -1463,10 +1512,9 @@ def test_l_logging_calls_carry_no_contact_details():
             assert not re.search(r"email|phone|prospect\.", l.lower().replace("unmatched", "")), l
 
 
-def test_h_duplicate_zoominfo_id_puts_the_trigger_on_one_duplicate_only(tmp_path):
-    """Two SF accounts share one ZoomInfo id (flagged possible_duplicate, both kept). The caller's
-    {zoominfo_id: account} dict keeps ONE, so one duplicate gets the trigger and the other reads 'No trigger'
-    (review_1g L: pipeline contract for 2c; trigger_radar keeps the FIRST, a plain dict comprehension the LAST)."""
+def test_h_duplicate_zoominfo_id_trigger_reaches_every_duplicate(tmp_path):
+    """FIXED (1d group_by_zoominfo_id + 1e list values): two SF accounts share one ZoomInfo id (flagged
+    possible_duplicate, both kept); both get the same trigger, so neither is wrongly labelled 'No trigger'."""
     b = Builder()
     for n in (1, 2):
         b.account(n, f"Dup {n} Pty Ltd", state="New South Wales", emp=300)
@@ -1477,8 +1525,9 @@ def test_h_duplicate_zoominfo_id_puts_the_trigger_on_one_duplicate_only(tmp_path
     b.scoop(1, "Funding", "Dup raised $5 million in funding.", 2, topics=("Funding",))
     out = run(b.w, tmp_path)
     got = {x.account.name: x for x in out.result.ranked}
-    assert all("possible_duplicate" in x.account.flags for x in got.values())
-    assert sorted(bool(x.signals) for x in got.values()) == [False, True]
+    assert len(got) == 2 and all("possible_duplicate" in x.account.flags for x in got.values())
+    assert all(x.signals and x.signals[0].kind is SignalKind.FUNDING for x in got.values())
+    assert len({x.signals[0].source for x in got.values()}) == 1
 
 
 # ----------------------------------------------------------------------------- (m) interface contracts
@@ -1539,26 +1588,30 @@ def test_m_prospect_to_account_join_paths(world, tmp_path):
     assert [p.nooks_id for p in out2.result.prospects[ranker.account_key(z2.account)]] == ["FAKE-NK-P-0027-2"]
 
 
-def test_m_signals_combination_formulas_differ():
-    """ranker adds +0.10 per extra signal; signals.combined_strength damps (x0.5). Two formulas for one idea
-    (review_1g L): only the ranker's is used on the real path."""
+def test_m_ranker_uses_the_single_signals_combination_formula():
+    """review_1g L (fixed in 1f-fixes): ranker.trigger_strength points come from signals.combined_strength."""
     s = [Signal("x", SignalKind.FUNDING, 0.5, "a", None, "e"), Signal("x", SignalKind.FUNDING, 0.4, "b", None, "e")]
     assert sig_mod.combined_strength(s) == 0.6
-    assert min(1.0, 0.5 + ranker.EXTRA_SIGNAL_BONUS * 1) == 0.6      # equal here by coincidence of 0.4*0.5
     s3 = s + [Signal("x", SignalKind.FUNDING, 0.2, "c", None, "e")]
-    assert sig_mod.combined_strength(s3) == 0.64 and min(1.0, 0.5 + 0.1 * 2) == 0.7
+    assert sig_mod.combined_strength(s3) == 0.64
+    cfg = load_config()
+    acct = Account("FAKE-X", "X", employees=500, timezone="Australia/Sydney")
+    _, b = ranker.score_account(acct, s3, False, False, cfg, date(2026, 11, 26))
+    assert b["trigger_strength"] == round(cfg.signals.weights.trigger_strength * 0.64, 2)
+    assert not hasattr(ranker, "EXTRA_SIGNAL_BONUS")
 
 
-def test_m_accounts_docstring_stale_about_id_forms():
-    """accounts.build_account_list's docstring still says 15/18 are NOT normalised; the code does normalise."""
-    assert "NOT normalised" in acc_mod.build_account_list.__doc__
+def test_m_accounts_docstring_matches_id_normalisation():
+    """FIXED (1d): the docstring no longer says 15/18-char ids are NOT normalised; the code does normalise."""
+    assert "NOT normalised" not in acc_mod.build_account_list.__doc__     # docstring fixed in phase1/1d-fixes
     r = acc_mod.build_account_list([{"Id": sf18(5), "Name": "A Pty Ltd", "BillingCountry": "Australia",
                                      "BillingState": "New South Wales", "ZoomInfo_Employee_Count__c": 100}], [], [],
                                    load_config(CFG_PATH), {sf15(5): date(2026, 11, 24)}, date(2026, 11, 25))
-    assert r.dropped and r.dropped[0].reason == "recently_touched"       # so the docstring is wrong, the code right
+    assert r.dropped and r.dropped[0].reason == "recently_touched"       # 18-char row, 15-char touched key
 
 
-def test_m_state_notes_stale_about_plus_addressing():
+def test_m_plus_addressing_is_matched_and_state_notes_say_so():
+    assert "Plus-addressing (`a+x@` vs `a@`) is not matched" not in (ROOT / "docs" / "state_notes.md").read_text()
     assert normalise_email_for_match("a+x@Example.com") == normalise_email_for_match("A@example.com") == "a@example.com"
 
 
@@ -1579,31 +1632,36 @@ def test_m_guessed_timezone_no_longer_calls_later_but_models_comment_says_so(wor
 
 
 # ----------------------------------------------------------------------------- (n) tracked leftovers
-def test_n_1c_M1_partial_history_is_accepted_as_a_full_rebuild(world, tmp_path):
-    """STILL PRESENT. mark_dnc_rebuilt trusts the caller's count: one page of one call 'proves' a full rebuild."""
+def test_n_1c_M1_partial_history_is_rejected(world, tmp_path):
+    """Fixed: mark_dnc_rebuilt needs reached_last_page=True and calls_seen >= distinct calls already recorded."""
     idx = build_disposition_index(world.dispositions)
     cfg_ = load_config(CFG_PATH)
     calls = [call_from_nooks(r, idx) for r in world.calls]
     st = st_mod.record_calls(State(), calls[:1], [], {}, config=cfg_)       # page 1 of N only
-    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"])
-    st_mod.require_healthy(st, live=True)                                   # live runs now allowed...
-    assert not st.dnc_prospect_ids or len(st.dnc_prospect_ids) < len(DNC_IDS)       # ...with DNC incomplete
+    with pytest.raises(ValueError):                                         # adapter says hasMore is still true
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 1, reached_last_page=False)
+    full = st_mod.record_calls(State(), calls, [], {}, config=cfg_)
+    with pytest.raises(ValueError):                                         # count smaller than calls already held
+        st_mod.mark_dnc_rebuilt(full, date(2026, 11, 25), 1, reached_last_page=True)
+    with pytest.raises(st_mod.StateResetError):
+        st_mod.require_healthy(st, live=True)
 
 
-def test_n_1c_L1_saving_an_empty_state_over_a_populated_file_wipes_dnc_silently(world, tmp_path):
-    """STILL PRESENT. save_state has no guard against replacing a populated file with an empty State."""
+def test_n_1c_L1_saving_an_empty_state_over_a_populated_file_is_refused(world, tmp_path):
+    """Fixed: StateShrinkError unless allow_shrink=True; the old file is kept and a .prev backup exists."""
     out = run(world, tmp_path)
-    assert json.loads((tmp_path / "state.json").read_text())["dnc_prospect_ids"]
-    st_mod.save_state(State(), tmp_path)                                    # no exception, no .bak
-    raw = json.loads((tmp_path / "state.json").read_text())
-    assert raw["dnc_prospect_ids"] == [] and raw["dnc_phones"] == []
-    assert not any(p.name.startswith("state.json.") for p in tmp_path.iterdir())
-    assert not st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))            # the marker gate still catches it
+    before = (tmp_path / "state.json").read_text()
+    assert json.loads(before)["dnc_prospect_ids"]
+    with pytest.raises(st_mod.StateShrinkError):
+        st_mod.save_state(State(), tmp_path)
+    assert (tmp_path / "state.json").read_text() == before
+    st_mod.save_state(State(), tmp_path, allow_shrink=True)                 # explicit override
+    assert (tmp_path / "state.json.prev").read_text() == before
+    assert not st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))            # and the marker gate still catches it
 
 
-def test_n_1c_L2_malformed_local_date_falls_back_to_the_utc_date(tmp_path):
-    """STILL PRESENT. Call at Tue 23:00 UTC = Wed 10:00 Sydney; with a corrupt stored local date the fallback is the
-    UTC date (Tue), so the cooldown ends a day early (Mon->Thu would be Wed->Sat)."""
+def test_n_1c_L2_malformed_local_date_falls_back_to_the_account_zone(tmp_path):
+    """Fixed: Tue 23:00 UTC = Wed 10:00 Sydney; with a corrupt stored date the fallback uses the account zone."""
     st = State(accounts={sf15(1): AccountState(last_call_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
                                               last_call_date="2026-11-25", last_outcome="no_contact")})
     raw = st_mod.state_to_dict(st)
@@ -1612,8 +1670,8 @@ def test_n_1c_L2_malformed_local_date_falls_back_to_the_utc_date(tmp_path):
     bad = st_mod.state_from_dict(json.loads(json.dumps(raw)))
     cfg_ = load_config(CFG_PATH)
     assert st_mod.cooldown_until(good, cfg_)[sf15(1)] == date(2026, 11, 28)
-    assert st_mod.cooldown_until(bad, cfg_)[sf15(1)] == date(2026, 11, 27)
-    assert any("malformed last_call_date" in w for w in bad.load_warnings)   # at least it is logged
+    assert st_mod.cooldown_until(bad, cfg_)[sf15(1)] == date(2026, 11, 28)  # no longer a day short
+    assert any("malformed last_call_date" in w for w in bad.load_warnings)
 
 
 def test_n_1e_max_age_days_still_drives_ranker_recency(world, tmp_path):
@@ -1642,10 +1700,8 @@ def test_n_1f_unmatched_titles_still_unmatched(world, tmp_path, cfg):
             assert got is None, title                   # Product Owner / Engineering Manager / CIO unmatched
 
 
-# ----------------------------------------------------------------------------- known bugs (xfail = desired behaviour)
-@pytest.mark.xfail(strict=False, reason="review_1g H2: ranker._best_signal ignores the 'intent is never best while a "
-                                        "real signal exists' rule of signals.best_signal")
-def test_bug_intent_never_outranks_a_real_dated_signal(world, tmp_path):
+# ----------------------------------------------------------------------------- former 1g findings, now fixed (regression guards)
+def test_fixed_h2_intent_never_outranks_a_real_dated_signal(world, tmp_path):
     out = run(world, tmp_path)
     a = next(x.account for x in out.result.ranked if x.account.name == name_of(world, 4))
     fund = Signal(a.sf_account_id, SignalKind.FUNDING, 0.1585, "zoominfo_scoop:F", NOW - timedelta(days=45), "raised", a.zoominfo_id)
@@ -1657,23 +1713,115 @@ def test_bug_intent_never_outranks_a_real_dated_signal(world, tmp_path):
     assert ra.signals[0].kind is SignalKind.FUNDING
 
 
-@pytest.mark.xfail(strict=False, reason="review_1g M1: an email touch drops an account only when it has NO call "
-                                        "history (accounts._drop_reason returns early when cooldown_until covers the id)")
-def test_bug_email_touch_treated_the_same_with_and_without_call_history(world, tmp_path):
+def test_fixed_m1_email_touch_treated_the_same_with_and_without_call_history(world, tmp_path):
     out = run(world, tmp_path)
     got = where(out)
     assert got[name_of(world, 28)][0] == got[name_of(world, 29)][0]
 
 
-@pytest.mark.xfail(strict=False, reason="review_1g L: filter_scoops ages use the Sydney calendar date, the ranker "
-                                        "uses elapsed 24h periods, so the same scoop reads '4 days' and '3 days'")
-def test_bug_scoop_age_wording_agrees_between_signals_and_ranker(world, tmp_path):
+def test_fixed_l1_scoop_age_wording_agrees_between_signals_and_ranker(world, tmp_path):
     out = run(world, tmp_path, now=datetime(2026, 11, 25, 20, 30, tzinfo=UTC))
     ra = where(out)[name_of(world, 1)][1]
     v = next(v for v in out.verdicts if v.scoop.company_id == "FAKE-ZI-0001")
     days_v = int(re.search(r"(\d+) days? ago", v.reason).group(1))
     days_r = int(re.search(r"(\d+) days? ago", ra.reasons[0]).group(1))
     assert days_v == days_r
+
+
+# ----------------------------------------------------------------------------- new contracts after the fixes
+def test_contract_signatures_require_the_new_arguments(world, tmp_path):
+    """Phase 2 callers cannot forget them: reached_last_page and run_date are required, call_date is accepted."""
+    import inspect
+    assert inspect.signature(st_mod.mark_dnc_rebuilt).parameters["reached_last_page"].default is inspect.Parameter.empty
+    assert inspect.signature(st_mod.last_sheet_ids).parameters["run_date"].default is inspect.Parameter.empty
+    assert inspect.signature(st_mod.was_in_last_sheet).parameters["run_date"].default is inspect.Parameter.empty
+    assert "call_date" in inspect.signature(acc_mod.build_account_list).parameters
+    st = State()
+    with pytest.raises(TypeError):
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3)                      # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        st_mod.last_sheet_ids(st)                                                # type: ignore[call-arg]
+    with pytest.raises(ValueError):
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3, reached_last_page=False)
+
+
+def test_contract_new_seat_with_no_calls_needs_explicit_confirmation():
+    """FIXED (1c L3): an empty history can be marked rebuilt only with empty_history_confirmed=True."""
+    st = State()
+    with pytest.raises(ValueError):
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True)
+    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
+    st_mod.require_healthy(st, live=True)
+
+
+def test_contract_accounts_ignore_touched_when_cooldown_until_is_given(world, tmp_path):
+    """FIXED (1d M1): an explicit touch map cannot drop an account when cooldown_until is supplied (even empty)."""
+    cfg_ = load_config(CFG_PATH)
+    kw = dict(blocked_account_ids=set(), cooldown_until={}, call_date=date(2026, 11, 26))
+    r = acc_mod.build_account_list(world.sf_rows, world.nooks_accounts, world.zoominfo_rows, cfg_,
+                                   {sf15(1): date(2026, 11, 25)}, date(2026, 11, 25), **kw)
+    assert name_of(world, 1) in {a.name for a in r.accounts}
+    legacy = acc_mod.build_account_list(world.sf_rows, world.nooks_accounts, world.zoominfo_rows, cfg_,
+                                        {sf15(1): date(2026, 11, 25)}, date(2026, 11, 25))
+    assert name_of(world, 1) in {d.name for d in legacy.dropped}                 # legacy path still available
+
+
+def test_contract_run_log_names_every_skipped_needs_prospect_and_spilled_account(tmp_path):
+    """FIXED (1f L7, rule 5): the log names accounts and says why; bounded by list_limit with an 'and N more' tail."""
+    w = mini_world(25)
+    out = run(w, tmp_path, now=datetime(2026, 11, 25, 5, 10, tzinfo=UTC))
+    log = out.log
+    r = out.result
+    assert r.spilled and r.needs_prospect
+    for x in r.spilled + r.needs_prospect:
+        assert x.account.name in log
+    assert "SPILLED" in log and "NEEDS PROSPECT" in log
+    big = run(scale_world(600, seed=5), tmp_path / "big")
+    names = [x.account.name for x in big.result.skipped[:25]]
+    assert all(n in big.log for n in names)
+    assert re.search(r"and \d+ more", big.log)
+    assert len(big.log.split("== RANKER ==")[1].splitlines()) < 200              # ranker section bounded at scale
+
+
+def test_contract_state_last_run_counts_survive_save_and_load(world, tmp_path):
+    """FIXED (1c L4): counts from record_calls / record_sent_emails / record_sheet are saved (counts only, no ids)."""
+    run(world, tmp_path)
+    st = st_mod.load_state(tmp_path)
+    assert st.last_run["record_calls"]["calls_seen"] >= 1
+    assert st.last_run["record_sheet"]["recorded"] >= 1
+    assert st.last_run["record_sent_emails"]["new"] == 2
+    text = (tmp_path / "state.json").read_text()
+    assert "@" not in text
+
+
+def test_contract_accounts_without_a_salesforce_id_are_counted_not_silent(tmp_path):
+    """FIXED (1c L6, partly): record_sheet counts ids it cannot store. They still cannot be hard-skipped."""
+    st = st_mod.record_sheet(State(), date(2026, 11, 25), [sf15(1), None, None])
+    assert st.report["record_sheet"] == {"recorded": 1, "dropped_no_id": 2}
+
+
+def test_known_gap_n2_early_zone_account_in_cooldown_is_penalised_not_skipped(tmp_path):
+    """NEW after the merge (review_1g N2), pinned as current behaviour, NOT fixed. accounts gets ONE call_date (Sydney's
+    first usable day). On a Thu 16:28 run that is Friday, so a Perth account whose cooldown ends Friday is KEPT by accounts;
+    the ranker then gives Perth its own first usable day (Thursday 13:30 AWST), sees the cooldown (-30, 'In cooldown'),
+    but still ranks it and gives it a Thursday slot, i.e. a task inside its cooldown. When this is fixed (skip with a
+    reason, or per-zone call_date in accounts) flip this test."""
+    b = Builder()
+    b.account(1, "Perth Cool Pty Ltd", state="Western Australia", emp=200)
+    p = b.prospect(1, 1, HEAD_PROD)
+    b.scoop(1, "Funding", "Perth raised $5 million in funding.", 2, topics=("Funding",))
+    b.call(p, "No Answer", 0.6, duration=30)                                    # Tue 24 Nov local: cooldown ends Fri 27
+    b.account(2, "Syd Cool Pty Ltd", state="New South Wales", emp=200)
+    q = b.prospect(2, 1, HEAD_PROD)
+    b.scoop(2, "Funding", "Syd raised $5 million in funding.", 2, topics=("Funding",))
+    b.call(q, "No Answer", 0.6, duration=30)
+    out = run(b.w, tmp_path, now=datetime(2026, 11, 26, 5, 28, tzinfo=UTC))
+    assert out.cooldown[sf15(1)] == date(2026, 11, 27)
+    got = {x.account.name: x for x in out.result.ranked}
+    perth, syd = got["Perth Cool Pty Ltd"], got["Syd Cool Pty Ltd"]
+    assert syd.local_call_time.date() == date(2026, 11, 27) and "In cooldown" not in syd.reasons
+    assert perth.local_call_time.date() == date(2026, 11, 26) and "In cooldown" in perth.reasons
+    assert perth.score_breakdown["cooldown_penalty"] == -30.0
 
 
 # ----------------------------------------------------------------------------- state gate / dry run wiring
@@ -1684,8 +1832,10 @@ def test_gate_live_requires_marker_and_dry_run_only_warns(tmp_path):
         st_mod.require_healthy(st, live=True)
     st_mod.require_healthy(st, live=False)
     with pytest.raises(ValueError):
-        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0)
-    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3)
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True)      # 0 needs confirmation
+    with pytest.raises(ValueError):
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3, reached_last_page=True)      # nothing was recorded
+    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
     st_mod.require_healthy(st, live=True)
     st_mod.save_state(st, tmp_path)
     assert st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))
@@ -1717,16 +1867,20 @@ def _main(argv):
         import tempfile
         d = pathlib_Path(tempfile.mkdtemp())
         st_mod.save_state(st_mod.record_sheet(State(), date(2026, 11, 24), [sf18(10)]), d)
-        print(run_pipeline(named_world(), d, now=NOW, mark_sheet=False).log)
+        late = "--late" in argv                  # Wed 16:12 AEDT: Sydney has 5 slots left, so some accounts spill
+        print(run_pipeline(named_world(), d, now=datetime(2026, 11, 25, 5, 12, tzinfo=UTC) if late else NOW,
+                           mark_sheet=False).log)
     if "--scale" in argv:
         import tempfile, resource, tracemalloc
-        w = scale_world(3000, seed=7)
+        n_ = int(argv[argv.index("--scale") + 1]) if argv.index("--scale") + 1 < len(argv) else 3000
+        page_ = int(argv[argv.index("--call-page") + 1]) if "--call-page" in argv else 7
+        w = scale_world(n_, seed=7)
         t0 = time.perf_counter()
-        out = run_pipeline(w, pathlib_Path(tempfile.mkdtemp()), now=NOW)
+        out = run_pipeline(w, pathlib_Path(tempfile.mkdtemp()), now=NOW, call_page=page_)
         wall = time.perf_counter() - t0
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
         tracemalloc.start()
-        run_pipeline(w, pathlib_Path(tempfile.mkdtemp()), now=NOW)
+        run_pipeline(w, pathlib_Path(tempfile.mkdtemp()), now=NOW, call_page=page_)
         peak = tracemalloc.get_traced_memory()[1] / 1e6
         print(json.dumps({"wall_s": round(wall, 2), "stages_s": {k: round(v, 3) for k, v in out.timings.items()},
                           "py_heap_peak_mb_during_run": round(peak, 1), "maxrss_mb_whole_process": round(rss, 1),

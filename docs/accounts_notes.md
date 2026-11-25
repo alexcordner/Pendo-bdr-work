@@ -35,9 +35,16 @@ Their timezone already starts at the HQ state (loader rule). To exclude them lat
   (pass `touched` dates, or `cooldown_days`, already adjusted for outcome).
 - Salesforce ids: the loaders canonicalise to the 15-char form; `build_account_list` also normalises the keys of
   `touched`, `cooldown_until`, `blocked_account_ids` and the Nooks `_sf_account_id`, so 15- and 18-char forms match.
-- `cooldown_until` (optional `Mapping[str, date]`, e.g. from 1c state) takes precedence over `touched` +
-  `cooldown_days` for the ids it covers: dropped while `today < cooldown_until`. Otherwise callers should pass
-  `touched` dates already adjusted for outcome (no-answer vs connect).
+- **Cooldown contract (prefer `cooldown_until`):** callers pass `cooldown_until` (from state:
+  `state.cooldown_until` / `cooldown_until_by`). When it is given (even `{}`), `touched` is ignored, so an
+  email-only touch never drops an account (emails do not start call cooldowns). `touched` + `cooldown_days`
+  is the legacy path for tests and callers without state. Dropped while `cooldown_until` is after the reference
+  date; equal is eligible.
+- `call_date` (optional): the first date the account would be called (2c passes it; account-local semantics are
+  the caller's job). Reference date is `call_date` if given, else `today`, so a Wed-night run with `call_date=Thu`
+  keeps an account whose cooldown ends Thu.
+- `group_by_zoominfo_id(accounts)` returns every account per ZoomInfo id (possible_duplicate ones included) so the
+  signals join can attach one trigger to all of them.
 - Duplicates can share an `sf_account_id` (two rows with the same Id are kept and flagged `possible_duplicate`), so
   callers that key a dict on `sf_account_id` must handle collisions.
 - Government rule for ZoomInfo-only rows is looser (jurisdiction word first, e.g. "Victorian Department of
