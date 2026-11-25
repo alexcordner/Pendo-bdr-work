@@ -144,3 +144,67 @@ At `now` = Wed 20:00 UTC: Sydney Thu 07:00 -> window Thu 08:45-11:30 +11:00; Per
 
 ## Suggested order of fixes
 1. H1 (callable/needs_prospect split, cap on callable only). 2. H2 (call-date based cooldown, `date` coercion). 3. M1 decision, M3 guard. 4. M2 title normalisation plus config aliases. 5. M4 doc/code alignment, M5 scheduling capacity after Alex says how many calls per window.
+
+---
+
+# Re-review of commit 28980ed (worker fixes), 2026-11-25
+
+Scope: narrow, offline, read-only. Merged `origin/phase1/1f-ranker` into this branch and re-ran `python docs/review_1f_checks.py` (the script was updated for the new `score_account` signature and new result shape; its second half is the re-review).
+
+## FINAL: PASS, with one required fix (N1) before 2c relies on the spill flag
+N1 is a medium bug in the new scheduling code; it does not affect a normal evening or overnight run, so it does not block 1g. It does block "exclude spilled accounts from tonight's tasks" (recommendation 4) until fixed.
+
+## 1. Tests and determinism
+- `pytest tests -q`: **292 passed**; with `-W error`: **292 passed**.
+- Shuffle test (20 shuffles of accounts, prospects, per-key signals; 150 accounts, 4 timezones including None, ties, guessed flags): identical output including `needs_prospect` and its codes. Digest `7a267429ffaa759beec2b91f6919abf8` of the same run under `PYTHONHASHSEED` 0, 1, 42, 999 matched (run via `docs/review_1f_checks.py`; the script prints the digest for comparison).
+- 72 run times (every 0:00/0:29/0:59 UTC for a day), 40 accounts split Sydney/Perth: **0** slots outside a call window or before `now`.
+
+## 2. Status of earlier findings
+| ID | Status | Evidence |
+|---|---|---|
+| H1 | **FIXED** | 45 no-prospect (fresh Funding) + 10 callable tier-3: `ranked` = 10 (all callable), `needs_prospect` = 45, none has a window or call time, codes `no_prospects_on_account` x45. Codes also verified: no phone -> `persona_match_no_phone`, intern title -> `no_persona_match`, none -> `no_prospects_on_account`; all-blocked -> skipped. `summarise()` prints the bucket. `src/ranker.py:408-413, 424-428, 439-440`. |
+| H2 | **FIXED** | Tue 20:00 AEDT run, call date Wed 25 Nov: `cooldown_until` Wed -> penalty 0.0; Thu -> -30. `datetime` value accepted (`.date()`); `str`/`int` raise a clear `ValueError` up front (`:342-351`). 23:00 UTC run with `cooldown_until` = Thu (Sydney call date): 0.0. Caveat: see N1 (call date can be wrong on late-day runs). |
+| M1 | **FIXED for `last_sheet_ids`** | Hard skip `on last sheet` (`:392-394`), also for accounts with no prospect (verified: 0 in `needs_prospect`, 1 skipped). Active cooldown remains a -30 penalty by design (worker relies on 1d dropping recently touched accounts). Accepted, but it is a cross-task dependency: verify 1d really does that. |
+| M2 | **FIXED, residual gaps** | See table below. |
+| M3 | **FIXED** | `"Mars/Base"` and `""` -> skipped `invalid timezone ...`; `None` -> `no timezone`. `:376-381`. |
+| M4 | **NOT FIXED (docs only)** | `docs/interfaces.md:46, 90` and `src/models.py:70` still say "no icp_fit points" for unknown headcount; code and `docs/ranker_notes.md` say 7.5. The worker flagged it for the coordinator; one-line doc edits. |
+| M5 | **FIXED** (new code reviewed below, N1 found) | 40 accounts at 07:00 Thu: 20 morning + 20 afternoon, min gap 517 s, 08:45-16:21. |
+| L1 | NOT FIXED (documented) | Future-dated signal still gets full recency (`:232`); `ranker_notes.md` says 1e must not emit them. Low; recommend 1e drops dates > now + 1 day. |
+| L2 | **FIXED** | Naive `source_date` treated as UTC (`:230-231`, `_ts`). |
+| L3/L4 | **FIXED by removal** | The guessed-timezone later-half rule is gone (it never protected Perth); one shared timeline per timezone. Guessed accounts now get no special treatment other than the reason text. Accept. |
+| L5 | **FIXED** | Prospects de-duplicated by `nooks_id` / `sf_contact_id` (`:383-386`). |
+
+### M2 titles (current result: level, position)
+Match now: Chief Technology Officer, CTO & Co-founder, Interim CTO (secondary CTO); VP, Product / VP of Product / Vice President, Product / Vice President of Product (primary VP Product); Head of CX, Head of Customer Support, Customer Success Director (primary); Head of Products, Product Managers (plural ok); Director, Product Management; Senior Director of Product; Associate Director, Product; Product Director / Digital Director; Group Head of Digital Workplace (now the intended secondary); Head of Digital Experience (primary Head of Digital: acceptable, digital-experience roles are a Pendo fit); Head, Product; Head of Product (Acting).
+Correctly NOT matched: Director (alone), Director of Product-Led Growth, Head of Product-Led Growth, Product-Led Growth Lead, Co-CTO, Chief Executive Officer, Director of Engineering, Engineering Manager, Product Owner, VP Engineering, Product Lead, Head of Technology, Head of Information Technology.
+Still unmatched, judgement: **Chief Product & Technology Officer** (compound; recommend an alias group {"chief product technology officer"} under the CPO group, it is a primary-level buyer), **Customer Success Manager** (individual contributor; correct to exclude, Alex's call to add as secondary), CIO (alias exists but CIO is not a configured persona), Director of Customer Experience / VP Customer Success (config lacks them; Alex's call), Product Management Lead / Customer Success Lead.
+New false-positive risk: **"Former Head of Product"** (and "Ex-", "Previous") matches because "former" is just another token. Low; consider a `_STALE_WORDS = {"former", "ex", "previous", "ex-"}` guard. Also "Deputy Head of Product" matches primary (arguably fine).
+
+## 3. New code review: scheduling (`_timeline`, `_assign_times`, `:448-500`)
+Verified:
+- **Correct**: per-timezone timelines; slots never before `now`, never outside a window (72 run times); min gap 180 s in every case tried (40 accounts, 130 accounts over one day, 15:00 and Fri 15:00 runs). Slot arithmetic cannot reach the window end: `(n-1) x gap < total`, and `gap = total // n >= 180` because `n <= sum(floor(seg / 180 s))`.
+- **Windows at edges**: run 11:29 Syd -> the 1-minute morning stub is dropped and the sheet starts 13:30; run exactly at 11:30 -> afternoon (end exclusive, helper unchanged).
+- **Perth/Sydney/Auckland, same run**: 04:00 UTC: Auckland Thu 08:45 +13 (17:00 Wed, next day), Perth Wed 13:30 +08, Sydney Wed 15:00 +11 (starts at `now`, inside the afternoon window). 23:00 UTC: Auckland Thu 13:30, Perth Thu 08:45, Sydney Thu 10:00 (now already 10:00 there). Each is correct for its own zone.
+- **DST**: run Fri 2 Oct 2026 13:00 Sydney with 130 accounts and cap 200: 60 on Fri 2 Oct (+10:00) and 70 on Mon 5 Oct (+11:00); Auckland Fri 2 Apr 2027: 60 Fri (+13:00), 70 Mon (+12:00); min gap 180 s. Wall-clock arithmetic is safe because DST changes on Sunday, never inside a window (public holidays not modelled).
+- **Cap vs capacity**: a full day holds 115 accounts at 3 min (55 morning + 60 afternoon); 130 accounts gave Thu 115 + Fri 15. With the default cap of 40 spill only happens on late runs: Thu 15:00 -> 10 of 40 spill to Fri (the lowest-ranked 10, best earliest); Fri 15:00 -> 10 spill to Mon.
+- **Determinism**: timezones processed in sorted order, members best first; shuffles identical.
+- `needs_prospect_codes` correct (above). `by_window` can contain spilled accounts under the later day's window name; builder must use the date, not the window name.
+
+### New findings
+- **N1 (MEDIUM). "Call date" is taken from `windows[0]` even when that window is unusable, so spill labelling and cooldown use the wrong day.** `src/ranker.py:396-397` vs `_timeline` (`:459`, drops segments < 3 min). Run Thu 16:28 Syd (2 min left in the afternoon window): all 40 accounts are scheduled for Fri 08:45+ and **all 40 get "Spilled to Fri ..."** (they are simply on the next working day). Run Wed 16:29 with `cooldown_until` = Thu: penalised -30 and labelled "Spilled" although Thu is the day it will be called. Fix: compute the first usable day from `_timeline` first (`call_date` = local date of the first day with any usable segment) and use it for the cooldown and for the spill test (`:497`). Required before the sheet builder excludes spilled accounts (item 4), otherwise a late run would produce an empty sheet.
+- **N2 (LOW). No machine-readable spill flag.** Spill exists only as a reason string (`"Spilled to ..."`, `:497-498`). Add `RankResult.spilled: list[RankedAccount]` (or ids) so 2c does not parse text.
+- **N3 (LOW).** For an in-window run the first slot equals `now` exactly (e.g. Thu 15:00:00 at a 15:00 run), so the first call cannot be dialed on time. Add a small lead time (e.g. 5 min) or document that tasks are for the next working day anyway.
+- **N4 (LOW).** Spilled accounts keep their daily-cap slot, so a Perth account spilled to Monday blocks rank 41 in Sydney that could have called tonight. Effect only on late runs; accept and document.
+- **N5 (LOW).** Stale-title match ("Former Head of Product"), above.
+- **No new HIGH.** No imports of state/accounts/signals: only `from src.config` and `from src.models` (verified by regex), no I/O, no network, Python 3.11+ syntax, constants documented at the top.
+
+## 4. DESIGN: should spilled accounts get tonight's Nooks tasks?
+**Recommendation: no. Agree with the coordinator's lean, tightened.**
+1. The nightly sheet and Nooks tasks include only accounts whose `local_call_time` falls on the **first usable working day** for their timezone (the day the sheet is for). Spilled accounts (later day) are neither written as tasks nor recorded in sheet history or `last_sheet_ids`.
+2. Why: (a) CLAUDE.md rule 2 means a wrongly dated task can never be fixed by deleting or overwriting it, so write only what is certain; (b) `last_sheet_ids` is now a **hard** skip, so recording a spilled account as served would block it the next night, the opposite of what spill means; (c) tomorrow's run re-ranks with fresh `now`, cooldowns and signals, so a held account re-enters on merit at no cost; (d) a Nooks task dated three days out clutters Alex's queue and goes stale.
+3. Preconditions: fix N1 (otherwise a late run labels the whole sheet "spilled") and add N2 (a spill flag). Define "tonight's day" per timezone as the first usable day; accounts in different zones may legitimately have different dates.
+4. The run log should list spilled accounts (name, intended day) so nothing disappears silently; they are not "skipped for a reason", they are "held".
+5. Also decide, in 2c, whether `ranked` truncation should fill free slots from the cap-cut list in other timezones (N4); my view: not worth the complexity at a cap of 40.
+
+## Not verified
+Real 1c/1d/1e output (not on this branch); that 1d drops recently touched accounts (the cooldown-penalty-only decision depends on it); real call cadence (3 min is a default).
