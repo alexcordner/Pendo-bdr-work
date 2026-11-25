@@ -1,5 +1,9 @@
 {
-  "_note": "SOQL Task WHERE OwnerId=<SF user id> AND IsClosed=false. 30 rows total; these are stale 'BDR Meeting Booked' tasks, WhatId null. Names removed.",
+  "_note": "SOQL Task WHERE OwnerId=<SF user id> AND IsClosed=false ORDER BY CreatedDate DESC LIMIT 30 -> 30 rows: 28 Type='BDR Meeting Booked' (Jan-Mar 2026, WhatId null, subject '<Contact Name> - BDR Meeting Booked'), 2 Type='Call' (Jan/Mar 2026, ActivityDate set, WhatId null). Rows below are 3 anonymised samples.",
+  "count_by_type": {
+    "BDR Meeting Booked": 28,
+    "Call": 2
+  },
   "records": [
     {
       "Id": "00T-EXAMPLE-1",
@@ -9,8 +13,27 @@
       "TaskSubtype": "Task",
       "ActivityDate": null,
       "WhatId": null,
-      "WhoId": "003-EXAMPLE-A",
-      "CreatedDate": "2026-03-05T04:49:51.000+0000"
+      "CreatedDate": "2026-03-09T00:45:36.000+0000"
+    },
+    {
+      "Id": "00T-EXAMPLE-2",
+      "Subject": "<Contact Name> - BDR Meeting Booked",
+      "Status": "Not Started",
+      "Type": "BDR Meeting Booked",
+      "TaskSubtype": "Task",
+      "ActivityDate": null,
+      "WhatId": null,
+      "CreatedDate": "2026-02-17T06:33:42.000+0000"
+    },
+    {
+      "Id": "00T-EXAMPLE-3",
+      "Subject": null,
+      "Status": "Not Started",
+      "Type": "Call",
+      "TaskSubtype": "Task",
+      "ActivityDate": "2026-03-06",
+      "WhatId": null,
+      "CreatedDate": "2026-03-02T01:15:23.000+0000"
     }
   ]
 }

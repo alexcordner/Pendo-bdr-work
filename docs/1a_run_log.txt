@@ -1,0 +1,23 @@
+1a run log (audit). Reconstructed from the session transcript after the fact. The first session had no log file committed (logs/*.log is gitignored), so this is the committed copy. Counts are what each call returned. No PII.
+Mode: READ-ONLY. No writes, no sends, no drafts, no notes. ZoomInfo credits: 0 (no redeem, no enrich, no account_research, no conversation_intelligence).
+
+ROUND 1 (original task)
+Salesforce (all reads)
+ getUserInfo                1 call  -> 1 user
+ getObjectSchema            2 calls (Account; AccountTeamMember+Task) -> saved to file (177k and 93k chars)
+ soqlQuery                  about 14 calls, all SELECT: COUNT/sample on Account by Assigned_SDR__c (19,660; 7,604 AU/NZ non-customer; 41 SDR_Target), Task open (30), AccountTeamMember count (0), Contact by Id (1), Account by Id (1), Contact HasOptedOutOfEmail count (3,762). 4 returned INVALID_FIELD errors (NumberOfEmployees, Account_Status__c, DoNotCall) -> no data.
+Nooks (all reads)
+ getMe 1 | listCallDispositions 1 (32 dispositions) | listCalls 1 (40 calls, 7 days) | listTasks 3 (page of 50; empty probe; page of 100 manual_email) | listProspects 1 (2) | getProspect 1 | listAccounts 1 (1)
+Gmail (all reads, metadata view only, no bodies)
+ search_threads 7 calls: in:sent newer_than:7d (5 of 10 shown); to: tests (2 empty, 3 found); in:sent after:2026/11/18 (10 threads)
+ZoomInfo (free searches)
+ search_companies 2 calls: AU+NZ size 20-2000 (25 of 192,853); companyName 'Sydney CBD' (10 of 65)
+ search_scoops 2 calls: AU+NZ 30 days (50 of 4,695); type-filtered (25 of 7,118)
+Written: docs/connector_notes.md, 13 fixtures, local log (gitignored).
+
+ROUND 2 (coordinator review fixes)
+Nooks reads: listCalls 2 calls (14 days, 104 calls over 2 pages); listTasks 1 more page of 100 manual_email
+Salesforce reads (soqlQuery SELECT only): BillingState group (107 values), BillingCountry group, Contact phone formats (12 rows), Contact->Account join (2), open Task list (30), null-state fallback count (622), HQ_Country null-BillingCountry count (4,926), SDR_Target state group (5)
+ZoomInfo: search_companies by companyIdList (2 ids, free)
+Written: fixtures nooks_calls_14d_rows, nooks_manual_email_backlog, sf_nooks_zoominfo_chain, sf_billing_state_values, phone_formats, zoominfo_scoop_sample_evidence; updated sf_tasks_open, zoominfo_scoops; notes edits.
+Limits of this log: counts for round 1 were recorded from memory of tool results, not from a machine-captured trace; exact call counts may be off by one or two.

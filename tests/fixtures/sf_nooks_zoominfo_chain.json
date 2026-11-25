@@ -1,0 +1,87 @@
+{
+  "_note": "Join path, verified on two rows. Nooks prospect.crmId = SF Contact.Id. Contact.AccountId = SF Account.Id. Account.DOZISF__ZoomInfo_Id__c = ZoomInfo companyId (search_companies companyIdList returned the same company name). Nooks account: listAccounts filter_crmId=<SF Account.Id> (prospect.account is a Nooks UUID, not a SF id). Contacts anonymised.",
+  "verified_pairs": [
+    {
+      "sf_account": {
+        "Id": "0010a00001RoVJYAA3",
+        "Name": "Shippit",
+        "BillingCountry": "Australia",
+        "BillingState": "New South Wales",
+        "ZoomInfo_Employee_Count__c": 155,
+        "Current_Customer__c": false,
+        "SDR_Target__c": true,
+        "DOZISF__ZoomInfo_Id__c": "366181829"
+      },
+      "zoominfo_search_companies_by_id": {
+        "id": "366181829",
+        "type": "Company",
+        "attributes": {
+          "name": "Shippit"
+        }
+      },
+      "nooks_account_by_crmId": {
+        "name": "Shippit",
+        "domain": "shippit.com",
+        "numEmployees": 155,
+        "source": "salesforce"
+      }
+    },
+    {
+      "sf_account": {
+        "Id": "0010a00001MavKfAAJ",
+        "Name": "Phocas Software",
+        "BillingCountry": "Australia",
+        "BillingState": "New South Wales",
+        "ZoomInfo_Employee_Count__c": 215,
+        "Current_Customer__c": false,
+        "SDR_Target__c": true,
+        "DOZISF__ZoomInfo_Id__c": "347001511"
+      },
+      "zoominfo_search_companies_by_id": {
+        "id": "347001511",
+        "type": "Company",
+        "attributes": {
+          "name": "Phocas Software"
+        }
+      }
+    }
+  ],
+  "prospect_to_account_chain": [
+    {
+      "nooks_prospect": {
+        "id": "prospect-uuid-1",
+        "crmId": "003Pf00000A2h38IAB",
+        "title": "Head of Product",
+        "primaryEmail": "<first.last>@example.com"
+      },
+      "sf_contact": {
+        "Id": "003Pf00000A2h38IAB",
+        "AccountId": "001Pf00000AHnY5IAL",
+        "MobilePhone": "+61 4XX XXX XXX",
+        "HasOptedOutOfEmail": false
+      },
+      "sf_account": {
+        "Id": "001Pf00000AHnY5IAL",
+        "Name": "Xemplo",
+        "DOZISF__ZoomInfo_Id__c": "1326795596"
+      }
+    },
+    {
+      "nooks_prospect": {
+        "id": "prospect-uuid-2",
+        "crmId": "0030a00002P01LuAAJ",
+        "title": "Chief Product Officer",
+        "primaryEmail": "<first.last>@example.com.au"
+      },
+      "sf_contact": {
+        "Id": "0030a00002P01LuAAJ",
+        "AccountId": "0010a00001g0k0RAAQ"
+      },
+      "sf_account": {
+        "Id": "0010a00001g0k0RAAQ",
+        "Name": "Shift",
+        "DOZISF__ZoomInfo_Id__c": "348057661"
+      }
+    }
+  ]
+}

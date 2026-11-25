@@ -1,0 +1,42 @@
+{
+  "_note": "Formats seen (digits masked). SF Contact.Phone/MobilePhone are free text. Nooks call.to is mostly E.164 but sometimes has spaces. Proposed normaliser: strip everything except digits and a leading '+'; '00' prefix -> '+'; leading '+' keep; digits already starting with the country code (61/64) and >=11 digits -> add '+'; leading '0' -> prefix the country calling code (+61 AU, +64 NZ) taken from the PHONE's own context, falling back to the account country only if nothing else. Never override an explicit '+' prefix with the account country (a +61 mobile exists on an NZ account).",
+  "sf_examples": [
+    "+61 4XX XXX XXX",
+    "+64 9-XXX XXXX",
+    "0226XXXXXX",
+    "61390XXXXXX",
+    "+64272XXXXXX",
+    "+6496XXXXXX",
+    "0275XXXXXX"
+  ],
+  "nooks_call_to_examples": [
+    "+61409XXXXXX",
+    "+61 474 XXX XXX",
+    "+6590XXXXXX",
+    "+1917XXXXXXX",
+    "+91916XXXXXXX"
+  ],
+  "test_vectors": [
+    {
+      "in": "+61 4XX XXX XXX (AU mobile)",
+      "out": "+614XXXXXXXX"
+    },
+    {
+      "in": "0226431011 (NZ account)",
+      "out": "+64226431011"
+    },
+    {
+      "in": "61390956533",
+      "out": "+61390956533"
+    },
+    {
+      "in": "+64 9-377 9779",
+      "out": "+6493779779"
+    },
+    {
+      "in": "+61 474 771 228",
+      "out": "+61474771228"
+    }
+  ],
+  "observed_match": "SF MobilePhone '+61 409 074 447' == Nooks call.to '+61409074447' after stripping spaces (one verified pair)."
+}

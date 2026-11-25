@@ -1,5 +1,5 @@
 {
-  "_note": "search_scoops shape. contacts[] present only on person-based scoops (anonymised). link/linkText only on news-sourced scoops.",
+  "_note": "search_scoops shape. contacts[] present only on person-based scoops (anonymised). link/linkText only on news-sourced scoops. Includes a pure Pain Point-only row (last item): type Pain Point without Project, vendor-survey style, not Pendo relevant.",
   "data": [
     {
       "attributes": {
@@ -152,6 +152,40 @@
         ]
       },
       "id": "18335939",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "370540705",
+          "name": "North Ridge Partners"
+        },
+        "description": "North Ridge Partners, according to an internal source in financial planning, is experiencing challenges related to customer relationship management (CRM).",
+        "id": "18346551",
+        "originalPublishedDate": "2026-11-25T00:00:00Z",
+        "publishedDate": "2026-11-25T00:00:00Z",
+        "topics": [
+          {
+            "id": "9",
+            "topic": "CRM"
+          },
+          {
+            "id": "10",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "259",
+            "topic": "Finance"
+          }
+        ],
+        "types": [
+          {
+            "id": "20",
+            "type": "Pain Point"
+          }
+        ]
+      },
+      "id": "18346551",
       "type": "Scoop"
     }
   ]

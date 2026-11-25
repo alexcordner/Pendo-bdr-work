@@ -1,0 +1,25 @@
+{
+ "_note": "Evidence for 'manual_email backlog'. Two full pages of 100 (listTasks filter owner, action=manual_email, status=ready, page_size=100). Page 2 still had a next cursor, so the TOTAL is >=200 and UNVERIFIED beyond that. Ordering is by id, so the pages are not a time-ordered sample.",
+ "rows_seen": 200,
+ "distinct_prospects": 200,
+ "in_sequence": 200,
+ "one_off": 0,
+ "by_sequence": {
+  "SEQ0": 189,
+  "SEQ1": 2,
+  "SEQ2": 1,
+  "SEQ3": 3,
+  "SEQ4": 1,
+  "SEQ5": 1,
+  "SEQ6": 1,
+  "SEQ7": 1,
+  "SEQ8": 1
+ },
+ "due_min": "2026-04-22T00:09:43.627Z",
+ "due_max": "2026-11-15T20:03:51.066Z",
+ "completed_true": 0,
+ "has_email_ref": 200,
+ "statuses": {
+  "ready": 200
+ }
+}

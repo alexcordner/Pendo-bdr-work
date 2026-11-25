@@ -1,0 +1,350 @@
+{
+  "_note": "Per-scoop evidence for the scoop shares. Sample A = newest 50 AU+NZ scoops, last 30 days (of 4,695 total; ordered newest first, so NOT random). 'pendo_topic_match' is my judgment: scoop topics include Customer Experience, Customer Success, Product Management, Product Development or Digital-workplace/intranet. Sample B = 25 of 7,118 scoops filtered to Pendo-leaning types. Counts re-derived from the saved responses. Descriptions omitted.",
+  "sample_A": {
+    "n": 50,
+    "by_type": {
+      "Funding": 1,
+      "Project_or_PainPoint": 49,
+      "Pain Point (alone or with Project)": 18
+    },
+    "distinct_companies": 12,
+    "by_company": {
+      "The iGroup": 14,
+      "The Car Distribution Group": 6,
+      "E-VIS": 8,
+      "North Ridge Partners": 13,
+      "Christian Community Ministries": 2,
+      "Tritium": 1,
+      "NRFC": 1,
+      "Hostplus": 1,
+      "Funds": 1,
+      "Main Sequence Ventures": 1,
+      "WearOptimo": 1,
+      "Hesta": 1
+    },
+    "pendo_topic_match": 5,
+    "pendo_topic_match_pct": 10,
+    "generic_pct": 90,
+    "rows": [
+      {
+        "scoop_id": "18353305",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18353104",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18352800",
+        "company": "The iGroup",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18352638",
+        "company": "The iGroup",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351802",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351734",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351714",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351705",
+        "company": "The iGroup",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348618",
+        "company": "The Car Distribution Group",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348395",
+        "company": "The Car Distribution Group",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348305",
+        "company": "The Car Distribution Group",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348242",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348240",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348239",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348182",
+        "company": "The Car Distribution Group",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348137",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346828",
+        "company": "North Ridge Partners",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346785",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346629",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346623",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346551",
+        "company": "North Ridge Partners",
+        "types": "PP",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346548",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346545",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18345517",
+        "company": "Christian Community Ministries",
+        "types": "Project",
+        "pendo_topic_match": true,
+        "why": "topic Product Development"
+      },
+      {
+        "scoop_id": "18344686",
+        "company": "Christian Community Ministries",
+        "types": "PP,Project",
+        "pendo_topic_match": true,
+        "why": "topics Product Development, DevOps"
+      },
+      {
+        "scoop_id": "18344256",
+        "company": "Tritium",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18340139",
+        "company": "NRFC",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18340056",
+        "company": "Hostplus",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18340055",
+        "company": "Funds",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18340054",
+        "company": "Main Sequence Ventures",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18338395",
+        "company": "WearOptimo",
+        "types": "Funding",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18338285",
+        "company": "Hesta",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18353404",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18352723",
+        "company": "The iGroup",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351803",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": true,
+        "why": "topics Customer Experience, Customer Success"
+      },
+      {
+        "scoop_id": "18351716",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18351588",
+        "company": "The iGroup",
+        "types": "PP",
+        "pendo_topic_match": true,
+        "why": "topics Product Management, Product Development"
+      },
+      {
+        "scoop_id": "18351496",
+        "company": "The iGroup",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348626",
+        "company": "The Car Distribution Group",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348238",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348230",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348226",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18348174",
+        "company": "The Car Distribution Group",
+        "types": "PP,Project",
+        "pendo_topic_match": true,
+        "why": "topics Employee Engagement, Collaboration/Web Apps (intranet)"
+      },
+      {
+        "scoop_id": "18348139",
+        "company": "E-VIS",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346763",
+        "company": "North Ridge Partners",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346714",
+        "company": "North Ridge Partners",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346651",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346635",
+        "company": "North Ridge Partners",
+        "types": "Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346590",
+        "company": "North Ridge Partners",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      },
+      {
+        "scoop_id": "18346583",
+        "company": "North Ridge Partners",
+        "types": "PP,Project",
+        "pendo_topic_match": false
+      }
+    ]
+  },
+  "sample_B": {
+    "n": 25,
+    "by_type": {
+      "M&A": 7,
+      "Partnership": 6,
+      "Hiring Plans": 5,
+      "Executive Move": 4,
+      "Funding": 3
+    },
+    "generic_medical_health_hiring": 4,
+    "generic_medical_health_pct": 16,
+    "note": "Of the 25, none was clearly a product, digital or CX trigger; many are mining, energy or finance. Executive moves had a name but no job title field (title appears only in description text)."
+  },
+  "correction": "The first notes draft said 48/50 (96%) were irrelevant. With the explicit topic rule above it is 45/50 (90%) irrelevant and 5/50 (10%) weakly relevant."
+}

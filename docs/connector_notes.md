@@ -37,7 +37,9 @@ WHERE Assigned_SDR__c = '005Pe00000HHNMbIAP'
   AND SDR_Target__c = true
 LIMIT 200
 ```
-It returned 41 rows (ran with `LIMIT 5`). Samples are in `sf_accounts_my_book.json`.
+A separate `COUNT()` with the same filters returned **41**; the sample rows were pulled with `LIMIT 5` (3 anonymised rows in `sf_accounts_my_book.json`).
+
+**Coverage hole (found in the review round).** `BillingCountry` is blank on many accounts and mixed case (`AUSTRALIA` vs `Australia`; SOQL `IN` is case-insensitive, Python must be too). Among Alex's non-customer accounts, **4,926 more** have `BillingCountry = null` but `HQ_Country__c` in (Australia, New Zealand), so the 7,604 figure undercounts. Use `(BillingCountry IN (...) OR HQ_Country__c IN (...))`. The 41 `SDR_Target__c` accounts all have both country and state filled in.
 
 **Field map**
 
@@ -56,7 +58,7 @@ It returned 41 rows (ran with `LIMIT 5`). Samples are in `sf_accounts_my_book.js
 SELECT Id, Subject, Status, Type, TaskSubtype, ActivityDate, WhatId, WhoId, CreatedDate
 FROM Task WHERE OwnerId='005Pe00000HHNMbIAP' AND IsClosed=false LIMIT 100
 ```
-All 3 sampled rows are stale "BDR Meeting Booked" tasks from March 2026 with `WhatId` null. Open SF Tasks are therefore **not** a useful work queue. The real queue is Nooks tasks (section 2). `Task` has call fields (`CallDisposition`, `CallDurationInSeconds`, `CallType`). I did not verify that Nooks writes calls back to SF Tasks (**UNVERIFIED**).
+The 30 open tasks are 28 stale "BDR Meeting Booked" (Jan to Mar 2026, `WhatId` null) and 2 `Call` tasks (Jan and Mar 2026, `WhatId` null); see `sf_tasks_open.json`. Open SF Tasks are therefore **not** a useful work queue. The real queue is Nooks tasks (section 2). `Task` has call fields (`CallDisposition`, `CallDurationInSeconds`, `CallType`). I did not verify that Nooks writes calls back to SF Tasks (**UNVERIFIED**).
 
 **Contact fields.** `Phone` and `MobilePhone` exist, and the mobile matched a Nooks `call.to` exactly after normalising spaces. `HasOptedOutOfEmail` exists, with 3,762 contacts opted out under Alex's accounts. **`DoNotCall` does not exist** on Contact. The call-do-not-call flag lives elsewhere (**UNVERIFIED**; Nooks `globalOptedOut` is the other candidate, see section 2).
 
@@ -95,10 +97,10 @@ Findings:
 - `callDisposition` is a **reference only**. Resolve the name through the disposition table.
 - 8 of 40 calls have `prospect: null` and `from: "external"`. These look like calls logged from outside the dialer, so join on `to` (phone) as a fallback.
 - The "Left Voicemail" calls were 23 to 32s.
-- "No Answer" is also used on calls of 41s and 64s. **Do not infer voicemail from duration; use the disposition id.**
+- "No Answer" is also used on long calls: in the 14-day pull, 8 calls of 34 to 64s (41, 41, 39, 45, 41, 34, 41, 64) carry "No Answer", while the 4 "Left Voicemail" calls were 23 to 32s. **Do not infer voicemail from duration; use the disposition id.**
 - The `dialingMode` is always `one-off`; no calls came from sequences.
 
-**Duration distribution** (40 calls by Alex, 2026-11-18 to 2026-11-25):
+**Duration distribution** (evidence: `tests/fixtures/nooks_calls_14d_rows.json`). 40 calls by Alex from 2026-11-18 to 2026-11-25 (re-derived from per-row data; the same shares reproduce). In the full 14 days (104 calls, 2026-11-11 onwards) the shares are 68.3% / 6.7% / 25.0%.
 
 | Bucket | Calls | Share |
 |---|---|---|
@@ -120,7 +122,7 @@ Findings:
 - Shape: `id`, `action`, `completed`, `dueAt`, `note`, `status` (pending/ready/finished/skipped/failed), `priority`, `owner`, `prospect`, `sequence`, `sequenceState`, `sequenceStep`, `email` (ref or null).
 - Every task I saw belongs to a sequence. One-off tasks (created by `createTask`) are filterable with `filter_sequenceState_state=null`; none exist right now (the query returned 0).
 - An email task is `action: manual_email` with `email: {id}`; the body needs `include=email` or `getTaskEmail`.
-- **Old manual_email backlog:** the first page of 100 open `ready` manual_email tasks was full and had `hasMore`, so there are **at least 100** (full count not taken). 97 of those 100 are in one sequence, due Jun to Oct 2026. They were **not touched**.
+- **Old manual_email backlog:** two full pages of 100 `ready` manual_email tasks (200 rows, all in sequences, all distinct prospects) and page 2 still had a next cursor, so there are **at least 200** and the total is **UNVERIFIED**. 189 of the 200 are in one sequence; due dates run from 2026-04-22 to 2026-11-15 (so some are recent, not only old). Evidence: `nooks_manual_email_backlog.json`. They were **not touched**.
 - The same owner has open `call` tasks from sequences dated from April to August 2026.
 
 **Not authorised on this connection** (per server notes): `listTags`, `createTag`, `listPlays` and friends. Reconnecting Nooks would add them.
@@ -139,7 +141,7 @@ in:sent after:2026/11/18                            # date form
 
 Use `view=THREAD_VIEW_METADATA_ONLY` (no subject, snippet or body). I read **no bodies**.
 
-**Gotcha.** Returned addresses have the **dots stripped from the local part**: `alex.cordner@pendo.io` comes back as `alexcordner@pendo.io`, and a recipient `travis.tyler@…` comes back as `travistyler@…`. A query built from the stripped form returned **nothing**; the dotted form found the thread. So always query with the real address from Nooks/SF, never one copied from a Gmail result.
+**Gotcha.** Returned addresses have the **dots stripped from the local part**: `alex.cordner@pendo.io` comes back as `alexcordner@pendo.io`, and a recipient `first.last@…` comes back as `firstlast@…`. A query built from the stripped form returned **nothing**; the dotted form found the thread. So always query with the real address from Nooks/SF, never one copied from a Gmail result.
 
 A thread-level result shows only the first 5 messages, so use `messageCount` and `get_thread` if replies matter. 10 sent threads in the last 7 days. Hyphenated local parts (`a-b@`) matched fine.
 
@@ -174,8 +176,8 @@ The filter rule "drop when the whole name is just a place" catches only #1. Loca
 
 Samples (small and biased, so treat the shares as rough):
 
-- **Newest 50, no type filter** (of 4,695 in 30 days). Types: 49 Project or Pain Point (some with both), 1 Funding. They came from just **9 companies**: The iGroup 14, North Ridge Partners 13, E-VIS 8, Car Distribution Group 6, and a few others. They are vendor-survey style notes ("according to an internal source in finance…"), not news. I judged **48 of 50 (96%) not Pendo-buyer relevant**: finance, HR, marketing and AI-tooling scoops, plus 5 "X invested in Myriota" notes that are about the investor. The 2 weakly relevant ones had topics Customer Experience, Customer Success and Product Management (iGroup), plus Employee Engagement/intranet (Car Distribution Group).
-- **Type-filtered** (Funding, Executive Move, New Hire, Hiring Plans, Partnership, M&A, etc.; 25 of 7,118). Real events appear: funding (WearOptimo, Myriota, Laronix), exec moves (SCEE CEO change, RNZ people chief leaving), M&A, partnerships. But many are not Pendo buyers (mining, energy). 4 of 25 were the generic **"more open roles in Medical & Health"** pattern, which CLAUDE.md says to ignore.
+- **Newest 50, no type filter** (of 4,695 in 30 days). Types: 49 Project or Pain Point (some with both), 1 Funding. They came from just **9 companies**: The iGroup 14, North Ridge Partners 13, E-VIS 8, Car Distribution Group 6, and a few others. They are vendor-survey style notes ("according to an internal source in finance…"), not news. By an explicit rule (topics include Customer Experience, Customer Success, Product Management, Product Development or intranet/digital workplace), **5 of 50 (10%) match and 45 of 50 (90%) are generic**: finance, HR, marketing and AI-tooling scoops, plus 5 "X invested in Myriota/WearOptimo" notes that are about the investor. The rule is my judgment. Per-row evidence: `zoominfo_scoop_sample_evidence.json`. (My first draft said 96%; this corrects it.)
+- **Type-filtered** (Funding, Executive Move, New Hire, Hiring Plans, Partnership, M&A, etc.; 25 of 7,118). Real events appear: funding (WearOptimo, Myriota, and one more), exec moves (SCEE CEO change, RNZ people chief leaving), M&A, partnerships. But many are not Pendo buyers (mining, energy). 4 of 25 were the generic **"more open roles in Medical & Health"** pattern, which CLAUDE.md says to ignore.
 - The config's `scoop_types_keep` includes `Open Position` and `Management Move`. Neither appeared in the sample, so I could not check them. `Project` and `Pain Point` are **not** in the keep list, and that is where most of the volume sits.
 
 Relevant to Pendo buyers (see `config/icp.md`): `Product Launch`, `Funding`, `Executive Move`/`New Hire` where the person is product, digital, CX or CTO (the scoop has `contacts[]` with a name but **no job title field**, so the title is only in the description text), `Partnership`, `M&A`. A `Pain Point` or `Project` scoop is only useful when its topics include Customer Experience, Product Management, Customer Success or Digital Workplace.
@@ -198,13 +200,37 @@ I did not run `search_intent`.
 
 ---
 
+## 6. Join paths and normalisation (review follow-ups)
+
+Fixtures: `sf_nooks_zoominfo_chain.json`, `sf_billing_state_values.json`, `phone_formats.json`.
+
+**(a) Nooks prospect to Salesforce.** `prospect.crmId` is the SF **Contact Id** (`003…`). `Contact.AccountId` gives the SF Account. Verified on two prospects. Nooks `prospect.account.id` is a Nooks UUID, not a SF id; to reach the Nooks account from SF, use `listAccounts filter_crmId=<SF Account Id>` (verified on one account). Prospects with `type` other than `salesforce` have no `crmId`.
+
+**(b) ZoomInfo id to SF Account.** `Account.DOZISF__ZoomInfo_Id__c` equals the ZoomInfo `companyId`. A free `search_companies companyIdList=[...]` for two SF ids returned the same company names (Shippit, Phocas Software). Paired rows are in `sf_nooks_zoominfo_chain.json`. Not every account will have the field filled in; I did not measure that.
+
+**(c) Timezone fallback.** For 7,604 non-customer AU/NZ accounts there are 107 distinct `BillingState` values:
+- Full names dominate (NSW 2,614, VIC 1,925, QLD 1,031, WA 395, SA 214, ACT 98, TAS 43, NT 26).
+- NZ states are regions (Auckland 272, Wellington 59, Canterbury 35, Waikato 20, …). **All NZ maps to `Pacific/Auckland`, so NZ needs only the country.**
+- **Abbreviations occur** (NSW 41, VIC 18, QLD 12, WA 5, ACT 2, SA 1; TAS and NT not seen but expected), so the lookup must accept both forms case-insensitively.
+- **NULL for 624 (8.2%)**; 622 of those have `BillingCity` or `HQ_State_Province__c`, which can be used as a second hint.
+- Junk exists ("Other", "n/a", "NULL", US states, cities in the state field such as "Sydney", misspellings such as "Aukland"). Anything unmapped should fall back to the country default (`Australia/Sydney`, `Pacific/Auckland`) and be **logged as a guess**, and ideally be called later in the window (Australia spans 3 offsets, up to 2.5 hours).
+- The 41 `SDR_Target__c` accounts all have a full-name state.
+
+**(d) Phone normalisation.** SF `Phone`/`MobilePhone` are free text: `+61 4XX XXX XXX`, `+64 9-377 9779`, `0226…` (no country code), `61390…` (no plus), `+6496…`. Nooks `call.to` is mostly E.164 but can contain spaces (`+61 474 …`). Rule and test vectors are in `phone_formats.json`: keep a leading `+`, strip other non-digits, add `+` when digits start with 61 or 64 and are long enough, convert a leading `0` using the country calling code, and **never override an explicit `+` with the account country** (a +61 mobile exists on an NZ account). One SF mobile matched a Nooks `call.to` after stripping spaces.
+
+**(e) 14-day call window.** 104 calls since 2026-11-11 (page 1 held 100, page 2 held 4), 74 distinct prospects, 94 distinct numbers, 20 calls with no prospect link. Pages are ordered by call id, not time, so always page to the end before counting. Cooldown logic that keys on `prospect.id` will miss the 20 unlinked calls; fall back to the normalised `to` number.
+
+**(f) Pain Point scoop.** A Pain Point-only row (type Pain Point, no Project) is now in `zoominfo_scoops.json`.
+
+---
+
 ## Decisions needed from Alex
 
 1. **Which accounts are "mine"?** The 41 `SDR_Target__c = true` accounts, or the 7,604 AU/NZ non-customer accounts assigned to you, or a ranked mix? (I recommend: the 41 first, then the rest ranked by signals.)
 2. **Is `SDR_Target__c` the flag you work from?** Or is there a list, view or report you really use?
 3. **Employee floor.** Config says 20 to 2000. In SF use `ZoomInfo_Employee_Count__c`; is that the number you trust?
 4. **Opt-out and do-not-call.** SF Contact has no `DoNotCall`, and Nooks does not return `globalOptedOut` on read. Which should block a call: Nooks "Do Not Call" disposition history, `HasOptedOutOfEmail`, or something else?
-5. **Old manual_email tasks** (100+, mostly one sequence, due Jun to Oct). Leave alone, or may a later task skip or complete them?
+5. **Old manual_email tasks** (200+, mostly one sequence, due Apr to Nov). Leave alone, or may a later task skip or complete them?
 6. **Scoop keep list.** Add `Project` and `Pain Point` scoops filtered by topic (Customer Experience, Product Management, Customer Success, Digital Workplace)? Today they would all be dropped.
-7. **Voicemail rule.** Use only the `Left Voicemail` disposition, or also long "No Answer" calls (41s and 64s were logged as No Answer)?
+7. **Voicemail rule.** Use only the `Left Voicemail` disposition, or also long "No Answer" calls (8 calls of 34 to 64s were logged as No Answer)?
 8. **Mixed `from` numbers.** Calls come from an AU number and a UK number. Does it matter for the call sheet?
