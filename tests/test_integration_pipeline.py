@@ -1466,7 +1466,8 @@ def test_l_no_network_or_process_imports(path):
     assert not mods & set(FORBIDDEN_IMPORTS), (path.name, mods & set(FORBIDDEN_IMPORTS))
     allowed = {"__future__", "collections", "copy", "dataclasses", "datetime", "enum", "functools", "hashlib",
                "json", "logging", "math", "os", "pathlib", "re", "tempfile", "typing", "unicodedata", "yaml",
-               "zoneinfo", "src", "itertools", "operator", "string"}
+               "zoneinfo", "src", "itertools", "operator", "string",
+               "argparse", "sys"}   # 2d: src/textcheck.py CLI (argv, stdin, exit code); no network or process access
     assert mods <= allowed, (path.name, sorted(mods - allowed))
 
 

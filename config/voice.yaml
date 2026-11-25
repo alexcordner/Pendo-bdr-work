@@ -1,13 +1,17 @@
 # Voice rules for openers, facts, gatekeeper lines and "just tried you" email drafts.
 # Enforced deterministically by src/textcheck.py. Explained in docs/voice_guide.md.
 #
-# Source of every rule below: skills/opener/SKILL.md, skills/email-draft/SKILL.md (draft v0) and the call-length data in
-# docs/connector_notes.md (about two-thirds of Alex's calls last under 10s, about a quarter pass 30s).
-# Items marked INFERRED are extensions of a rule the skills state in general terms. They are NOT Alex's confirmed taste.
-# Regexes are Python, matched case-insensitively. Single quotes in YAML so backslashes stay literal.
+# VALIDATED AT LOAD: every key below is required, no other key is allowed (a typo raises VoiceConfigError), and the
+# types are checked (calibrated must be a real true/false). Never remove a key to "turn a rule off": empty its list.
+#
+# Source of the rules: skills/*/SKILL.md and the call-length data in docs/connector_notes.md (about two-thirds of
+# Alex's calls last under 10s, about a quarter pass 30s). Anything marked INFERRED extends a rule the skills state
+# in general terms and is NOT Alex's confirmed taste. INFERRED lists are SOFT (warnings) unless the phrase is
+# unambiguous. Regexes are Python, case-insensitive. Single quotes in YAML keep backslashes literal.
+# Phrase lists: whole words, case/space/hyphen-insensitive; a trailing * on a word allows inflections (leverag*).
 
-# While false, every generated opener block / email draft MUST carry the label below as its first line.
-# Flip to true ONLY after Alex has supplied alex_examples and approved the tuned output (task 2e).
+# While false, every generated opener block / email body MUST start with the label line below.
+# Flip to true ONLY after Alex has supplied alex_examples and approved a tuned run (task 2e).
 calibrated: false
 draft_style_label: "DRAFT STYLE: not yet calibrated to Alex"
 
@@ -19,8 +23,15 @@ alex_examples:
   proud_emails: []       # TODO Alex: 2 emails he is proud of
 
 opener:
-  max_words: 25            # spoken in about 8 seconds (skill: "max ~25 words"; most calls end inside 10s)
-  max_questions: 1         # one ask
+  max_words: 25            # spoken in about 8 seconds (skill: "max ~25 words")
+  max_questions: 1         # one ask. A question mark counts as one ask; so does a cue below in a sentence without one
+  ask_cues:
+    - '\b(can|could|may) i\b'
+    - '\bmind if\b'
+    - '\bis it (ok|okay|fine|alright) if\b'
+    - '\bare you free\b'
+    - '\bdo you have a (minute|second|moment)\b'
+    - '\bor (should|shall|can|could|would|do|will) (i|we|you)\b'
 gatekeeper:
   max_words: 14            # skill: "under 15 words"
   role_cues:               # it must ask for a role / person, not a name
@@ -38,27 +49,21 @@ gatekeeper:
     - director
     - looks after
     - responsible
-  pitch_words:             # no pitch (skill: "no pitch")
-    - pendo
-    - software
-    - platform
-    - solution
-    - solutions
-    - demo
+  # Clear pitch language only (skill: "no pitch"). Everyday words (help, free, software, our) are NOT pitch.
+  pitch_patterns:
+    - '\bwe (help|offer|provide|build|make|sell|work with|do)\b'
+    - '\bour (platform|software|product|solution|tool|tooling|service|customers|clients)\b'
+    - '\bfree trial\b'
+    - '\b(demo|pitch)\b'
+    - '\b(analytics|feedback|adoption|engagement|onboarding|survey|nps)[ -](tool|tooling|platform|software|solution)'
+    - '\btooling\b'
+    - '\babout (product |user |customer )?(analytics|adoption|engagement|feedback|onboarding|churn|retention)\b'
+    - '\b(save|saves|saving|increase|increases|improve|improves|reduce|reduces) (them|you|your|time|costs?|churn|adoption)\b'
+  soft_pitch_words:        # INFERRED: may be pitch, may be ordinary English (warning only)
     - analytics
     - adoption
-    - offer
-    - help
-    - helps
-    - improve
-    - increase
-    - reduce
-    - save
-    - free
-    - sell
-    - pitch
-    - we
-    - our
+    - platform
+    - solution
 
 email:
   subject_min_words: 2     # skill: "2-5 words"
@@ -69,89 +74,125 @@ email:
   opening: "Just tried you"
   signoff: "Alex"
   allow_links: false       # skill: "no links except where Alex asks"
-  ask_cues:                # an ask that is not a question mark; counted toward the one-ask limit
+  # Asks: each question mark is one; a sentence with no question mark that holds a cue is one; a sentence with
+  # several cues ("can you X, or would you Y") counts each. So "Who owns it? Let me know." is two asks.
+  ask_cues:
     - '\blet me know\b'
-    - '\bplease reply\b'
+    - '\bplease (reply|respond|call|email)\b'
+    - '\b(reply|respond) (to|with)\b'
     - '\bsend me\b'
-    - '\bhappy to (chat|talk|jump|find)\b'
+    - '\bcall me\b'
+    - '\bhappy to (chat|talk|jump|find|catch)\b'
+    - '\b(can|could|would|will) you\b'
+    - '\bare you (open|free|available|keen)\b'
+    - '\bdo you want\b'
+    - '\bmind if\b'
+    - '\b(can|could|may) i\b'
+    - '\bcan we\b'
+    - '\bor (should|shall|can|could|would|do|will) (i|we|you)\b'
 
-# Matching is whole-word, case-insensitive. Applied to opener, gatekeeper, email subject and body. Not to FACT lines,
-# which quote the research packet.
+# Truly banned (the skills name them or they are the same family). Inflections via *.
 banned_phrases:
-  - "hope you're well"
-  - "hope you are well"
-  - "hope this finds you well"
-  - "hope this email finds you"
+  - "pick your brain"
+  - "hoping you"
+  - "wish you well"
+  - "hope you"                 # hope you're well, hope you are well, hope you're having a great week
+  - "hope this*"               # hope this finds you well, hope this email ...
   - "i'm reaching out"
   - "i am reaching out"
-  - "reaching out"
+  - "reach* out"
   - "quick call"
-  - "touch base"
-  - "circle back"
-  - "synergy"
-  - "leverage"
-  - "game-changing"
-  - "game changing"
-  - "revolutionise"
-  - "revolutionize"
-  # INFERRED from "no hype words":
+  - "touch* base"
+  - "circl* back"
+  - "just checking in"
+  - "check* in on"
+  - "synerg*"
+  - "leverag*"
+  - "game-chang*"
+  - "revolution*"
+  # INFERRED from "no hype words" (same family, error because they are unambiguous marketing hype):
   - "cutting-edge"
   - "best-in-class"
   - "world-class"
-  - "unlock"
-  - "supercharge"
-  - "disrupt"
+  - "next-gen*"
+  - "unlock*"
+  - "supercharg*"
+  - "disrupt*"
   - "transformative"
+  - "amazing"
 banned_phrases_email_only:
-  - "quick"              # skill: no "quick"
-  - "attached"
-  - "attachment"
+  - "quick"                    # skill: no "quick" in the email
+  - "attach*"
 
-# Pendo-feature words never go in the opener (skill: "Do not mention Pendo features in the opener").
-# INFERRED list of what counts as a feature: Alex to confirm.
-pendo_feature_words:
+# INFERRED. The opener never names a Pendo feature (skill). Clear multi-word feature phrases are errors; one
+# ordinary word that may be feature talk is a warning. A phrase that appears in the packet (the account's own
+# business) is exempt.
+pendo_feature_phrases:
+  - "in-app guide*"
   - "in-app"
-  - "guide"
-  - "guides"
-  - "analytics"
-  - "session replay"
-  - "heatmap"
-  - "heatmaps"
-  - "walkthrough"
-  - "walkthroughs"
-  - "tooltip"
-  - "tooltips"
+  - "session replay*"
+  - "heatmap*"
+  - "walkthrough*"
+  - "product analytics"
   - "resource center"
-  - "funnel"
-  - "funnels"
+  - "onboarding checklist*"
+  - "checklist*"
+  - "recordings of"
+  - "user session*"
+  - "drop-off"
+  - "feature adoption"
+  - "user segmentation"
+pendo_feature_soft_words:
+  - "analytics"
+  - "funnel*"
   - "nps"
-  - "survey"
-  - "surveys"
+  - "survey*"
+  - "guide*"
+  - "recordings"
 
-# Claims about Pendo's results or customers must never be written unless the packet supplies them (and it never does yet).
+# Claims about Pendo's results, customers or the account's growth that the packet can never support.
 unsupported_claim_patterns:
   - '\bwe help\b'
+  - '\bwe (make|build|offer|provide|sell|solve|fix|work with|specialise|specialize|power|enable|improve|increase|reduce|cut|boost|grow|lift|drive|speed up|save|simplify|streamline|deliver|measure|track|analyse|analyze)\b'
   - '\bcompanies like (yours|you)\b'
-  - '\b(customers|clients) (like|such as)\b'
+  - '\b(customers|clients|insurers|banks|teams|businesses|companies) (like|such as)\b'
   - '\bour (customers|clients)\b'
+  - '\bour (platform|product|software|tool|solution|approach|technology)\b'
+  - '\b(customers|teams|companies|clients) (using|on|with) pendo\b'
+  - '\bpendo (customers|clients|users)\b'
+  - '\b(use|rely on|trust) (us|pendo)\b'
   - "\\bwe(?:'ve| have) helped\\b"
   - '\b(increase|increases|increased|increasing|reduce|reduces|reduced|reducing|improve|improves|improved|improving|boost|boosts|boosted|cut|cuts) [\w ]{0,20}by\b'
+  - '\b(see|get|gain|achieve|enjoy)\b[^.?!]{0,30}\b(higher|more|fewer|less|faster|better|dramatically|half)\b'
+  - '\bcut\b[^.?!]{0,40}\bhalf\b'
+  - '\b(more|fewer|less|higher|lower) (adoption|tickets|churn|retention)\b'
   - '\bcase stud(y|ies)\b'
   - '\b(proven|trusted by)\b'
   - '\b\d+\s?x\b'
   - '\b(other|similar) (apac|anz|australian|nz|new zealand) (companies|teams|businesses)\b'
+  - '\b(growing|expanding|scaling) (fast|quickly|rapidly)\b'
+  - '\b(rapid|fast)[ -]growth\b|\bfast-growing\b'
+  - '\bgrowing \d'
+  - '\b(at the )?top of the (store|charts?|list|market)\b|\bnumber one\b|\b(market|industry) leader\b|\bbest-selling\b'
+  - "\\byou(?:'ve| have)? (?:just )?(moved|joined|started|been promoted|were promoted|got promoted|took over|stepped up)\\b"
+  - '\b(your|the) (promotion|new role|new job|new position)\b|\byour appointment\b'
 
-# Phrases that claim a real-world event or an observation of one. With no real trigger in the packet, the opener and
-# the email may not contain any of these. With a trigger, each event word must also appear in the trigger evidence.
-trigger_reaction_patterns:      # reactions: need a trigger to exist
+# Reactions to news: need a real, usable trigger in the packet (intent signals are NOT a trigger).
+trigger_reaction_patterns:
   - '\bcongrat\w*'
   - '\b(saw|noticed|spotted|came across)\b'
-  - '\b(read|heard|seen) (that|about)\b'
-trigger_event_words:            # event words: must also appear (first 5 letters) in the trigger evidence
+  - '\b(read|seen) (that|about)\b|\bheard\b'
+  - '\b(big|huge|exciting|busy|massive) (week|news|day|month|time)\b'
+  - '\bon a roll\b'
+  - '\bi hear\b|\bi heard\b|\bword is\b|\bapparently\b'
+# Event words. Each one used must appear (first 4 letters) in some packet fact or usable signal; with no trigger
+# they may only restate a packet fact. Includes meaning flips (ended, cancelled, left, shipped).
+trigger_event_words:
   - raise
   - raised
   - raising
   - funding
+  - funded
   - series
   - appointed
   - appointment
@@ -170,27 +211,138 @@ trigger_event_words:            # event words: must also appear (first 5 letters
   - joined
   - joins
   - promoted
+  - promotion
   - announced
   - rollout
+  - rolled out
+  - rolling out
   - migration
   - expansion
+  - expanding
+  - shipped
+  - went live
+  - ended
+  - terminated
+  - cancelled
+  - canceled
+  - scrapped
+  - paused
+  - delayed
+  - resigned
+  - departed
+  - exited
+  - retrenched
+  - laid off
+  - stepped down
+  - closed
+  - replaced
+  - rebuilt
+  - rebuilding
+  - redesigned
+  - revamped
+  - overhauled
+  - relaunched
+  - moved to
+  - switched
+  - won
+  - awarded
+  - award
+  - signed
+  - secured
+  - landed
+  - said
+  - posted
+  - tweeted
+  - wrote
+  - told
+  - merged
+  - merging
+  - bought
+  - takeover
+  - shut
+  - sunset
+  - sunsetted
+  - decommissioned
+  - retired
+  - went public
+  - floated
+  - listed
+  - went into administration
+  - collapsed
+# Words that may stand in for each other when the packet's own wording differs (joined for appointed). A word is
+# supported when any member of its group is in the packet. Opposites (ended, cancelled) are NOT in these groups.
+event_synonym_groups:
+  - "appointed, appointment, named, joined, joins, promoted, promotion, started"
+  - "hiring, hired"
+  - "raise, raised, raising, funding, funded, series, round, seed"
+  - "launch, launched, launches, launching, rollout, rolled out, rolling out, shipped, went live"
+  - "acquired, acquires, acquisition, merger, merged, merging, bought, takeover"
+  - "partnership, partnered"
+  - "expansion, expanding"
+
+# Claims about the account's product quality or customers' experience: an error unless the packet itself says so.
+unsupported_unless_in_packet:
+  - "crash*"
+  - "outage*"
+  - "bug"
+  - "bugs"
+  - "buggy"
+  - "broken"
+  - "complaint*"
+  - "complain*"
+  - "poor reviews"
+  - "bad reviews"
+  - "negative reviews"
+  - "low rating*"
+  - "one star"
+  - "laggy"
+  - "clunky"
+  - "outdated"
+  - "struggling"
+  - "falling behind"
+
+# Round / stage details that must appear verbatim in the packet (Series A is not Series B, seed is not Series A).
+round_patterns:
+  - '\b(series|round) [a-e]\b'
+  - '\bpre-?seed\b'
+  - '\bseed\b'
+  - '\bipo\b'
+  - '\bbridge round\b'
 
 # When the packet flags an ambiguous role, the text must not assume what the contact does.
+# (A question like "Do you own that area?" is not an assumption, hence the lookbehinds.)
 role_assumption_patterns:
   - '\bas (the|a|an|their) \w+'
   - '\b(in )?your role\b'
-  - '\byou (lead|run|manage|own|head|oversee)\b'
+  - '(?<!\bdo )(?<!\bdoes )(?<!\bdid )(?<!\bif )(?<!\bwho )(?<!\bwhether )\byou (lead|run|manage|own|head|oversee|look after|handle|care about|are responsible)\b'
+  - '\bresponsible for\b'
   - '\byour (team|department|function)\b'
 
-email_send_language_patterns:
+# Send / attach / invite language is banned in ALL generated text (openers, gatekeeper lines, emails): drafts only.
+send_language_patterns:
+  - '\b(i|we)(?:\x27ve| have|\x27ll| will|\x27m| am)? ?(just )?(sent|send|sending|emailed|emailing|forwarded)\b'
+  - '\bsend(ing)? (you|over|through|across)\b'
+  - '\bsent (you|this|from|via|by|over)\b'
+  - '\b(i|we)(\x27ll| will)? ?forward\b'
+  - '\battach(ed|ment|ments|ing)\b'
+  - '\b(calendar )?invite\b'
   - '\bsend (this|it|now)\b'
-  - '\bsent (this|from|via|by)\b'
-  - "\\b(?:i'?ll|i will|will) send (?:this|it)\\b"
-  - '\bsending (this|now|it)\b'
+  - '\bsending (this|it|now)\b'
   - '\bauto-?send\b'
   - '\[send\]'
 
-# Proper nouns allowed even when the packet does not contain them (matched lowercase, per word).
+# Claims of earlier contact. Never allowed in the opener (the call history is not opener material). In an email they
+# need the packet's contact_history to contain the key word.
+history_claim_patterns:
+  - '\bwe (spoke|talked|chatted|met|connected)\b'
+  - '\b(spoke|talked|chatted) (to|with) you\b'
+  - '\bleft (you )?a (voicemail|message|vm)\b'
+  - '\b(as|like) (we )?(discussed|agreed|promised)\b'
+  - '\bour (last |recent |earlier |previous )?(call|chat|conversation|catch-?up)\b'
+  - '\b(following|further to) (up|our|on)\b'
+  - '\blast (week|time|month) (we|i)\b'
+
+# Names allowed even when the packet does not contain them (matched lowercase, per word).
 allowed_proper_nouns:
   - alex
   - pendo
@@ -198,9 +350,6 @@ allowed_proper_nouns:
   - australian
   - new
   - zealand
-  - apac
-  - anz
-  - nz
   - monday
   - tuesday
   - wednesday
@@ -220,132 +369,99 @@ allowed_proper_nouns:
   - october
   - november
   - december
+  - jan
+  - feb
+  - mar
+  - apr
+  - jun
+  - jul
+  - aug
+  - sep
+  - sept
+  - oct
+  - nov
+  - dec
+# Common acronyms (ordinary business or place abbreviations) allowed anywhere.
+allowed_acronyms:
+  - cx
+  - ai
+  - ux
+  - ui
+  - it
+  - hr
+  - saas
+  - apac
+  - anz
+  - nz
+  - au
+  - wa
+  - nsw
+  - qld
+  - vic
+  - sa
+  - tas
+  - nt
+  - act
+  - pm
+  - am
+  - cv
+  - ok
+  - okay
+  - kpi
+  - okr
+  - crm
+  - erp
+  - hris
+  - api
+# Role acronyms are allowed only when the packet has them or their long form (CEO is not Chief Digital Officer).
+title_acronyms:
+  ceo: chief executive
+  cto: chief technology
+  cio: chief information
+  cfo: chief financial
+  coo: chief operating
+  cpo: chief product
+  cdo: chief digital
+  cmo: chief marketing
+  cxo: chief experience
+# "two seconds", "two questions" are ordinary speech, not facts.
+number_word_exempt_units:
+  - seconds
+  - second
+  - minutes
+  - minute
+  - mins
+  - min
+  - questions
+  - question
+  - quick
+  - moments
+  - things
 
-# Words that may open a sentence without being in the packet. A sentence-initial word is a name check only when it
-# is NOT in this list or the packet (so an invented company at the start of a sentence is caught). Extend as needed.
-sentence_start_words:
-  - "curious"
-  - "congratulations"
-  - "congrats"
-  - "saw"
-  - "noticed"
-  - "heard"
-  - "cold"
-  - "just"
-  - "fair"
-  - "is"
-  - "are"
-  - "was"
-  - "can"
-  - "could"
-  - "would"
-  - "will"
-  - "do"
-  - "does"
-  - "did"
-  - "have"
-  - "has"
-  - "who"
-  - "what"
-  - "when"
-  - "where"
-  - "why"
-  - "how"
-  - "which"
-  - "hi"
-  - "hello"
-  - "hey"
-  - "g'day"
-  - "not"
-  - "no"
-  - "yes"
-  - "sorry"
-  - "thanks"
-  - "thank"
-  - "mind"
-  - "worth"
-  - "happy"
-  - "looks"
-  - "sounds"
-  - "keen"
-  - "wondering"
-  - "thought"
-  - "given"
-  - "since"
-  - "with"
-  - "after"
-  - "before"
-  - "if"
-  - "it"
-  - "this"
-  - "that"
-  - "these"
-  - "those"
-  - "there"
-  - "the"
-  - "a"
-  - "an"
-  - "we"
-  - "you"
-  - "your"
-  - "our"
-  - "my"
-  - "so"
-  - "and"
-  - "but"
-  - "or"
-  - "to"
-  - "for"
-  - "at"
-  - "on"
-  - "in"
-  - "as"
-  - "from"
-  - "by"
-  - "one"
-  - "any"
-  - "some"
-  - "many"
-  - "most"
-  - "new"
-  - "big"
-  - "early"
-  - "first"
-  - "last"
-  - "next"
-  - "today"
-  - "now"
-  - "please"
-  - "let"
-  - "change"
-  - "changes"
-  - "weeks"
-  - "teams"
-  - "leaders"
-  - "launches"
-  - "launch"
-  - "money"
-  - "funding"
-  - "hiring"
-  - "partnership"
-  - "appointments"
-  - "appointment"
-  - "growth"
-  - "quick"
-  - "short"
-  - "fine"
-  - "okay"
-  - "right"
-  - "sure"
-  - "also"
-  - "still"
-  - "then"
-  - "once"
-  - "while"
-  - "whoever"
-  - "someone"
-  - "anyone"
-# Thresholds for the token-overlap tests (0 to 1).
-fact_overlap_min: 0.6         # share of a FACT line's words found in one packet fact
-trigger_overlap_min: 0.5      # share of a TRIGGER line's words found in the packet trigger evidence
+# A sentence-initial word is name-checked only when followed by one of these (Harbourline Group), or a possessive.
+company_suffixes:
+  - group
+  - partners
+  - pty
+  - ltd
+  - limited
+  - bank
+  - labs
+  - holdings
+  - inc
+  - corp
+  - co
+  - insurance
+  - systems
+  - technologies
+  - solutions
+  - software
+  - capital
+  - health
+  - energy
+  - foods
+
+# Thresholds (0 to 1).
+fact_overlap_min: 0.9         # share of a FACT line's content words found in ONE packet fact (single letters count)
+trigger_overlap_min: 0.7      # share of a TRIGGER line's words found in the packet trigger evidence
 disliked_similarity_min: 0.7  # Jaccard against alex_examples.disliked_openers
