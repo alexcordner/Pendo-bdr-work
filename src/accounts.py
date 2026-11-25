@@ -46,7 +46,7 @@ import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Iterable, Mapping
+from typing import Collection, Iterable, Mapping
 
 from src.config import Config, canonical_country, is_blank_or_junk
 from src.loaders import (LoaderError, account_from_nooks, account_from_sf_row, account_from_zoominfo,
@@ -127,6 +127,8 @@ class AccountListResult:
     accounts: list[Account] = field(default_factory=list)
     dropped: list[Dropped] = field(default_factory=list)
     stats: dict[str, int] = field(default_factory=dict)   # drop reason -> count
+    # (account, account, evidence kinds) for probable duplicate pairs (all merged accounts, incl. dropped)
+    duplicate_pairs: list = field(default_factory=list)
 
 
 # ---------------------------------------------------------------- name helpers
@@ -259,7 +261,9 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
                        blocked_account_ids: set[str] = frozenset(),
                        cooldown_days: int | None = None,
                        cooldown_until: Mapping[str, date] | None = None,
-                       call_date: date | None = None) -> AccountListResult:
+                       call_date: date | None = None,
+                       contact_names_by_account: Mapping[str, Collection[str]] | None = None
+                       ) -> AccountListResult:
     """Merge the three sources and apply the drop rules. See the module docstring.
 
     COOLDOWN (prefer ``cooldown_until``): callers should pass ``cooldown_until`` (id -> first date
@@ -273,6 +277,9 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     ``call_date`` is the first date the account would be called (account-local semantics are the
     caller's job, 2c passes it). The reference date is ``call_date`` when given, else ``today``;
     so a night run on Wed (today=Wed) with call_date=Thu keeps an account whose cooldown ends Thu.
+    ``contact_names_by_account`` (optional, SF account id -> casefolded "first last" contact names,
+    built by the pipeline) is duplicate-detection evidence only: >= 3 shared names plus name
+    containment flags a probable duplicate. Names are only counted, never logged or noted.
     ``touched`` maps an account id (sf_account_id, or zoominfo/nooks id for non-SF accounts) to the
     date it was last touched (``date``, ``datetime`` or ISO string). ``cooldown_days`` overrides
     ``limits.cooldown_days_no_answer``. A Nooks row may carry the optional key ``_sf_account_id``
@@ -367,7 +374,7 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
                 _mark_duplicates(match, same_source)
 
     # 3a. probable same-company groups: flagged, never merged or dropped here
-    flag_probable_duplicates(merged)
+    _, result.duplicate_pairs = _flag_groups(merged, contact_names_by_account)
 
     # 3b. flags and drops
     kept: list[Account] = []
@@ -487,14 +494,25 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
 
 # ---------------------------------------------------------------- helpers for callers
 # ---------------------------------------------------------------- probable-duplicate detector
-# Flags (never merges, never drops) accounts that are probably the same company:
-#   (a) same website registrable domain (shared hosting / social domains ignored),
-#   (b) one name's distinctive tokens are a whole-word sequence inside the other's, after removing
-#       legal suffixes and generic words ("Catapult" vs "Catapult Communications"),
-#   (c) shared ids (sf / zoominfo / nooks).
-# A name group of more than _MAX_GROUP accounts is NOT flagged as duplicates (a common word, not a
-# company): its members get ``large_name_group`` instead. Same for domains (``large_domain_group``).
+# Flags (never merges, never drops) accounts that are probably the same company. An edge needs
+# evidence; NAME CONTAINMENT ALONE NEVER FLAGS ("Bank Australia" vs "X Bank Australia", "Meridian" vs
+# "Meridian Informatics" are different companies). Evidence kinds:
+#   same website domain      registrable domain equal (shared hosting / social domains ignored)
+#   shared id                same sf / zoominfo / nooks id
+#   name+shared contacts     name containment AND >= 3 shared contact full names
+#   name+same headcount      name containment AND identical non-null employees AND same first
+#                            distinctive token
+# Name containment = the shorter name's tokens (legal suffixes and generic words removed) are a
+# whole-word sequence inside the longer one, and it holds a distinctive token of >= 5 characters.
+# A group of more than _MAX_GROUP accounts is a common word, not a company: its members get
+# ``large_name_group`` / ``large_domain_group`` instead of duplicate flags.
 _MAX_GROUP = 6
+_MIN_DISTINCTIVE = 5
+_MIN_SHARED_CONTACTS = 3
+EV_DOMAIN = "same website domain"
+EV_ID = "shared id"
+EV_CONTACTS = "name+shared contacts"
+EV_HEADCOUNT = "name+same headcount"
 # Removed from names before comparing: legal suffixes, country words, filler.
 _DROP_WORDS = {"pty", "ltd", "limited", "inc", "incorporated", "llc", "plc", "proprietary", "group",
                "holdings", "holding", "australia", "australian", "nz", "new", "zealand", "the", "and",
@@ -549,7 +567,7 @@ def _names_match(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
     if not a or not b:
         return False
     small, big = (a, b) if len(a) <= len(b) else (b, a)
-    if not any(len(t) >= 2 and t not in _WEAK_WORDS for t in small):
+    if not any(len(t) >= _MIN_DISTINCTIVE and t not in _WEAK_WORDS for t in small):
         return False
     return _contains(big, small)
 
@@ -583,65 +601,98 @@ def _components(n: int, edges: Iterable[tuple[int, int]]) -> list[list[int]]:
 @dataclass
 class _Groups:
     groups: list[list[int]]                 # duplicate groups (indexes), each >= 2, sorted
-    reasons: list[set[str]]                 # per group: why ('domain', 'name', 'shared id')
+    reasons: list[set[str]]                 # per group: evidence kinds
+    pairs: dict[tuple[int, int], set[str]]  # (i, j) i < j -> evidence kinds (pairs inside kept groups)
     large_name: list[list[int]]
     large_domain: list[list[int]]
 
 
-def _detect(accounts: list[Account]) -> _Groups:
+def _norm_contact(name: str) -> str:
+    return " ".join(str(name).casefold().split())
+
+
+def _contact_sets(accounts: list[Account],
+                  contacts: Mapping[str, Collection[str]] | None) -> list[frozenset[str]]:
+    if not contacts:
+        return [frozenset()] * len(accounts)
+    norm = {normalise_sf_id(k): v for k, v in contacts.items()}
+    return [frozenset(_norm_contact(n) for n in norm.get(a.sf_account_id, ()) if str(n).strip())
+            if a.sf_account_id else frozenset() for a in accounts]
+
+
+def _detect(accounts: list[Account],
+            contacts: Mapping[str, Collection[str]] | None = None) -> _Groups:
     n = len(accounts)
-    # (a) domain edges
+    ev: dict[tuple[int, int], set[str]] = defaultdict(set)
+
+    def add(a: int, b: int, kind: str) -> None:
+        ev[(min(a, b), max(a, b))].add(kind)
+
+    # same website domain (alone flags)
     by_dom: dict[str, list[int]] = defaultdict(list)
     for i, a in enumerate(accounts):
         d = registrable_domain(a.website)
         if d:
             by_dom[d].append(i)
-    dom_edges, large_domain = [], []
+    large_domain = []
     for idxs in by_dom.values():
         if len(idxs) > _MAX_GROUP:
             large_domain.append(idxs)
         else:
-            dom_edges += [(idxs[0], j) for j in idxs[1:]]
-    # (b) name edges via an inverted index on distinctive tokens
-    cores = [_core_tokens(a.name) for a in accounts]
-    bucket: dict[str, list[int]] = defaultdict(list)
-    for i, c in enumerate(cores):
-        for t in set(c):
-            if len(t) >= 2 and t not in _WEAK_WORDS:
-                bucket[t].append(i)
-    name_pairs: set[tuple[int, int]] = set()
-    for idxs in bucket.values():
-        for x in range(len(idxs)):
-            for y in range(x + 1, len(idxs)):
-                if _names_match(cores[idxs[x]], cores[idxs[y]]):
-                    name_pairs.add((idxs[x], idxs[y]))
-    name_comps = _components(n, name_pairs)
-    large_name = [m for m in name_comps if len(m) > _MAX_GROUP]
-    keep_name = {m_i for m in name_comps if len(m) <= _MAX_GROUP for m_i in m}
-    name_edges = [(a, b) for a, b in name_pairs if a in keep_name and b in keep_name]
-    # (c) shared ids
-    id_edges, seen = [], {}
+            for x in range(len(idxs)):
+                for y in range(x + 1, len(idxs)):
+                    add(idxs[x], idxs[y], EV_DOMAIN)
+
+    # shared ids (alone flags)
+    seen: dict[tuple[str, str], int] = {}
     for i, a in enumerate(accounts):
         for kind, v in (("sf", a.sf_account_id), ("zi", a.zoominfo_id), ("nk", a.nooks_account_id)):
             if v:
                 if (kind, v) in seen:
-                    id_edges.append((seen[(kind, v)], i))
+                    add(seen[(kind, v)], i, EV_ID)
                 else:
                     seen[(kind, v)] = i
-    all_comps = _components(n, dom_edges + name_edges + id_edges)
+
+    # name containment: a candidate only; it needs corroboration to become an edge
+    cores = [_core_tokens(a.name) for a in accounts]
+    csets = _contact_sets(accounts, contacts)
+    bucket: dict[str, list[int]] = defaultdict(list)
+    for i, c in enumerate(cores):
+        for t in set(c):
+            if len(t) >= _MIN_DISTINCTIVE and t not in _WEAK_WORDS:
+                bucket[t].append(i)
+    cand: set[tuple[int, int]] = set()
+    for idxs in bucket.values():
+        for x in range(len(idxs)):
+            for y in range(x + 1, len(idxs)):
+                if _names_match(cores[idxs[x]], cores[idxs[y]]):
+                    cand.add((idxs[x], idxs[y]))
+    name_ev: dict[tuple[int, int], set[str]] = {}
+    for i, j in cand:
+        kinds = set()
+        if len(csets[i] & csets[j]) >= _MIN_SHARED_CONTACTS:
+            kinds.add(EV_CONTACTS)
+        ea, eb = accounts[i].employees, accounts[j].employees
+        if ea is not None and ea == eb and cores[i][0] == cores[j][0]:
+            kinds.add(EV_HEADCOUNT)
+        if kinds:
+            name_ev[(i, j)] = kinds
+    name_comps = _components(n, name_ev)
+    large_name = [m for m in name_comps if len(m) > _MAX_GROUP]
+    capped = {i for m in large_name for i in m}
+    for (i, j), kinds in name_ev.items():
+        if i not in capped and j not in capped:
+            for k in kinds:
+                add(i, j, k)
+
+    comps = _components(n, ev)
     groups, reasons = [], []
-    for m in sorted(all_comps, key=lambda m: m[0]):
+    for m in sorted(comps, key=lambda m: m[0]):
         mset = set(m)
-        why = set()
-        if any(a in mset and b in mset for a, b in dom_edges):
-            why.add("same website domain")
-        if any(a in mset and b in mset for a, b in name_edges):
-            why.add("name containment")
-        if any(a in mset and b in mset for a, b in id_edges):
-            why.add("shared id")
         groups.append(sorted(m))
-        reasons.append(why)
-    return _Groups(groups, reasons, sorted(sorted(m) for m in large_name),
+        reasons.append({k for (a, b), kinds in ev.items() if a in mset and b in mset for k in kinds})
+    pairs = {k: v for k, v in ev.items()}
+    return _Groups(groups, reasons, pairs, sorted(sorted(m) for m in large_name),
                    sorted(sorted(m) for m in large_domain))
 
 
@@ -649,21 +700,22 @@ def _ref(a: Account) -> str:
     return f"{a.name!r} ({', '.join(_ids(a)) or 'no id'})"
 
 
-def flag_probable_duplicates(accounts: list[Account]) -> int:
-    """Flag probable same-company groups IN PLACE (flag ``possible_duplicate`` + a note naming the
-    others and a group id; ``large_name_group`` / ``large_domain_group`` for oversized groups).
-    Nothing is merged or dropped. Returns the number of duplicate groups. Deterministic: the result
-    does not depend on the input order (groups are keyed by their smallest id/name)."""
+_GROUP_NOTE = "possible_duplicate group "
+_GROUP_RE = re.compile(r"possible_duplicate group (dup-\S+) \(")
+
+
+def _flag_groups(accounts: list[Account], contacts: Mapping[str, Collection[str]] | None = None
+                 ) -> tuple[int, list[tuple[Account, Account, tuple[str, ...]]]]:
     order = sorted(range(len(accounts)), key=lambda i: (accounts[i].name.casefold(), _ids(accounts[i]), i))
     ordered = [accounts[i] for i in order]
-    g = _detect(ordered)
+    g = _detect(ordered, contacts)
     for members, why in zip(g.groups, g.reasons):
         accts = [ordered[i] for i in members]
-        gid = "dup-" + min((_ids(a)[0] if _ids(a) else a.name.casefold()) for a in accts)
+        gid = "dup-" + re.sub(r"\s+", "_", min((_ids(a)[0] if _ids(a) else a.name.casefold()) for a in accts))
         for a in accts:
             others = "; ".join(_ref(o) for o in accts if o is not a)
             _add_flag(a, FLAG_POSSIBLE_DUPLICATE)
-            note = (f"possible_duplicate group {gid} ({', '.join(sorted(why))}): also {others}; "
+            note = (f"{_GROUP_NOTE}{gid} ({', '.join(sorted(why))}): also {others}; "
                     "not merged, collapse on the sheet")
             if note not in a.notes:
                 a.notes.append(note)
@@ -673,16 +725,42 @@ def flag_probable_duplicates(accounts: list[Account]) -> int:
             for i in members:
                 _add_flag(ordered[i], flag, f"{flag}: shares a {label} with {len(members) - 1} other accounts "
                           f"(more than {_MAX_GROUP}); a common word, not flagged as duplicates")
-    return len(g.groups)
+    pairs = [(ordered[i], ordered[j], tuple(sorted(k))) for (i, j), k in sorted(g.pairs.items())]
+    return len(g.groups), pairs
 
 
-def duplicate_groups(accounts: Iterable[Account]) -> list[list[Account]]:
-    """Groups (size >= 2) of probably-the-same-company accounts, config-free and order-stable: members
-    keep input order, groups are ordered by their first member. For the ranker/sheet step: keep the
-    higher-scoring account of each group and mention the others in the 'why' line. Oversized name or
-    domain groups (> 6) are not returned."""
+def flag_probable_duplicates(accounts: list[Account],
+                             contact_names_by_account: Mapping[str, Collection[str]] | None = None) -> int:
+    """Flag probable same-company groups IN PLACE (flag ``possible_duplicate`` + a note naming the
+    others, the evidence and a group id; ``large_name_group`` / ``large_domain_group`` for oversized
+    groups). Nothing is merged or dropped. Returns the number of duplicate groups. Deterministic:
+    independent of input order. Contact names are only counted, never written to notes."""
+    return _flag_groups(accounts, contact_names_by_account)[0]
+
+
+def duplicate_groups(accounts: Iterable[Account],
+                     contact_names_by_account: Mapping[str, Collection[str]] | None = None
+                     ) -> list[list[Account]]:
+    """Groups (size >= 2) of probably-the-same-company accounts. Members keep input order and groups
+    are ordered by first member. For the ranker/sheet step: keep the higher-scoring account of each
+    group and mention the others in the 'why' line.
+
+    Accounts already flagged by ``build_account_list`` carry a group id in their notes; when any do,
+    the groups are read from those notes (so contact evidence used at build time is not lost and no
+    contacts are needed here). Otherwise the groups are detected fresh (optionally with
+    ``contact_names_by_account``). Oversized name/domain groups (> 6) are not returned. Never mutates."""
     accts = list(accounts)
-    g = _detect(accts)
+    by_gid: dict[str, list[int]] = defaultdict(list)
+    for i, a in enumerate(accts):
+        for note in a.notes:
+            m = _GROUP_RE.match(note)
+            if m:
+                by_gid[m.group(1)].append(i)
+                break
+    if by_gid:
+        groups = [sorted(m) for m in by_gid.values() if len(m) > 1]
+        return [[accts[i] for i in m] for m in sorted(groups)]
+    g = _detect(accts, contact_names_by_account)
     return [[accts[i] for i in m] for m in g.groups]
 
 
@@ -731,11 +809,13 @@ def summarise(result: AccountListResult) -> str:
         items = by_reason[reason]
         lines.append(f"  {reason}: {len(items)}")
         lines.append("    e.g. " + "; ".join(d.name for d in items[:5]) + (" ..." if len(items) > 5 else ""))
-    groups = duplicate_groups(kept)
-    npairs = sum(len(g) * (len(g) - 1) // 2 for g in groups)
-    lines.append(f"possible duplicate pairs: {npairs} (top 10 listed with names)")
-    for g in sorted(groups, key=lambda g: (-len(g), g[0].name.casefold()))[:10]:
-        lines.append("    " + " ~ ".join(a.name for a in g))
+    keep_ids = {id(x) for x in kept}
+    pairs = [p for p in result.duplicate_pairs if id(p[0]) in keep_ids and id(p[1]) in keep_ids]
+    breakdown = Counter(k for p in pairs for k in p[2])
+    detail = ", ".join(f"{k}: {breakdown[k]}" for k in sorted(breakdown)) or "none"
+    lines.append(f"possible duplicate pairs: {len(pairs)} (evidence: {detail}; top 10 listed with names)")
+    for x, y, kinds in sorted(pairs, key=lambda p: (-len(p[2]), p[0].name.casefold(), p[1].name.casefold()))[:10]:
+        lines.append(f"    {x.name} ~ {y.name} [{', '.join(kinds)}]")
     for flag in (FLAG_LARGE_NAME_GROUP, FLAG_LARGE_DOMAIN_GROUP):
         c = sum(1 for a in kept if flag in a.flags)
         if c:

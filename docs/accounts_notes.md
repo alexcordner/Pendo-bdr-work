@@ -60,25 +60,31 @@ Their timezone already starts at the HQ state (loader rule). To exclude them lat
 
 ## Probable duplicates (phase2/fix-dupes)
 Two Salesforce records for one company (e.g. "Catapult" and "Catapult Communications") are FLAGGED, never merged or
-dropped: flag `possible_duplicate` plus a note with a group id (`dup-<smallest id>`), the reason and the other
-account's name and ids. Rules (all deterministic, all-accounts, any source):
-- (a) same website registrable domain (`www.`, scheme, path, port removed; `.com.au`/`.co.nz`-style suffixes handled).
-  Shared hosts are ignored: linkedin, facebook, twitter/x, instagram, youtube, google (sites), wix/wixsite, weebly,
+dropped: flag `possible_duplicate` plus a note with a group id (`dup-<smallest id>`), the evidence kinds and the
+other accounts' names and ids. Contact names are only counted, never written to notes or logs.
+
+**Name containment alone NEVER flags** (real data: a naive rule gave 1,253 pairs, nearly all false: "Bank Australia" vs
+every "X Bank Australia", "Meridian" vs "Meridian Informatics", "Perpetual" vs "Perpetual Guardian"). An edge needs
+evidence:
+- `same website domain`: registrable domain equal (`www.`, scheme, path, port removed; `.com.au`/`.co.nz` handled).
+  Shared hosts are ignored (linkedin, facebook, twitter/x, instagram, youtube, google sites, wix/wixsite, weebly,
   squarespace, wordpress, blogspot, github.io, business.site, linktr.ee, medium, godaddysites, myshopify, netlify,
-  herokuapp, azurewebsites, pages.dev, tiktok, pinterest, bit.ly.
-- (b) name containment: after removing legal suffixes and filler (pty, ltd, limited, inc, group, holdings,
+  herokuapp, azurewebsites, pages.dev, tiktok, pinterest, bit.ly). Alone, this flags.
+- `shared id`: same sf / zoominfo / nooks id. Alone, this flags.
+- `name+shared contacts`: name containment AND >= 3 shared contact full names (case-folded, whitespace-normalised).
+- `name+same headcount`: name containment AND identical non-null employee count AND the same first distinctive token.
+- Name containment = after removing legal suffixes and filler (pty, ltd, limited, inc, group, holdings,
   australia/australian, nz/new zealand, the, and, of, co, company, corp...), the shorter name's tokens are a
-  whole-word sequence inside the longer one (or equal). The shorter name needs at least one token of 2+ characters
-  that is not a weak/common word (post, office, bank, health, energy, services, digital, media, ...), so
-  "Australia Post" vs "Post Office" or "Alpha Digital" vs "Beta Digital" do NOT match, while "Catapult" vs
-  "Catapult Communications" and "Westpac" vs "Westpac Institutional Bank" do. Partial words never match.
-- (c) shared sf / zoominfo / nooks id.
+  whole-word sequence inside the longer one (or equal), and it holds a distinctive token of >= 5 characters that is
+  not a weak/common word (post, office, bank, health, energy, services, digital, media, ...).
+- `contact_names_by_account` (optional parameter of `build_account_list`, also of `duplicate_groups` /
+  `flag_probable_duplicates`): `Mapping[str, Collection[str]]`, SF account id (15 or 18 chars) -> casefolded
+  "first last" names, built by the pipeline. Evidence only; without it the contacts rule simply never fires.
 - Cap: a name (or domain) group of more than 6 accounts is a common word, not a company. Its members get
-  `large_name_group` (or `large_domain_group`) and are NOT flagged as duplicates.
-- Groups are connected components over the edges, so a domain link can join a name group. Chains through a
-  distinctive token are possible; the 6-account cap limits the damage. Only flags are set (no model change).
-- `duplicate_groups(accounts) -> list[list[Account]]` (config-free, input order inside a group, groups ordered by
-  first member, oversized groups excluded) is for the sheet step: keep the higher-scoring account, mention the
-  other in the 'why' line. `flag_probable_duplicates(accounts)` does the in-place flagging (idempotent).
-- `summarise()` prints `possible duplicate pairs: N (top 10 listed with names)` and large-group counts.
-- Drops still apply: a dropped twin (e.g. a customer) still appears in its kept twin's note.
+  `large_name_group` (or `large_domain_group`) and are NOT flagged as duplicates. Groups are connected components.
+- `duplicate_groups(accounts)` (for the sheet step: keep the higher-scoring account, mention the other in the 'why'
+  line) reads the group ids from the notes when the accounts were flagged by `build_account_list` (so contact
+  evidence is kept without passing contacts again); otherwise it detects fresh. It never mutates.
+- `AccountListResult.duplicate_pairs` holds (account, account, evidence kinds). `summarise()` prints
+  `possible duplicate pairs: N (evidence: kind: count, ...; top 10 listed with names)` with each pair's evidence kind,
+  plus large-group counts. Pairs with a dropped twin are not counted but the twin is still named in the kept note.
