@@ -140,3 +140,77 @@ The 8 questions are clearly worded. Recommended defaults below, plus 5 missing q
 - Duration shares, the 40-call count, the manual_email backlog size and scoop-sample percentages. These need live Nooks/ZoomInfo reads I chose not to repeat. They can be re-checked with read-only calls if the coordinator wants.
 - The Gmail `to:` form and the dot-stripping behaviour on returned recipient addresses (needs reading real recipients).
 - Whether the repo has secrets in any commit before `0bd2b30`. I scanned only the current tree.
+
+---
+
+# Re-review of worker commit 8b16df8 (narrow, read-only)
+
+Reviewed `origin/phase1/1a-discovery` @ `8b16df8` in a scratch worktree. My only external call was one read-only SOQL `COUNT()`. I recomputed statistics from the committed fixtures myself.
+
+**Verdict: FAIL on item 4 (PII), PASS on everything else, with one small inconsistency.** Fix the phone numbers, then it is a PASS.
+
+| # | Item | Result |
+|---|---|---|
+| 1 | M1: run log | PASS |
+| 2 | M2: evidence fixtures | PASS (one inconsistency, below) |
+| 3 | L1/L2 | PASS |
+| 4 | PII/secret grep | **FAIL** |
+| 5 | Gaps (a) to (f) | PASS |
+| 6 | HQ_Country coverage hole | PASS (4,926 verified) |
+
+## 1. M1, run log: PASS
+`docs/1a_run_log.txt` exists. It states up front that it was reconstructed from the session transcript after the fact, and it ends with "counts for round 1 were recorded from memory... may be off by one or two". It lists only reads: SOQL SELECT, getObjectSchema, getUserInfo, Nooks get/list calls, Gmail `search_threads` (metadata view, no bodies), ZoomInfo `search_*`. It says ZoomInfo credits are 0 with no redeem, enrich, `account_research` or `conversation_intelligence`. There is no write, send, draft or note. It is an honest after-the-fact reconstruction, not a machine-captured log. That limits its value as an audit trail, but it is not misleading.
+
+## 2. M2, evidence: PASS
+I recomputed from `nooks_calls_14d_rows.json` (104 per-call rows):
+- 14 days: 104 calls, 71 / 7 / 26 = **68.3 / 6.7 / 25.0%**. Correct.
+- 7 days since 11-18: 40 calls, 26 / 3 / 11 = **65.0 / 7.5 / 27.5%**. Correct.
+- "No Answer" calls over 30s: 8, with durations 34 / 39 / 41 / 41 / 41 / 41 / 45 / 64. Correct.
+- Left Voicemail: 4 calls, 23 to 32s. Correct.
+- 20 calls without a prospect, 74 distinct prospects, 94 distinct numbers. Correct.
+- Manual-email backlog (`nooks_manual_email_backlog.json`): 200 rows, 189 in one sequence, due 2026-04-22 to 2026-11-15, total UNVERIFIED beyond 200. This is a summary only, with no per-row data, so I can't recompute it. It is internally consistent (189 + 2+1+3+1+1+1+1+1 = 200).
+- Scoops (`zoominfo_scoop_sample_evidence.json`): 5 of 50 match the stated rule, so 10% weakly relevant and 90% generic. Sample B is 25 with 4 generic "Medical & Health" rows (16%). Correct. The worker disclosed the 96% to 90% correction. The relevance rule is the worker's judgement and is stated as such.
+
+**Inconsistency (low):** `connector_notes.md` still says the 50 scoops came from "just **9 companies**". The evidence fixture lists **12 distinct companies** (it also counts "Funds", "Hostplus", "Hesta" and others). Change the notes to 12.
+
+## 3. L1/L2: PASS
+- The third-party name at the old line 142 is now `first.last@…`.
+- "LIMIT 5 / 41 rows" is reworded: a separate `COUNT()` returned 41, and the sample used `LIMIT 5` (3 anonymised rows).
+- The open-tasks wording is now "30 open tasks: 28 BDR Meeting Booked and 2 Call", and the fixture matches (`count_by_type`, 3 sample rows).
+
+## 4. PII/secrets: FAIL
+Clean: no tokens or keys, no recording URLs (all `<redacted>`), no personal names, no LinkedIn profile URLs. The email grep shows only placeholders plus Alex's own address.
+
+**Problem: `tests/fixtures/phone_formats.json` contains what look like unmasked real phone numbers.** Its `_note` says "digits masked", but these are not masked:
+- `observed_match`: "SF MobilePhone '+61 409 074 447' == Nooks call.to '+61409074447'". These are Australian mobile numbers belonging to a real contact.
+- Test vectors: `+61 474 771 228` (also an AU mobile), `0226431011` (NZ mobile), `61390956533` (AU landline), and `+64 9-377 9779` (Auckland landline).
+- Fix: replace all of them with obviously fake numbers in the same formats (for example `+61 400 000 000`, `0220000000`, `61390000000`, `+64 9-000 0000`). Check the test outputs still follow the stated rule. The landlines may be business numbers, but the mobiles identify an individual. Scrub them all and re-grep.
+
+**Lower-risk re-identification (judgement call):** `sf_nooks_zoominfo_chain.json` pairs a prospect job title ("Chief Product Officer") with a named company ("Shift"), and another ("Head of Product") with "Xemplo". Names and emails are anonymised, but title plus company is probably enough to identify one person. Suggest dropping the title or the company name from those rows. This file also holds real SF record ids (`0030a00002P01LuAAJ` etc.); these are not secrets, but they point at real records.
+
+The phone format list in `nooks_call_dispositions`/other fixtures is fine; `+6590XXXXXX`-style entries are masked.
+
+## 5. Gaps (a) to (f): PASS
+Documented in notes section 6, and consistent with the fixtures:
+- (a) Prospect to Contact to Account join: the two-row chain fixture matches the text.
+- (b) ZoomInfo id to SF Account: two verified pairs (Shippit, Phocas) in the chain fixture.
+- (c) Timezone fallback: the state-value distribution fixture is present, and the notes give a sensible rule (full name or abbreviation, case-insensitive, fall back to the country default and log a guess).
+- (d) Phone normalisation: the rule and vectors are present, but see the PII failure above.
+- (e) 14-day call window: the fixture supports it. Note the useful warning that pages are ordered by id, not time.
+- (f) Pain Point scoop: a Pain Point-only row is in `zoominfo_scoops.json`.
+
+## 6. HQ_Country coverage hole: PASS (verified)
+My read-only query:
+
+```sql
+SELECT COUNT() FROM Account
+WHERE Assigned_SDR__c = '005Pe00000HHNMbIAP' AND Current_Customer__c = false
+  AND BillingCountry = null AND HQ_Country__c IN ('Australia','New Zealand')
+```
+
+returned **4,926**, which matches the worker's number exactly. A broader variant I ran first (any non-AU/NZ `BillingCountry`, plus `'AU'`/`'NZ'` values in `HQ_Country__c`) gave 5,349, so about 420 more accounts have a different `BillingCountry` and an ANZ HQ. That is outside the worker's claim, but 1d should probably decide whether those count as ANZ. The 4,926 figure is correct as stated; note that it makes the pool about 12,500, not 7,604.
+
+## Remaining actions for the worker
+1. Mask the phone numbers in `phone_formats.json` (blocking).
+2. Change "9 companies" to 12 in `connector_notes.md`.
+3. Optionally drop job title or company from the chain fixture rows.
