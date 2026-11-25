@@ -635,3 +635,93 @@ def test_drop_detail_mentions_merge(config):
     res = build(sf=[sf_row("S1", "Acme Pty Ltd", Current_Customer__c=True)],
                 nk=[{"id": "N1", "name": "Acme", "_sf_account_id": "S1"}], config=config)
     assert "after merging" in res.dropped[0].detail
+
+
+# ------------------------------------------------------------ R1: loose government rule (ZoomInfo-only)
+GOV_ZI_DROPPED = ["Victorian Department of Health", "Western Australian Department of Education",
+                  "Queensland Health Department", "NSW Department of Planning", "Tasmanian Government",
+                  "Office of the Victorian Information Commissioner"]
+PRIVATE_NAMES = ["Fake Ministry of Sound Media Ltd", "Fake Government Services Pty Ltd"]
+
+
+@pytest.mark.parametrize("name", GOV_ZI_DROPPED)
+def test_loose_gov_dropped_for_zoominfo_only(config, name):
+    res = build(zi=[{"id": "Z1", "name": name}], config=config)
+    assert res.dropped and res.dropped[0].reason == "noise_government"
+
+
+@pytest.mark.parametrize("name", GOV_ZI_DROPPED[:5])
+def test_loose_gov_not_applied_to_salesforce_or_nooks(config, name):
+    assert [a.name for a in build(sf=[sf_row("S1", name)], config=config).accounts] == [name]
+    assert len(build(nk=[{"id": "N1", "name": name, "numEmployees": 100}], config=config).accounts) == 1
+
+
+@pytest.mark.parametrize("name", PRIVATE_NAMES)
+@pytest.mark.parametrize("source", ["sf", "nooks", "zi"])
+def test_private_names_never_dropped(config, name, source):
+    kw = {"sf": dict(sf=[sf_row("S1", name)]), "nooks": dict(nk=[{"id": "N1", "name": name, "numEmployees": 90}]),
+          "zi": dict(zi=[{"id": "Z1", "name": name}])}[source]
+    res = build(config=config, **kw)
+    assert len(res.accounts) == 1 and not res.dropped
+    assert "noise_government" not in res.accounts[0].flags
+
+
+# ------------------------------------------------------------ L3: 15 vs 18 char Salesforce ids
+SF18 = "0015g00000ABCDEFGH"      # 18 chars, synthetic
+SF15 = SF18[:15]
+
+
+def test_18char_row_matches_15char_touched(config):
+    res = build(sf=[sf_row(SF18)], touched={SF15: TODAY}, config=config)
+    assert res.stats == {"recently_touched": 1}
+
+
+def test_15char_row_matches_18char_touched(config):
+    assert build(sf=[sf_row(SF15)], touched={SF18: TODAY}, config=config).stats == {"recently_touched": 1}
+
+
+def test_18char_row_matches_15char_blocked(config):
+    assert build(sf=[sf_row(SF18)], blocked={SF15}, config=config).stats == {"blocked": 1}
+
+
+def test_15char_row_matches_18char_blocked(config):
+    assert build(sf=[sf_row(SF15)], blocked={SF18}, config=config).stats == {"blocked": 1}
+
+
+def test_nooks_merge_key_18_vs_15(config):
+    res = build(sf=[sf_row(SF18, "Acme Pty Ltd")],
+                nk=[{"id": "N1", "name": "Other Name", "_sf_account_id": SF15}], config=config)
+    assert len(res.accounts) == 1 and res.accounts[0].source_nooks
+
+
+def test_blocked_input_set_unchanged_by_normalisation(config):
+    blocked = {SF18}
+    build(sf=[sf_row(SF15)], blocked=blocked, config=config)
+    assert blocked == {SF18}
+
+
+# ------------------------------------------------------------ L4: cooldown_until
+def test_cooldown_until_in_future_drops(config):
+    res = build(sf=[sf_row("S1")], cooldown_until={"S1": TODAY + timedelta(days=1)}, config=config)
+    assert res.stats == {"recently_touched": 1}
+
+
+def test_cooldown_until_today_is_eligible(config):
+    assert len(build(sf=[sf_row("S1")], cooldown_until={"S1": TODAY}, config=config).accounts) == 1
+
+
+def test_cooldown_until_overrides_touched(config):
+    res = build(sf=[sf_row("S1")], touched={"S1": TODAY}, cooldown_until={"S1": TODAY - timedelta(days=1)},
+                config=config)
+    assert len(res.accounts) == 1
+
+
+def test_cooldown_until_only_for_covered_ids_else_touched_applies(config):
+    res = build(sf=[sf_row("S1"), sf_row("S2")], touched={"S2": TODAY},
+                cooldown_until={"S1": TODAY - timedelta(days=5)}, config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["S1"] and res.dropped[0].id == "S2"
+
+
+def test_cooldown_until_accepts_18char_key_and_iso(config):
+    res = build(sf=[sf_row(SF15)], cooldown_until={SF18: (TODAY + timedelta(days=2)).isoformat()}, config=config)
+    assert res.stats == {"recently_touched": 1}

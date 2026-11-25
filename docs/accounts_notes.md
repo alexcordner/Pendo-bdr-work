@@ -33,7 +33,16 @@ Their timezone already starts at the HQ state (loader rule). To exclude them lat
   `cooldown` days ago is eligible. Future-dated touches always drop (defensible; callers should pass real dates).
   `touched` values may be `date`, `datetime` or ISO string. `cooldown_days_after_connect` is the caller's job
   (pass `touched` dates, or `cooldown_days`, already adjusted for outcome).
-- Salesforce 15 vs 18 char ids are not normalised: callers must use one form.
+- Salesforce ids: the loaders canonicalise to the 15-char form; `build_account_list` also normalises the keys of
+  `touched`, `cooldown_until`, `blocked_account_ids` and the Nooks `_sf_account_id`, so 15- and 18-char forms match.
+- `cooldown_until` (optional `Mapping[str, date]`, e.g. from 1c state) takes precedence over `touched` +
+  `cooldown_days` for the ids it covers: dropped while `today < cooldown_until`. Otherwise callers should pass
+  `touched` dates already adjusted for outcome (no-answer vs connect).
+- Duplicates can share an `sf_account_id` (two rows with the same Id are kept and flagged `possible_duplicate`), so
+  callers that key a dict on `sf_account_id` must handle collisions.
+- Government rule for ZoomInfo-only rows is looser (jurisdiction word first, e.g. "Victorian Department of
+  Health", "Queensland Health Department", "Tasmanian Government"); SF/Nooks only use the strict rule and are
+  flagged, never dropped.
 - `filters.drop_if_no_domain` is false in config and not applied here.
 - Known gap (M2, not fixed): ZoomInfo-only noise outside the CBD pattern ("Bondi Florist", "Fakeville Plumbing")
   passes as `zoominfo_only` low confidence; the ranker should rank those low.

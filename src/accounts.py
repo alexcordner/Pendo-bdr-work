@@ -49,7 +49,8 @@ from datetime import date, datetime
 from typing import Iterable, Mapping
 
 from src.config import Config, canonical_country, is_blank_or_junk
-from src.loaders import LoaderError, account_from_nooks, account_from_sf_row, account_from_zoominfo
+from src.loaders import (LoaderError, account_from_nooks, account_from_sf_row, account_from_zoominfo,
+                         normalise_sf_id)
 from src.models import Account
 
 # ---------------------------------------------------------------- reasons and note tags
@@ -91,6 +92,16 @@ _PLACEHOLDER_WORDS = {"placeholder", "tbd", "unknown", "unnamed"}
 _GOV_RE = re.compile(
     r"^(government of|department of|dept of|ministry of|minister for|parliament of|"
     r"public service|office of the)\b|\b(commissioner|city council|shire council|regional council)\b")
+# Looser rule used for ZoomInfo-only rows ONLY (they are dropped, so it must stay precise): a
+# jurisdiction word first ("Victorian", "NSW", "Western Australian"...), then optionally up to two
+# words, then Department/Ministry of ..., or ending in Department/Ministry/Government. Private
+# names like "Fake Ministry of Sound Media" or "Fake Government Services" have no jurisdiction
+# word first and are not matched.
+_JURIS = (r"(?:victorian|queensland|nsw|new south wales|western australian|south australian|"
+          r"tasmanian|australian|commonwealth|state|federal|national|new zealand|nz|act|nt|wa|sa|"
+          r"qld|vic|tas|northern territory)")
+_GOV_LOOSE_RE = re.compile(rf"^(?:{_JURIS} )+(?:[a-z]+ ){{0,2}}"
+                           rf"(?:(?:department|dept|ministry) of\b|(?:department|dept|ministry|government)$)")
 # Exists ONLY because the synthetic noise fixture marks a non-ANZ ZoomInfo row this way; real
 # ZoomInfo names will not. Applied to ZoomInfo-only rows only (see _drop_reason).
 _NOT_ANZ_RE = re.compile(r"\(not anz\)")
@@ -134,7 +145,7 @@ def normalise_name(name: str | None) -> str:
 
 
 # ---------------------------------------------------------------- noise detection
-def noise_reason(account: Account, config: Config) -> tuple[str, str] | None:
+def noise_reason(account: Account, config: Config, loose_gov: bool = False) -> tuple[str, str] | None:
     """(reason, detail) when the account is non-company noise, else None.
 
     Rules: pure location names, locality + trade businesses of small/unknown size, government
@@ -161,7 +172,8 @@ def noise_reason(account: Account, config: Config) -> tuple[str, str] | None:
             return R_NOISE_LOCAL_BUSINESS, (
                 f"locality name with trade words and small/unknown size ({account.name!r})")
 
-    if _GOV_RE.search(" ".join(_tokens(account.name))):
+    joined = " ".join(_tokens(account.name))
+    if _GOV_RE.search(joined) or (loose_gov and _GOV_LOOSE_RE.search(joined)):
         return R_NOISE_GOVERNMENT, f"government body or department ({account.name!r})"
     if set(toks) & _PLACEHOLDER_WORDS or all(t in _GENERIC_WORDS for t in toks):
         return R_NOISE_VAGUE, f"vague or placeholder name ({account.name!r})"
@@ -243,9 +255,12 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
                        zoominfo_rows: Iterable[dict], config: Config,
                        touched: Mapping[str, date], today: date,
                        blocked_account_ids: set[str] = frozenset(),
-                       cooldown_days: int | None = None) -> AccountListResult:
+                       cooldown_days: int | None = None,
+                       cooldown_until: Mapping[str, date] | None = None) -> AccountListResult:
     """Merge the three sources and apply the drop rules. See the module docstring.
 
+    ``cooldown_until`` (optional, id -> date, e.g. from 1c state) takes precedence over
+    ``touched`` + ``cooldown_days`` for the ids it covers: dropped while ``today < cooldown_until``.
     ``touched`` maps an account id (sf_account_id, or zoominfo/nooks id for non-SF accounts) to the
     date it was last touched (``date``, ``datetime`` or ISO string). ``cooldown_days`` overrides
     ``limits.cooldown_days_no_answer``. A Nooks row may carry the optional key ``_sf_account_id``
@@ -254,6 +269,11 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     are NOT normalised: callers must use one form).
     """
     cooldown = config.limits.cooldown_days_no_answer if cooldown_days is None else cooldown_days
+    # Salesforce ids may arrive as 15 or 18 chars: key everything on the canonical form (the raw
+    # key is kept too, so ZoomInfo/Nooks ids are unaffected).
+    touched = _with_normalised_keys(touched)
+    cooldown_until = _with_normalised_keys(cooldown_until or {})
+    blocked_account_ids = set(blocked_account_ids) | {normalise_sf_id(b) for b in blocked_account_ids} - {None}
     prio = {s: i for i, s in enumerate(config.sources)}
     result = AccountListResult()
 
@@ -331,7 +351,7 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     kept: list[Account] = []
     for a in merged:
         _annotate(a, config)
-        drop = _drop_reason(a, config, touched, today, blocked_account_ids, cooldown)
+        drop = _drop_reason(a, config, touched, today, blocked_account_ids, cooldown, cooldown_until)
         if drop:
             reason, detail = drop
             result.dropped.append(Dropped(a.name, a.sf_account_id or a.zoominfo_id or a.nooks_account_id,
@@ -344,6 +364,16 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     result.stats = dict(Counter(d.reason for d in result.dropped))
     result.stats.update({k: v for k, v in counters.items() if v})
     return result
+
+
+def _with_normalised_keys(m: Mapping[str, date]) -> dict[str, date]:
+    """Copy of ``m`` that also answers to the canonical 15-char form of each key."""
+    out = dict(m)
+    for k, v in m.items():
+        nk = normalise_sf_id(k)
+        if nk is not None and nk not in out:
+            out[nk] = v
+    return out
 
 
 def _is_zoominfo_only(a: Account) -> bool:
@@ -398,7 +428,8 @@ def _touch_date(a: Account, touched: Mapping[str, date]) -> date | None:
 
 
 def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today: date,
-                 blocked: set[str], cooldown: int) -> tuple[str, str] | None:
+                 blocked: set[str], cooldown: int,
+                 cooldown_until: Mapping[str, date] | None = None) -> tuple[str, str] | None:
     """First matching drop rule as (reason, detail), or None to keep."""
     merged_note = " (after merging sources)" if len(_ids(a)) > 1 else ""
     if a.is_customer:
@@ -412,7 +443,7 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
     if _is_zoominfo_only(a):
         if _NOT_ANZ_RE.search(a.name.casefold()):
             return R_NOT_ANZ, f"name marks the company as not ANZ ({a.name!r})"
-        noise = noise_reason(a, config)
+        noise = noise_reason(a, config, loose_gov=True)
         if noise:
             return noise
     if a.employees is not None:
@@ -420,6 +451,11 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
             return R_OVER_MAX, f"{a.employees} employees > max {config.company_size.max_employees}"
         if a.employees < config.company_size.min_employees:
             return R_UNDER_MIN, f"{a.employees} employees < min {config.company_size.min_employees}"
+    until = _touch_date(a, cooldown_until or {})
+    if until is not None:        # explicit cooldown_until (from state) wins over touched + cooldown
+        if today < until:
+            return R_TOUCHED, f"cooldown_until {until.isoformat()} is after today ({today.isoformat()})"
+        return None
     last = _touch_date(a, touched)
     if last is not None and (today - last).days < cooldown:
         return R_TOUCHED, (f"touched {last.isoformat()} ({(today - last).days} days ago) "
