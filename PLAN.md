@@ -15,16 +15,17 @@ Status key: [ ] todo, [~] in progress, [x] done. Every task ends with a reviewer
 - 1g Independent review + full test run
 - CHECKPOINT: Alex confirms
 
-## Phase 2: Dry run (no writes to Nooks or Gmail)
-- 2a Live read-only intake: Salesforce, Nooks, ZoomInfo search (free)
-- 2b Signals pull (scoops, intent) with ZoomInfo credit counter in the log
-- 2c callsheet.py assembles a 10-account sheet and prints it
-- 2d Opener / facts / gatekeeper generated via the opener skill
-- 2e Voice tuning loop with Alex until the openers sound like him
-- 2f Review (honesty check: no invented triggers or facts, sources cited)
-- CHECKPOINT
+## Phase 2: Dry run (no writes to Nooks or Gmail) [~] (2a, 2c, 2d, 2e script and the 2f integration are done; 2b and the voice tuning with Alex are open)
+- 2a [x] Live read-only intake: Salesforce, Nooks, ZoomInfo search (free): `src/intake.py`, `src/pipeline.py`, `scripts/merge_pages.py` (+ `recent_call_ids.py`, `gmail_queue.py`, `safeout.py`), `docs/fetch_runbook.md`. First real dry run done; fixes merged (untied recent calls classes, Gmail coverage hashes, derive-last-page rules).
+- 2b [ ] Signals pull (scoops, intent) with ZoomInfo credit counter in the log. Scoops are fetched and filtered (digital launch, M&A direction, debt / fund / rumour weights, vacated roles). Intent is deferred by decision (docs/decisions.md).
+- 2c [x] callsheet.py assembles the sheet, research packets and the single checked task entry point (`prepare_task`).
+- 2d [x] Opener / facts / gatekeeper / email skills + deterministic lint (`src/textcheck.py`, `config/voice.yaml`, `docs/voice_guide.md`). The voice is NOT calibrated to Alex (see 2e).
+- 2e [ ] Voice tuning loop with Alex until the openers sound like him (needs his three liked openers, three disliked, two proud emails: `config/voice.yaml: alex_examples`). `scripts/dry_run_sheet.py` is in.
+- 2f [x] Integration (this branch `phase2/integration`): seven owner branches merged, wiring done, end-to-end tests, docs/phase2_report.md, docs/review_2f.md.
+- CHECKPOINT: Alex reviews the dry-run sheet and the report.
 
 ## Phase 3: Live writes
+Preconditions (all enforced or logged by the pipeline; the full list is `PHASE3_PRECONDITIONS` in src/pipeline.py and the end of docs/phase2_report.md): owner id from `getMe` (never stored), refuse dry-run payloads, tasks only for `ranked` lines of a LIVE run, `record_sheet` only after writes succeed, re-run Do Not Call / opt-out BY NOOKS PROSPECT ID for every chosen prospect, every chosen prospect Gmail-covered, `callsheet.email_draft_allowed` before any draft, `textcheck` clean (no errors) before any draft or task field is written.
 - 3a nooks_writer.py (idempotent, `--live` only, tagged so test tasks are deletable)
 - 3b Write 10 tasks to Nooks, verify with listTasks, show Alex
 - 3c drafts.py + voicemail detection (listCalls, last 24h, skip rules)

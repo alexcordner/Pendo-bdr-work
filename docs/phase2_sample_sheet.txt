@@ -1,0 +1,19 @@
+CALL SHEET 2026-11-25: 10 of 20 callable accounts (top 10 by score) | needs prospect 1, spilled 0, skipped 0
+
+== Australia/Sydney afternoon Wed 25 Nov ==
+ 1. Wed 14:01 AEDT Catapult Communications            Morgan, VP Product | score 94 (#1) | Executive Move: Catapult Communications has appointed a new Head of Product to lead its digital product team. (ZoomInfo… | flags: possible_duplicate
+ 2. Wed 14:08 AEDT Personalmail Pty Ltd               Quin, Head of Product | score 90 (#2) | Executive Move: Personalmail has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 1 d… | flags: contact email is personal: call only, no email draft
+ 3. Wed 14:15 AEDT Reed Assistant And Clean Pty Ltd   Cleo, Head of Product | score 90 (#3) | Executive Move: Reed has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 2 days ago)…
+ 4. Wed 14:23 AEDT Sable Assistant Director Pty Ltd   Dev, Assistant Director of Produ… | score 89 (#4) | Executive Move: Sable has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 3 days ago…
+ 5. Wed 14:30 AEDT Bank Australia Pty Ltd             Eli, Head of Product | score 88 (#5) | Executive Move: Bank Australia has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 4…
+ 6. Wed 14:38 AEDT Arab Bank Pty Ltd                  Fay, Head of Product | score 88 (#6) | Executive Move: Arab Bank has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 5 days…
+ 7. Wed 14:45 AEDT Normalmail Pty Ltd                 Rex, Head of Product | score 87 (#7) | Executive Move: Normalmail has appointed a new Head of Product to lead its digital product team. (ZoomInfo scoop, 6 day…
+ 8. Wed 14:53 AEDT Digicontrol Pty Ltd                Oli, Head of Product | score 80 (#8) | Product Launch: Digicontrol launched a new mobile banking app for customers. (ZoomInfo scoop, 5 days ago); Size 220 (ti…
+ 9. Wed 15:00 AEDT Ambigretail Pty Ltd                Sia, Head of Product | score 79 (#9) | Executive Move: Ambigretail has appointed a new Head of Product, Footwear. (ZoomInfo scoop, 3 days ago); Flag: role amb… | flags: role ambiguous
+10. Wed 15:08 AEDT Plainfunding Pty Ltd               Pam, Head of Product | score 74 (#10) | Funding: Plainfunding raised $20 million in Series B funding. (ZoomInfo scoop, 5 days ago); Size 220 (tier1)
+
+NEEDS PROSPECT (find a contact; never a task) (1):
+  - Quill Only Assistant Pty Ltd: junk_title, score 74.58
+DROPPED FROM SHEET (ranked but not sheetable) (1):
+  - Catapult: probable duplicate of Catapult Communications (kept the higher score)
+
