@@ -52,7 +52,7 @@ All six present and working (`test_iii_*`, real `run_pipeline`): lab-consumables
 - The voice calibration (`alex_examples`) needs Alex.
 - `docs/review_2d.md` and the other review notes (`2a-review`, `2c-review`, `probe-notes`) were NOT merged (reference only, as instructed).
 - The 12,000-account run uses synthetic names; real-name bucket sizes are unknown until a real dry run reports `accounts._detect` time (add a timing line to the log if B1 is not fixed).
-- `tests/test_integration_phase2_gates.py::test_vi_*` runs the 20-shuffle x 3-hash-seed determinism check in subprocesses (about 25 s total): digest of sheet text + markdown + JSON + every packet + the full run log is identical across all 60 runs.
+- `tests/test_integration_phase2_gates.py::test_vi_*` runs the 20-shuffle x 3-hash-seed determinism check in subprocesses (about 3 s total): digest of sheet text + markdown + JSON + every packet + the full run log is identical across all 60 runs.
 
 ## 6. Hard-rule scan results (tests `test_viii_*`)
 - No call of any send / draft / create / update / delete tool name in `src/` or `scripts/` (AST).
