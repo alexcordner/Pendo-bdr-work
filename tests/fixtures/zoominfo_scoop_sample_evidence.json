@@ -1,0 +1,75 @@
+{
+  "_note": "SYNTHETIC illustration of the per-scoop keep/drop judgement used to size the filter. Shares are rounded and illustrative.",
+  "expected": [
+    {
+      "scoop": "FAKE-SCOOP-1",
+      "keep": true,
+      "why": "Funding"
+    },
+    {
+      "scoop": "FAKE-SCOOP-2",
+      "keep": true,
+      "why": "Executive Move, product title"
+    },
+    {
+      "scoop": "FAKE-SCOOP-3",
+      "keep": false,
+      "why": "New Hire, finance role"
+    },
+    {
+      "scoop": "FAKE-SCOOP-4",
+      "keep": true,
+      "why": "Product Launch"
+    },
+    {
+      "scoop": "FAKE-SCOOP-5",
+      "keep": true,
+      "why": "M&A"
+    },
+    {
+      "scoop": "FAKE-SCOOP-6",
+      "keep": true,
+      "why": "Partnership"
+    },
+    {
+      "scoop": "FAKE-SCOOP-7",
+      "keep": true,
+      "why": "Pain Point/Project with Customer Experience / Product Management topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-8",
+      "keep": false,
+      "why": "Pain Point, finance topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-9",
+      "keep": false,
+      "why": "Project, HR topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-10",
+      "keep": false,
+      "why": "generic Medical & Health open roles"
+    },
+    {
+      "scoop": "FAKE-SCOOP-11",
+      "keep": false,
+      "why": "generic Legal open roles"
+    },
+    {
+      "scoop": "FAKE-SCOOP-12",
+      "keep": true,
+      "why": "Hiring Plans with digital/engineering topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-13",
+      "keep": true,
+      "why": "Open Position, product topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-14",
+      "keep": true,
+      "why": "Management Move, digital role"
+    }
+  ]
+}

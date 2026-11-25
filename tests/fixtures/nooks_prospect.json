@@ -1,0 +1,57 @@
+{
+  "_note": "SYNTHETIC listProspects/getProspect shape. No phone and no globalOptedOut on read.",
+  "data": [
+    {
+      "id": "FAKE-NOOKS-PROSPECT-1",
+      "type": "salesforce",
+      "name": "Example Person",
+      "firstName": "Example",
+      "lastName": "Person",
+      "title": "Head of Product",
+      "primaryEmail": "first.last@example.com",
+      "linkedInUrl": "",
+      "crmId": "FAKE-003-001",
+      "account": {
+        "id": "FAKE-NOOKS-ACCT-1",
+        "_href": "/v1/accounts/FAKE-NOOKS-ACCT-1"
+      },
+      "sequenceStates": [],
+      "createdAt": "2025-01-22T06:26:49.295Z",
+      "updatedAt": "2026-11-25T00:02:18.585Z"
+    },
+    {
+      "id": "FAKE-NOOKS-PROSPECT-2",
+      "type": "salesforce",
+      "name": "Sample Contact",
+      "firstName": "Sample",
+      "lastName": "Contact",
+      "title": "VP Product",
+      "primaryEmail": "user@example.com",
+      "linkedInUrl": "",
+      "crmId": "FAKE-003-002",
+      "account": {
+        "id": "FAKE-NOOKS-ACCT-2"
+      },
+      "sequenceStates": [],
+      "createdAt": "2025-02-01T06:26:49.295Z",
+      "updatedAt": "2026-11-20T00:02:18.585Z"
+    },
+    {
+      "id": "FAKE-NOOKS-PROSPECT-3",
+      "type": "csv",
+      "name": "No Crm Id",
+      "firstName": "No",
+      "lastName": "CrmId",
+      "title": "CTO",
+      "primaryEmail": "user@example.com",
+      "linkedInUrl": "",
+      "crmId": null,
+      "account": {
+        "id": "FAKE-NOOKS-ACCT-3"
+      },
+      "sequenceStates": [],
+      "createdAt": "2025-03-01T06:26:49.295Z",
+      "updatedAt": "2026-11-01T00:02:18.585Z"
+    }
+  ]
+}

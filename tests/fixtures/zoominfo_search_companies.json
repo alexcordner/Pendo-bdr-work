@@ -1,0 +1,33 @@
+{
+  "_note": "SYNTHETIC search_companies redeem=false: ONLY id + name. No domain, employees, city or state.",
+  "data": [
+    {
+      "attributes": {
+        "name": "Example Widgets Pty Ltd"
+      },
+      "id": "FAKE-ZI-1001",
+      "type": "Company"
+    },
+    {
+      "attributes": {
+        "name": "Fakeville Software Pty Ltd"
+      },
+      "id": "FAKE-ZI-1002",
+      "type": "Company"
+    },
+    {
+      "attributes": {
+        "name": "Sample Logistics Ltd"
+      },
+      "id": "FAKE-ZI-1003",
+      "type": "Company"
+    }
+  ],
+  "meta": {
+    "page": {
+      "number": 1,
+      "total": 3
+    },
+    "totalResults": 3
+  }
+}

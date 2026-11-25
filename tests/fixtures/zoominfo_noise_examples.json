@@ -1,0 +1,51 @@
+{
+  "_note": "SYNTHETIC noise rows as returned by search_companies. All 10 should be dropped by the filter.",
+  "location_or_local_business": [
+    {
+      "id": "FAKE-ZI-9001",
+      "name": "Fakeville CBD"
+    },
+    {
+      "id": "FAKE-ZI-9002",
+      "name": "Fakeville CBD Florist"
+    },
+    {
+      "id": "FAKE-ZI-9003",
+      "name": "The Co-op Fakeville CBD"
+    },
+    {
+      "id": "FAKE-ZI-9004",
+      "name": "Example Early Learning Centre (Fakeville CBD"
+    },
+    {
+      "id": "FAKE-ZI-9005",
+      "name": "CBD Quality Used Furniture Fakeville"
+    },
+    {
+      "id": "FAKE-ZI-9006",
+      "name": "Fakeville Cbd Drainage"
+    }
+  ],
+  "government_or_non_company": [
+    {
+      "id": "FAKE-ZI-9007",
+      "name": "Office of the Example Information Commissioner"
+    },
+    {
+      "id": "FAKE-ZI-9008",
+      "name": "Government of Exampleland Department of Health"
+    }
+  ],
+  "not_anz": [
+    {
+      "id": "FAKE-ZI-9009",
+      "name": "Example Overseas Corporation (not ANZ)"
+    }
+  ],
+  "vague_name": [
+    {
+      "id": "FAKE-ZI-9010",
+      "name": "Fake Funds Placeholder"
+    }
+  ]
+}

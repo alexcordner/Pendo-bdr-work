@@ -1,0 +1,42 @@
+{
+  "_note": "SYNTHETIC. Open SF Tasks owned by the BDR: stale, WhatId null; not a work queue.",
+  "count_by_type": {
+    "BDR Meeting Booked": 2,
+    "Call": 1
+  },
+  "records": [
+    {
+      "Id": "FAKE-00T-001",
+      "Subject": "<Contact Name> - BDR Meeting Booked",
+      "Status": "Not Started",
+      "Type": "BDR Meeting Booked",
+      "TaskSubtype": "Task",
+      "ActivityDate": null,
+      "WhatId": null,
+      "WhoId": "FAKE-003-001",
+      "CreatedDate": "2026-03-09T00:45:36.000+0000"
+    },
+    {
+      "Id": "FAKE-00T-002",
+      "Subject": "<Contact Name> - BDR Meeting Booked",
+      "Status": "Not Started",
+      "Type": "BDR Meeting Booked",
+      "TaskSubtype": "Task",
+      "ActivityDate": null,
+      "WhatId": null,
+      "WhoId": "FAKE-003-002",
+      "CreatedDate": "2026-02-02T00:45:36.000+0000"
+    },
+    {
+      "Id": "FAKE-00T-003",
+      "Subject": "Call",
+      "Status": "Not Started",
+      "Type": "Call",
+      "TaskSubtype": "Call",
+      "ActivityDate": "2026-03-10",
+      "WhatId": null,
+      "WhoId": "FAKE-003-003",
+      "CreatedDate": "2026-03-01T00:45:36.000+0000"
+    }
+  ]
+}

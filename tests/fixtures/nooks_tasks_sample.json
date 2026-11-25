@@ -1,0 +1,91 @@
+{
+  "_note": "SYNTHETIC listTasks shape. Existing tasks are sequence tasks; manual_email tasks carry an email ref. Never touch old manual_email tasks.",
+  "data": [
+    {
+      "id": "FAKE-TASK-1",
+      "action": "call",
+      "completed": false,
+      "dueAt": "2026-09-09T01:45:15.356Z",
+      "note": "",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": {
+        "id": "FAKE-SEQ-A"
+      },
+      "sequenceState": {
+        "id": "FAKE-SS-1"
+      },
+      "sequenceStep": {
+        "id": "FAKE-STEP-1"
+      },
+      "email": null,
+      "createdAt": "2026-09-09T01:45:15.078Z",
+      "updatedAt": "2026-09-15T18:54:37.596Z"
+    },
+    {
+      "id": "FAKE-TASK-2",
+      "action": "manual_email",
+      "completed": false,
+      "dueAt": "2026-05-01T01:45:15.356Z",
+      "note": "",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": {
+        "id": "FAKE-SEQ-B"
+      },
+      "sequenceState": {
+        "id": "FAKE-SS-2"
+      },
+      "sequenceStep": {
+        "id": "FAKE-STEP-2"
+      },
+      "email": {
+        "id": "FAKE-EMAIL-1",
+        "_href": "/v1/emails/FAKE-EMAIL-1"
+      },
+      "createdAt": "2026-04-22T01:45:15.078Z",
+      "updatedAt": "2026-04-22T18:54:37.596Z"
+    },
+    {
+      "id": "FAKE-TASK-3",
+      "action": "manual_email",
+      "completed": false,
+      "dueAt": "2026-11-15T20:03:51.066Z",
+      "note": "",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": {
+        "id": "FAKE-SEQ-B"
+      },
+      "sequenceState": {
+        "id": "FAKE-SS-3"
+      },
+      "sequenceStep": {
+        "id": "FAKE-STEP-2"
+      },
+      "email": {
+        "id": "FAKE-EMAIL-2"
+      },
+      "createdAt": "2026-11-01T01:45:15.078Z",
+      "updatedAt": "2026-11-01T18:54:37.596Z"
+    }
+  ]
+}

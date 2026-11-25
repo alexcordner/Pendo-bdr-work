@@ -1,0 +1,18 @@
+{
+  "_note": "SYNTHETIC getUserInfo shape. User timezone is not the prospect timezone.",
+  "identity": {
+    "displayName": "Example BDR",
+    "roleName": "Commercial BDR - ANZ",
+    "title": "Sales Development Representative",
+    "userId": "FAKE-SF-USER-ALEX",
+    "email": "user@example.com"
+  },
+  "manager": {
+    "identity": {
+      "roleName": "BDR Manager"
+    }
+  },
+  "userTimeAndLocale": {
+    "timeZoneIana": "Europe/London"
+  }
+}

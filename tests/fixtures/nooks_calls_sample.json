@@ -1,0 +1,1061 @@
+{
+  "_note": "SYNTHETIC listCalls shape. 40 calls: durations <10s 60%, 10-30s ~12%, >30s ~28%. 8 calls have prospect null / from 'external'. Four Left Voicemail (22-34s); eight No Answer calls of 35-63s (do not infer voicemail from duration); No Answer at 19s and 21s are the boundary cases for the under-20s no-contact rule.",
+  "data": [
+    {
+      "id": "FAKE-CALL-001",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000001",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:01:36.486Z",
+      "createdAt": "2026-11-19T03:01:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-002",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000002",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:02:36.486Z",
+      "createdAt": "2026-11-20T03:02:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-003",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000003",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:03:36.486Z",
+      "createdAt": "2026-11-21T03:03:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-004",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000004",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:04:36.486Z",
+      "createdAt": "2026-11-22T03:04:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-005",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000005",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:05:36.486Z",
+      "createdAt": "2026-11-23T03:05:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-006",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000006",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:06:36.486Z",
+      "createdAt": "2026-11-24T03:06:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-007",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000007",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-18T03:07:36.486Z",
+      "createdAt": "2026-11-18T03:07:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-008",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000008",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:08:36.486Z",
+      "createdAt": "2026-11-19T03:08:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-009",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000009",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:09:36.486Z",
+      "createdAt": "2026-11-20T03:09:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-010",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000010",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:10:36.486Z",
+      "createdAt": "2026-11-21T03:10:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-011",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "external",
+      "to": "+61400000011",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:11:36.486Z",
+      "createdAt": "2026-11-22T03:11:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-012",
+      "source": "nooks_sep",
+      "duration": 1,
+      "from": "external",
+      "to": "+61400000012",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:12:36.486Z",
+      "createdAt": "2026-11-23T03:12:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-013",
+      "source": "nooks_sep",
+      "duration": 2,
+      "from": "external",
+      "to": "+61400000013",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:13:36.486Z",
+      "createdAt": "2026-11-24T03:13:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-014",
+      "source": "nooks_sep",
+      "duration": 3,
+      "from": "external",
+      "to": "+61400000014",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-18T03:14:36.486Z",
+      "createdAt": "2026-11-18T03:14:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-015",
+      "source": "nooks_sep",
+      "duration": 4,
+      "from": "external",
+      "to": "+61400000015",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:15:36.486Z",
+      "createdAt": "2026-11-19T03:15:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-016",
+      "source": "nooks_sep",
+      "duration": 5,
+      "from": "external",
+      "to": "+61400000016",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:16:36.486Z",
+      "createdAt": "2026-11-20T03:16:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-017",
+      "source": "nooks_sep",
+      "duration": 6,
+      "from": "external",
+      "to": "+61400000017",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:17:36.486Z",
+      "createdAt": "2026-11-21T03:17:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-018",
+      "source": "nooks_sep",
+      "duration": 8,
+      "from": "external",
+      "to": "+61400000018",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:18:36.486Z",
+      "createdAt": "2026-11-22T03:18:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-019",
+      "source": "nooks_sep",
+      "duration": 3,
+      "from": "+61400000000",
+      "to": "+61400000019",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-bad-number",
+        "_href": "/v1/callDispositions/disp-bad-number"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:19:36.486Z",
+      "createdAt": "2026-11-23T03:19:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-020",
+      "source": "nooks_sep",
+      "duration": 5,
+      "from": "+61400000000",
+      "to": "+61400000020",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-bad-number",
+        "_href": "/v1/callDispositions/disp-bad-number"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:20:36.486Z",
+      "createdAt": "2026-11-24T03:20:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-021",
+      "source": "nooks_sep",
+      "duration": 6,
+      "from": "+61400000000",
+      "to": "+61400000021",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-do-not-call",
+        "_href": "/v1/callDispositions/disp-do-not-call"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-18T03:21:36.486Z",
+      "createdAt": "2026-11-18T03:21:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-022",
+      "source": "nooks_sep",
+      "duration": 4,
+      "from": "+61400000000",
+      "to": "+61400000022",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-hang-up",
+        "_href": "/v1/callDispositions/disp-hang-up"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:22:36.486Z",
+      "createdAt": "2026-11-19T03:22:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-023",
+      "source": "nooks_sep",
+      "duration": 7,
+      "from": "+61400000000",
+      "to": "+61400000023",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-wrong-person",
+        "_href": "/v1/callDispositions/disp-wrong-person"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:23:36.486Z",
+      "createdAt": "2026-11-20T03:23:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-024",
+      "source": "nooks_sep",
+      "duration": 9,
+      "from": "+61400000000",
+      "to": "+61400000024",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-left-company",
+        "_href": "/v1/callDispositions/disp-left-company"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:24:36.486Z",
+      "createdAt": "2026-11-21T03:24:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "FAKE-CALL-025",
+      "source": "nooks_sep",
+      "duration": 22,
+      "from": "+61400000000",
+      "to": "+61400000025",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:25:36.486Z",
+      "createdAt": "2026-11-22T03:25:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-026",
+      "source": "nooks_sep",
+      "duration": 27,
+      "from": "+61400000000",
+      "to": "+61400000026",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:26:36.486Z",
+      "createdAt": "2026-11-23T03:26:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-027",
+      "source": "nooks_sep",
+      "duration": 30,
+      "from": "+61400000000",
+      "to": "+61400000027",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:27:36.486Z",
+      "createdAt": "2026-11-24T03:27:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-028",
+      "source": "nooks_sep",
+      "duration": 34,
+      "from": "+61400000000",
+      "to": "+61400000028",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-18T03:28:36.486Z",
+      "createdAt": "2026-11-18T03:28:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-029",
+      "source": "nooks_sep",
+      "duration": 19,
+      "from": "+61400000000",
+      "to": "+61400000029",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:29:36.486Z",
+      "createdAt": "2026-11-19T03:29:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-030",
+      "source": "nooks_sep",
+      "duration": 21,
+      "from": "+61400000000",
+      "to": "+61400000030",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:30:36.486Z",
+      "createdAt": "2026-11-20T03:30:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-031",
+      "source": "nooks_sep",
+      "duration": 36,
+      "from": "+61400000000",
+      "to": "+61400000031",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:31:36.486Z",
+      "createdAt": "2026-11-21T03:31:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-032",
+      "source": "nooks_sep",
+      "duration": 52,
+      "from": "+61400000000",
+      "to": "+61400000032",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:32:36.486Z",
+      "createdAt": "2026-11-22T03:32:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-033",
+      "source": "nooks_sep",
+      "duration": 38,
+      "from": "+61400000000",
+      "to": "+61400000033",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:33:36.486Z",
+      "createdAt": "2026-11-23T03:33:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-034",
+      "source": "nooks_sep",
+      "duration": 47,
+      "from": "+61400000000",
+      "to": "+61400000034",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:34:36.486Z",
+      "createdAt": "2026-11-24T03:34:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-035",
+      "source": "nooks_sep",
+      "duration": 35,
+      "from": "+61400000000",
+      "to": "+61400000035",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-18T03:35:36.486Z",
+      "createdAt": "2026-11-18T03:35:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-036",
+      "source": "nooks_sep",
+      "duration": 58,
+      "from": "+61400000000",
+      "to": "+61400000036",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-19T03:36:36.486Z",
+      "createdAt": "2026-11-19T03:36:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-037",
+      "source": "nooks_sep",
+      "duration": 44,
+      "from": "+61400000000",
+      "to": "+61400000037",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-20T03:37:36.486Z",
+      "createdAt": "2026-11-20T03:37:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-038",
+      "source": "nooks_sep",
+      "duration": 63,
+      "from": "+61400000000",
+      "to": "+61400000038",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-21T03:38:36.486Z",
+      "createdAt": "2026-11-21T03:38:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-039",
+      "source": "nooks_sep",
+      "duration": 75,
+      "from": "+61400000000",
+      "to": "+61400000039",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-gatekeeper",
+        "_href": "/v1/callDispositions/disp-gatekeeper"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-22T03:39:36.486Z",
+      "createdAt": "2026-11-22T03:39:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "FAKE-CALL-040",
+      "source": "nooks_sep",
+      "duration": 120,
+      "from": "+61400000000",
+      "to": "+61400000040",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "disp-meeting",
+        "_href": "/v1/callDispositions/disp-meeting"
+      },
+      "owner": {
+        "id": "FAKE-NOOKS-USER-ALEX"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-23T03:40:36.486Z",
+      "createdAt": "2026-11-23T03:40:52.721Z",
+      "hasTranscript": true
+    }
+  ]
+}
