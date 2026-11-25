@@ -4,10 +4,15 @@ from datetime import date, timedelta
 
 import pytest
 
+import random
+import time
+
 from src.accounts import (AccountListResult, Dropped, build_account_list, confidence, duplicate_groups,
                           flag_probable_duplicates, group_by_zoominfo_id, list_flagged, registrable_domain,
                           noise_reason, normalise_name, summarise)
 from src.models import Account
+from collections import defaultdict
+
 from tests.conftest import load_fixture
 
 TODAY = date(2026, 11, 25)
@@ -1061,7 +1066,7 @@ def test_summary_lists_pairs_with_evidence(config):
     res = two(config, "Freelancer", "Freelancer Technology", ea=318, eb=318)
     text = summarise(res)
     assert "possible duplicate pairs: 1 (evidence: name+same headcount: 1; top 10 listed with names)" in text
-    assert "Freelancer ~ Freelancer Technology [name+same headcount]" in text
+    assert "    [name+same headcount] Freelancer ~ Freelancer Technology" in text
 
 
 def test_summary_evidence_breakdown_mixed(config):
@@ -1077,7 +1082,7 @@ def test_summary_top_ten_cap(config):
     rows += [sf_row(f"B{i}", f"Pair{i}b", Website=f"www.p{i}.com") for i in range(12)]
     text = summarise(build(sf=rows, config=config))
     assert "possible duplicate pairs: 12" in text
-    assert sum(1 for l in text.splitlines() if l.startswith("    Pair")) == 10
+    assert sum(1 for l in text.splitlines() if l.startswith("    [same website domain] Pair")) == 10
 
 
 def test_summary_no_duplicates_line(config):
@@ -1090,3 +1095,126 @@ def test_summary_pair_with_dropped_twin_not_counted(config):
     assert "possible duplicate pairs: 0" in summarise(res)
     assert "possible_duplicate" in res.accounts[0].flags            # still flagged, twin named in the note
     assert "'Aaa'" in " ".join(res.accounts[0].notes)
+
+
+# ------------------------------------------------------------ scale: capped name buckets and indexes
+def mk(i, name, emp=None, site=None):
+    return Account(f"A{i:06d}", name, website=site, employees=emp)
+
+
+def test_perf_12000_accounts_sharing_one_distinctive_word_under_5s():
+    accts = [mk(i, f"Meridian {i} Fake{i}", emp=i % 500) for i in range(12000)]
+    t0 = time.perf_counter()
+    flag_probable_duplicates(accts)
+    took = time.perf_counter() - t0
+    assert took < 5, f"{took:.1f}s"
+    assert all("large_name_group" in a.flags for a in accts)
+
+
+def test_perf_12000_realistic_names_under_3s():
+    rng = random.Random(7)
+    words = [f"{a}{b}" for a in ("zen", "ora", "kel", "mar", "tri", "nov", "alt", "bel", "cor", "dyn")
+             for b in ("tech", "line", "works", "vista", "labs", "flow", "gate", "scape", "wave", "mind")]
+    sfx = ["Pty Ltd", "Group", "Australia", "Holdings", "Limited", ""]
+    accts = [mk(i, f"{rng.choice(words)} {rng.choice(words)} {rng.choice(sfx)}".strip(), emp=rng.randint(20, 2000),
+                site=f"site{i}.com.au") for i in range(12000)]
+    t0 = time.perf_counter()
+    flag_probable_duplicates(accts)
+    took = time.perf_counter() - t0
+    assert took < 3, f"{took:.1f}s"
+
+
+def test_perf_whole_build_12000_accounts_one_word(config):
+    rows = [sf_row(f"S{i:06d}", f"Meridian {i} Fake{i} Pty Ltd", 50 + i % 900) for i in range(12000)]
+    t0 = time.perf_counter()
+    res = build_account_list(rows, [], [], config, {}, TODAY)
+    assert time.perf_counter() - t0 < 30 and len(res.accounts) == 12000
+
+
+def test_big_bucket_gets_large_name_group_and_no_name_only_flag():
+    accts = [mk(i, f"Meridian {i}x") for i in range(201)]
+    flag_probable_duplicates(accts)
+    assert all("large_name_group" in a.flags and "possible_duplicate" not in a.flags for a in accts)
+
+
+def test_bucket_of_exactly_200_is_compared_pairwise_not_capped():
+    accts = [mk(i, f"Meridian Part{i}x", emp=40 + i) for i in range(199)] + [mk(999, "Meridian", emp=40)]
+    flag_probable_duplicates(accts)
+    assert not any("large_name_group" in a.flags for a in accts)      # 200 members: below the cap
+    assert "possible_duplicate" in accts[0].flags and "possible_duplicate" in accts[-1].flags   # same headcount (40)
+
+
+def test_big_bucket_headcount_index_still_flags_same_headcount_pair():
+    accts = [mk(i, f"Meridian Part{i}x", emp=1000 + i) for i in range(250)]
+    a = mk(900, "Meridian", emp=1000 + 7)             # same headcount and containment with Part7x, first token equal
+    accts.append(a)
+    flag_probable_duplicates(accts)
+    assert "possible_duplicate" in a.flags and "possible_duplicate" in accts[7].flags
+    assert "possible_duplicate" not in accts[8].flags
+    assert "large_name_group" in a.flags
+
+
+def test_big_bucket_shared_contacts_index_still_flags():
+    accts = [mk(i, f"Meridian Part{i}x", emp=2000 + i) for i in range(250)]
+    other = mk(900, "Meridian", emp=1)
+    accts.append(other)
+    shared = names("m", 3)
+    contacts = {accts[5].sf_account_id: shared, other.sf_account_id: shared}
+    flag_probable_duplicates(accts, contacts)
+    assert "possible_duplicate" in other.flags and "possible_duplicate" in accts[5].flags
+    assert "possible_duplicate" not in accts[6].flags
+
+
+def test_big_bucket_contact_name_shared_by_over_50_is_noise():
+    accts = [mk(i, f"Meridian Part{i}x", emp=3000 + i) for i in range(250)]
+    other = mk(900, "Meridian", emp=1)
+    accts.append(other)
+    noise = names("n", 3)
+    contacts = {a.sf_account_id: noise for a in accts[:60]}
+    contacts[other.sf_account_id] = noise
+    flag_probable_duplicates(accts, contacts)
+    assert "possible_duplicate" not in other.flags
+
+
+def test_small_buckets_identical_to_pairwise_reference():
+    """Results for buckets <= 200 match a brute-force reference of the documented rules."""
+    rng = random.Random(3)
+    base = ["Catapult", "Meridian", "Perpetual", "Freelancer", "Finder", "Carsales", "Acquire"]
+    tails = ["", " Technology", " Online", " Labs", " BI", " Pty Ltd"]
+    accts = [mk(i, rng.choice(base) + rng.choice(tails), emp=rng.choice([None, 50, 60, 70])) for i in range(120)]
+    groups = duplicate_groups(accts)
+    from src.accounts import _core_tokens, _names_match
+    edges = set()
+    for i in range(len(accts)):
+        for j in range(i + 1, len(accts)):
+            ci, cj = _core_tokens(accts[i].name), _core_tokens(accts[j].name)
+            if (_names_match(ci, cj) and accts[i].employees is not None and accts[i].employees == accts[j].employees
+                    and ci[0] == cj[0]):
+                edges.add((i, j))
+    parent = list(range(len(accts)))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    for i, j in edges:
+        parent[find(i)] = find(j)
+    comp = defaultdict(list)
+    for i in range(len(accts)):
+        comp[find(i)].append(i)
+    ref = sorted(sorted(m) for m in comp.values() if 1 < len(m) <= 6)
+    got = sorted(sorted(accts.index(a) for a in g) for g in groups)
+    assert got == ref
+
+
+def test_domain_rule_unchanged_for_large_domain_group_and_pairs():
+    accts = [mk(i, f"Unrelated{i}", site="same-host.com.au") for i in range(7)]
+    flag_probable_duplicates(accts)
+    assert all("large_domain_group" in a.flags for a in accts)
+
+
+def test_summary_pairs_show_evidence_kind_first(config):
+    res = build(sf=[sf_row("S1", "Adita Technologies", Website="adita.com.au"),
+                    sf_row("S2", "Adita Technologies", Website="www.adita.com.au")], config=config)
+    line = [l for l in summarise(res).splitlines() if "~" in l][0].strip()
+    assert line.startswith("[") and "same website domain" in line.split("]")[0] and line.endswith("Adita Technologies ~ Adita Technologies")
