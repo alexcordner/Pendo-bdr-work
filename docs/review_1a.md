@@ -214,3 +214,30 @@ returned **4,926**, which matches the worker's number exactly. A broader variant
 1. Mask the phone numbers in `phone_formats.json` (blocking).
 2. Change "9 companies" to 12 in `connector_notes.md`.
 3. Optionally drop job title or company from the chain fixture rows.
+
+---
+
+# Final check of worker commit b9d0d2c (read-only, no live calls)
+
+Reviewed `origin/phase1/1a-discovery` @ `b9d0d2c` in a scratch worktree.
+
+**FINAL PASS.**
+
+1. **Full-tree PII/secret grep on the current tree: PASS.**
+   - Scope: `docs/`, `tests/`, `config/`, root md files and the run log.
+   - Emails: only `first.last@example.com`, `firstlast@example.com`, `firstlast@pendo.example` and Alex's own address.
+   - Phone-like strings, in every format I tried (`+61`, `+64`, `+1`, `+65`, `+91`, `0[2-9]xxxxxxxx`, bare `61xxxxxxxxx`, runs of 9+ digits, excluding ZoomInfo ids and UUIDs): every hit is an obvious placeholder (all-zero patterns). The earlier real-looking numbers are gone.
+   - No person names, no tokens, keys or passwords, and no real recording URLs (only `<redacted>.wav`).
+2. **`phone_formats.json`: PASS.** All numbers are obviously fake (`+61 400 000 001`, `+64 9-000 0004`, `0200000002` and so on). I checked each test vector against the stated rule. `observed_match` now also uses the masked form.
+
+   | Input | Expected output | Under the rule |
+   |---|---|---|
+   | `+61 400 000 001` | `+61400000001` | keep `+`, strip spaces: OK |
+   | `0200000002` (NZ account) | `+64200000002` | drop `0`, prefix +64: OK |
+   | `61390000003` | `+61390000003` | starts 61 and is 11 digits, so add `+`: OK |
+   | `+64 9-000 0004` | `+6490000004` | keep `+`, strip non-digits: OK |
+   | `+61 400 000 008` | `+61400000008` | OK |
+3. **Chain fixture and company count: PASS.** `sf_nooks_zoominfo_chain.json` titles are now `<title>`, and `connector_notes.md` says "12 companies". The only remaining job title in the tree is "Head of Product" in `nooks_prospect.json`, which has no company attached, so it is not identifying.
+4. **JSON validity: PASS.** All 19 fixture files parse with `python -m json.tool`.
+
+No open blockers from 1a. The one scope note carried forward is the optional roughly 420 accounts with a non-ANZ `BillingCountry` but an ANZ `HQ_Country__c`, for 1d to decide.
