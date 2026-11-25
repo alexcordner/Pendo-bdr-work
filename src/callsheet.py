@@ -2,33 +2,40 @@
 
 Takes a RankResult plus plain arguments and returns a ``Sheet`` (what to call, in what order, and why),
 a ``ResearchPacket`` per entry (the ONLY facts a later Claude session may use for the opener), text /
-markdown / JSON renderers, and a builder for the Nooks task-create payload (Phase 3). Nothing here
-sends or writes anything. Notes: docs/callsheet_notes.md.
+markdown / JSON renderers, and ONE entry point for the Nooks task-create payload, ``prepare_task``
+(Phase 3). Nothing here sends or writes anything. Notes: docs/callsheet_notes.md.
 
 Hard rules honoured here (CLAUDE.md):
-  * rule 6: no invented trigger. An account without a real signal says "No trigger: ranked on fit only".
-  * never a contact email or phone in a packet or a rendered output (Nooks writer looks up by prospect id).
+  * rule 6: no invented trigger. An account without a real, usable signal says so.
+  * never a contact email or phone in a packet, render or note (free text is scrubbed; ``repr`` hides the
+    prospect). The Nooks writer looks the contact up by prospect id.
   * needs_prospect / spilled / skipped accounts are never sheet entries and never payloads.
+  * a payload can only be built by ``prepare_task``, which re-runs the do-not-contact check on the RESOLVED
+    Nooks prospect and on the sheet contact, and builds from exactly the id it checked.
 """
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 from src import signals as sigmod
 from src.config import Config, tier_for
 from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, SheetEntry, Signal, SignalKind
-from src.state import State, is_blocked
 from src.ranker import RankResult, account_key, pick_prospect
+from src.state import State, is_blocked
 
-RUN_DATE_TZ = "Australia/Sydney"          # run_date in the task tag = 'now' in the BDR's home zone
+RUN_DATE_TZ = "Australia/Sydney"          # run_date in the task tag = 'now' in the BDR's home zone (a label only)
 TAG_PREFIX = "apac-callsheet"
-OWNER_ID_PLACEHOLDER = "OWNER_ID_PLACEHOLDER"   # the caller resolves this (Nooks owner id)
+OWNER_ID_PLACEHOLDER = "OWNER_ID_PLACEHOLDER"   # only accepted with dry_run=True
 BUCKET_LIST_LIMIT = 25
+NOTE_MAX_CHARS = 2000                     # conservative, UNVERIFIED Nooks note limit: refuse above it
+ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")   # Nooks ownerId pattern; also applied to prospect ids
+REDACTED = "[redacted]"
 
 # Nooks task priority enum (schema): low, normal, high, urgent. Score bands (documented):
 #   score >= 75 urgent | >= 55 high | >= 35 normal | else low
@@ -47,6 +54,7 @@ MUST_NOT_CLAIM = (
     "Do not claim any Pendo customer, case study or result for this account.",
     "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
     "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
     "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
     "Do not include or guess an email address or phone number.",
 )
@@ -54,6 +62,88 @@ MUST_NOT_CLAIM = (
 
 class SheetError(ValueError):
     """Refusal to build a sheet entry or payload (never silently degrade)."""
+
+
+class BlockedError(SheetError):
+    """The contact is on a do-not-contact list (state / flags): no task may be built."""
+
+
+# ---------------------------------------------------------------- text hygiene
+_EMAIL = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+_PHONE = re.compile(
+    r"(?<!\w)(?:"
+    r"\+\d[\d\s().-]{6,}\d"                              # international, leading +
+    r"|\(?0\d{1,2}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}"       # AU/NZ landline (02 9999 1234, 021 123 4567)
+    r"|0\d{3}[\s.-]?\d{3}[\s.-]?\d{3}"                   # AU mobile (0400 111 222)
+    r"|\d{9,}"                                           # any long digit run
+    r")(?!\w)")
+_ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍⁠﻿᠎"), None)
+
+
+def _scrub(text: str) -> str:
+    """Replace email addresses and phone-like numbers with '[redacted]'."""
+    return _PHONE.sub(REDACTED, _EMAIL.sub(REDACTED, text))
+
+
+def _has_contact_data(text: str) -> bool:
+    return _scrub(text) != text
+
+
+def _clean(text: object) -> str:
+    """Single-line, invisible characters removed, whitespace collapsed, contact data redacted."""
+    s = str(text).translate(_ZERO_WIDTH).replace(" ", " ")
+    return _scrub(" ".join(s.split()))
+
+
+_MD_SPECIALS = re.compile(r"([\\`|#*_\[\]<>])")
+
+
+def _md(text: object, limit: int | None = 160) -> str:
+    """Markdown-safe: collapse whitespace/newlines, shorten, backslash-escape markdown characters."""
+    s = _clean(text)
+    if limit is not None and len(s) > limit:
+        s = s[: limit - 1].rstrip() + "…"
+    return _MD_SPECIALS.sub(r"\\\1", s)
+
+
+def _short(text: str, n: int = 110) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+_HONORIFICS = {"dr", "mr", "mrs", "ms", "miss", "mx", "prof", "professor", "sir", "dame"}
+_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "phd", "md"}
+_NAME_TOKEN = re.compile(r"[^\W\d_][\w'’-]*")
+
+
+def _first_name(name: str | None) -> str | None:
+    """First name, or None when unsure (never a surname, never an honorific or initial).
+
+    'Dr Pat Smith' -> 'Pat'; 'Smith, Pat' -> 'Pat'; 'Pat' / 'Dr Smith' / 'J. Smith' -> None."""
+    s = _clean(name or "")
+    if not s:
+        return None
+    if "," in s:                                     # 'Surname, First [Middle]'
+        _, _, rest = s.partition(",")
+        toks = [t for t in rest.replace(",", " ").split()]
+        toks = [t for t in toks if t.strip(".").lower() not in _HONORIFICS | _SUFFIXES]
+        cand = toks[0] if toks else None
+    else:
+        toks = s.split()
+        while toks and toks[0].strip(".").lower() in _HONORIFICS:
+            toks = toks[1:]
+        cand = toks[0] if len(toks) >= 2 else None   # a lone token could be a surname: unsure
+    if not cand or not _NAME_TOKEN.fullmatch(cand):
+        return None
+    return cand if len(re.sub(r"\W|\d|_", "", cand)) >= 2 else None
+
+
+def _who(name: str | None) -> str:
+    return _first_name(name) or "the contact"
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 # ---------------------------------------------------------------- data classes
@@ -80,7 +170,7 @@ class ContactHistory:
         if self.last_call_date is not None:
             parts.append(f"last call {self.last_call_date.isoformat()}")
         if self.last_outcome:
-            parts.append(f"outcome {self.last_outcome}")
+            parts.append(f"outcome {_clean(self.last_outcome)}")
         if self.calls_total:
             parts.append(f"{self.calls_total} call(s) logged")
         return ", ".join(parts)
@@ -104,6 +194,7 @@ class PacketSignal:
     source_label: str
     date: str | None                         # ISO date
     age_days: int | None
+    status: str                              # ok | undated | intent | future | stale
     verdict_reason: str
     ambiguous: bool
 
@@ -121,21 +212,22 @@ class ResearchPacket:
     city: str | None
     employees: int | None
     tier: str | None
-    prospect_first_name: str | None
+    prospect_first_name: str | None          # None when unsure: say 'the contact', never a surname
     prospect_title: str | None
     prospect_sf_contact_id: str | None       # identifies the contact (never email / phone); Nooks id may be None
     local_time: str | None                   # ISO with offset
     window: str | None
     timezone: str | None
     signals: list[PacketSignal]
-    has_real_trigger: bool
+    has_real_trigger: bool                   # a usable (dated-or-undated, non-intent, not future/stale) signal
+    trigger_kind: str | None                 # kind of the best usable signal, else None
     ambiguity_flags: list[str]
     sdr_target: bool
     contact_history: str | None
     contact_history_source: str | None
     available_facts: list[FactItem]
     must_not_claim: list[str]
-    facts_note: str                          # empty when two or more facts are available
+    facts_note: str                          # empty when two or more facts are available and none excluded
 
     @property
     def fact_count(self) -> int:
@@ -147,9 +239,10 @@ class ResearchPacket:
             "industry": self.industry, "state": self.state, "city": self.city, "employees": self.employees,
             "tier": self.tier, "prospect_first_name": self.prospect_first_name,
             "prospect_title": self.prospect_title,
-            "prospect_sf_contact_id": self.prospect_sf_contact_id, "local_time": self.local_time, "window": self.window,
-            "timezone": self.timezone, "signals": [s.to_dict() for s in self.signals],
-            "has_real_trigger": self.has_real_trigger, "ambiguity_flags": list(self.ambiguity_flags),
+            "prospect_sf_contact_id": self.prospect_sf_contact_id, "local_time": self.local_time,
+            "window": self.window, "timezone": self.timezone, "signals": [s.to_dict() for s in self.signals],
+            "has_real_trigger": self.has_real_trigger, "trigger_kind": self.trigger_kind,
+            "ambiguity_flags": list(self.ambiguity_flags),
             "sdr_target": self.sdr_target, "contact_history": self.contact_history,
             "contact_history_source": self.contact_history_source,
             "available_facts": [f.to_dict() for f in self.available_facts], "fact_count": self.fact_count,
@@ -159,10 +252,12 @@ class ResearchPacket:
 
 @dataclass
 class SheetLine:
-    """One sheet row: the shared ``SheetEntry`` plus everything the sheet adds."""
+    """One sheet row: the shared ``SheetEntry`` plus everything the sheet adds.
 
-    entry: SheetEntry
-    rank: int                                # 1 = best score (position in the ranked list)
+    ``entry`` is excluded from ``repr`` (it holds the Prospect with email, phone and surname)."""
+
+    entry: SheetEntry = field(repr=False)
+    rank: int                                # 1 = best score (position among ALL ranked accounts: can skip numbers)
     call_no: int                             # 1-based position in call order
     group: str                               # e.g. 'Australia/Sydney morning Thu 26 Nov'
     run_date: date
@@ -177,6 +272,10 @@ class SheetLine:
     @property
     def account(self) -> Account:
         return self.entry.ranked.account
+
+    @property
+    def account_name(self) -> str:
+        return _clean(self.account.name)
 
     @property
     def prospect(self) -> Prospect:
@@ -215,35 +314,21 @@ class Sheet:
         return [ln.entry for ln in self.lines]
 
 
-# ---------------------------------------------------------------- helpers
-def _first_name(name: str | None) -> str | None:
-    parts = (name or "").split()
-    return parts[0] if parts else None
-
-
-def _plural(n: int, word: str) -> str:
-    return f"{n} {word}{'' if n == 1 else 's'}"
-
-
-def _short(text: str, n: int = 110) -> str:
-    text = " ".join(text.split())
-    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
-
-
+# ---------------------------------------------------------------- signals
 def _source_label(sig: Signal) -> str:
     d = sig.source_date.date().isoformat() if sig.source_date else "date unknown"
     if sig.source.startswith(sigmod.SOURCE_PREFIX):
         return f"{sigmod.SOURCE_LABEL} {d}"
     if sig.kind is SignalKind.INTENT:
         return f"ZoomInfo intent {d} (unverified connector shape)"
-    return f"{sig.source} {d}"
+    return f"{_clean(sig.source)} {d}"
 
 
 def _clean_evidence(sig: Signal) -> str:
     ev = sig.evidence
     if sigmod.is_ambiguous(sig):
         ev = ev[: -len(sigmod.AMBIGUOUS_SUFFIX)]
-    return ev
+    return _clean(ev)
 
 
 def _real(sigs: Sequence[Signal]) -> list[Signal]:
@@ -276,46 +361,67 @@ def _call_date(ranked: RankedAccount) -> date | None:
     return t.date() if t else None
 
 
-def _age(sig: Signal, call_date: date | None) -> int | None:
-    if sig.source_date is None or call_date is None:
-        return None
-    return sigmod.age_days(sig.source_date, call_date)
+def _aware(d: datetime) -> datetime:
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
-def _age_text(age: int | None) -> str:
+def _status(sig: Signal, call_date: date | None, now: datetime | None, config: Config) -> tuple[str, int | None]:
+    """(status, age_days). status: intent | undated | future | stale | ok. Recomputed from the signal's own
+    date against ``now`` / the account-local call date and the kind's real limit: nothing is trusted from
+    upstream text."""
+    if sig.source_date is None:
+        return ("intent" if sig.kind is SignalKind.INTENT else "undated"), None
+    d = _aware(sig.source_date)
+    age = sigmod.age_days(d, call_date) if call_date else None
+    if sig.kind is SignalKind.INTENT:
+        return "intent", age
+    if (now is not None and d > now) or (call_date is not None and d.date() > call_date):
+        return "future", age
+    if age is not None and age > sigmod.max_age_for(sig.kind, config):
+        return "stale", age
+    return "ok", age
+
+
+def _age_text(status: str, age: int | None) -> str:
+    if status == "future":
+        return "future-dated: check the source"
     if age is None:
         return "date unknown"
     return "today" if age == 0 else f"{_plural(age, 'day')} ago"
 
 
-def _verdict_reason(sig: Signal, age: int | None, config: Config) -> str:
+def _verdict_reason(sig: Signal, status: str, age: int | None, config: Config) -> str:
     label = KIND_LABELS.get(sig.kind, sig.kind.value)
-    if sig.kind is SignalKind.INTENT:
-        return "kept as a capped interest signal, not a dated event"
-    limit = sigmod.max_age_for(sig.kind, config)
-    base = f"kept: {label} within {limit} day limit"
-    if age is not None:
-        base += f" ({_plural(age, 'day')} old)"
+    if status == "intent":
+        out = "interest signal, not a dated event"
+    elif status == "future":
+        out = "future-dated: check the source"
+    elif status == "stale":
+        out = f"older than its {sigmod.max_age_for(sig.kind, config)} day limit ({_plural(age or 0, 'day')} old): check before quoting"
+    elif status == "undated":
+        out = f"kept: {label}, date unknown"
+    else:
+        out = f"kept: {label} within {sigmod.max_age_for(sig.kind, config)} day limit ({_plural(age or 0, 'day')} old)"
     if sigmod.is_ambiguous(sig):
-        base += f"; {sigmod.AMBIGUOUS_NOTE}"
-    return base
+        out += f"; {sigmod.AMBIGUOUS_NOTE}"
+    return out
 
 
-def _packet_signal(sig: Signal, call_date: date | None, config: Config) -> PacketSignal:
-    age = _age(sig, call_date)
+def _packet_signal(sig: Signal, call_date: date | None, now: datetime | None, config: Config) -> PacketSignal:
+    status, age = _status(sig, call_date, now, config)
     return PacketSignal(
         kind=sig.kind.value, label=KIND_LABELS.get(sig.kind, sig.kind.value), evidence=_clean_evidence(sig),
-        source=sig.source, source_label=_source_label(sig),
-        date=sig.source_date.date().isoformat() if sig.source_date else None, age_days=age,
-        verdict_reason=_verdict_reason(sig, age, config), ambiguous=sigmod.is_ambiguous(sig))
+        source=_clean(sig.source), source_label=_source_label(sig),
+        date=sig.source_date.date().isoformat() if sig.source_date else None, age_days=age, status=status,
+        verdict_reason=_verdict_reason(sig, status, age, config), ambiguous=sigmod.is_ambiguous(sig))
 
 
 def _location(a: Account) -> str | None:
-    parts = [p for p in (a.billing_city, a.billing_state or a.hq_state) if p]
+    parts = [_clean(p) for p in (a.billing_city, a.billing_state or a.hq_state) if p]
     return ", ".join(parts) if parts else None
 
 
-def build_why(ranked: RankedAccount, sigs: list[Signal], config: Config) -> list[str]:
+def build_why(ranked: RankedAccount, sigs: list[Signal], config: Config, now: datetime | None = None) -> list[str]:
     """Plain-English lines derived ONLY from data. Never claims a trigger that is not a real signal."""
     a = ranked.account
     cd = _call_date(ranked)
@@ -324,10 +430,17 @@ def build_why(ranked: RankedAccount, sigs: list[Signal], config: Config) -> list
         out.append("SDR target")
     if sigs:
         b = sigs[0]
+        status, age = _status(b, cd, now, config)
         label = KIND_LABELS.get(b.kind, b.kind.value)
         src = "ZoomInfo scoop" if b.source.startswith(sigmod.SOURCE_PREFIX) else (
-            "ZoomInfo intent" if b.kind is SignalKind.INTENT else b.source)
-        out.append(f"{label}: {_short(_clean_evidence(b))} ({src}, {_age_text(_age(b, cd))})")
+            "ZoomInfo intent" if b.kind is SignalKind.INTENT else _clean(b.source))
+        out.append(f"{label}: {_short(_clean_evidence(b))} ({src}, {_age_text(status, age)})")
+        if status == "intent":
+            out.append("No dated trigger: interest signal only")
+        elif status == "future":
+            out.append("Flag: signal date in the future")
+        elif status == "stale":
+            out.append("Flag: signal older than its limit")
         if sigmod.is_ambiguous(b):
             out.append(f"Flag: {sigmod.AMBIGUOUS_NOTE}")
         if len(sigs) > 1:
@@ -346,17 +459,25 @@ def build_why(ranked: RankedAccount, sigs: list[Signal], config: Config) -> list
     if a.confidence == "low":
         out.append("Flag: low-confidence record")
     for f in a.flags:
-        out.append(f"Flag: {f}")
+        out.append(f"Flag: {_clean(f)}")
     return out
 
 
-def _flags(ranked: RankedAccount, sigs: list[Signal]) -> list[str]:
+def _flags(ranked: RankedAccount, sigs: list[Signal], config: Config, now: datetime | None) -> list[str]:
     a = ranked.account
+    cd = _call_date(ranked)
+    stats = [_status(s, cd, now, config)[0] for s in sigs]
     out = []
     if any(sigmod.is_ambiguous(s) for s in sigs):
         out.append("role ambiguous")
     if not sigs:
         out.append("no trigger")
+    elif not any(t in ("ok", "undated") for t in stats):
+        out.append("no dated trigger")
+    if "future" in stats:
+        out.append("signal in the future")
+    if "stale" in stats:
+        out.append("signal older than limit")
     if a.size_unknown:
         out.append("size unknown")
     if a.non_anz_billing_anz_hq:
@@ -365,7 +486,7 @@ def _flags(ranked: RankedAccount, sigs: list[Signal]) -> list[str]:
         out.append("tz guessed")
     if a.confidence == "low":
         out.append("low confidence")
-    out.extend(a.flags)
+    out.extend(_clean(f) for f in a.flags)
     return out
 
 
@@ -375,14 +496,18 @@ def _contact_flags(pr: Prospect) -> list[str]:
 
 # ---------------------------------------------------------------- research packet
 def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], config: Config,
-                 history: ContactHistory | None = None) -> ResearchPacket:
+                 history: ContactHistory | None = None, now: datetime | None = None) -> ResearchPacket:
     a = ranked.account
     cd = _call_date(ranked)
-    psigs = [_packet_signal(s, cd, config) for s in sigs]
+    psigs = [_packet_signal(s, cd, now, config) for s in sigs]
     facts: list[FactItem] = []
+    excluded = 0
     for s, ps in zip(sigs, psigs):
+        if ps.status in ("future", "stale"):
+            excluded += 1                      # not trustworthy as a fact: listed under signals only
+            continue
         text = ps.evidence
-        if s.kind is SignalKind.INTENT:
+        if ps.status == "intent":
             text = f"Intent signal (interest, not a dated event): {text}"
         facts.append(FactItem(text, ps.source_label))
     if a.employees is not None:
@@ -391,27 +516,35 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
     if loc:
         facts.append(FactItem(f"Based in {loc}", "Salesforce account record"))
     industry = getattr(a, "industry", None)
+    industry = _clean(industry) if industry else None
     if industry:
         facts.append(FactItem(f"Industry: {industry}", "Salesforce account record"))
     summary = history.summary() if history else None
     if summary:
         facts.append(FactItem(f"Previous contact: {summary}", history.source_label))  # type: ignore[union-attr]
-    note = ""
+    notes = []
     if len(facts) < 2:
-        note = (f"Only {len(facts)} verified fact(s) available. Write the missing fact as 'none verified'. "
-                "Do not pad.")
+        notes.append(f"Only {len(facts)} verified fact(s) available. Write the missing fact as 'none verified'. "
+                     "Do not pad.")
+    if excluded:
+        notes.append(f"{_plural(excluded, 'signal')} left out of the facts (future-dated or older than its limit): "
+                     "do not quote it.")
+    usable = [(s, p) for s, p in zip(sigs, psigs) if p.status in ("ok", "undated")]
     return ResearchPacket(
-        account_key=account_key(a), account_name=a.name, website=a.website, industry=industry,
-        state=a.billing_state or a.hq_state, city=a.billing_city, employees=a.employees,
+        account_key=account_key(a), account_name=_clean(a.name), website=_clean(a.website) if a.website else None,
+        industry=industry, state=_clean(a.billing_state or a.hq_state) if (a.billing_state or a.hq_state) else None,
+        city=_clean(a.billing_city) if a.billing_city else None, employees=a.employees,
         tier=None if a.size_unknown else tier_for(config, a.employees),
-        prospect_first_name=_first_name(prospect.name), prospect_title=prospect.title,
+        prospect_first_name=_first_name(prospect.name),
+        prospect_title=_clean(prospect.title) if prospect.title else None,
         prospect_sf_contact_id=prospect.sf_contact_id,
         local_time=ranked.local_call_time.isoformat() if ranked.local_call_time else None, window=ranked.window,
-        timezone=a.timezone, signals=psigs, has_real_trigger=bool(sigs),
+        timezone=a.timezone, signals=psigs, has_real_trigger=bool(usable),
+        trigger_kind=usable[0][1].kind if usable else None,
         ambiguity_flags=[sigmod.AMBIGUOUS_NOTE for s in sigs if sigmod.is_ambiguous(s)],
         sdr_target=a.is_sdr_target,
         contact_history=summary, contact_history_source=history.source_label if summary else None,
-        available_facts=facts, must_not_claim=list(MUST_NOT_CLAIM), facts_note=note)
+        available_facts=facts, must_not_claim=list(MUST_NOT_CLAIM), facts_note=" ".join(notes))
 
 
 def render_packet_text(p: ResearchPacket) -> str:
@@ -422,14 +555,19 @@ def render_packet_text(p: ResearchPacket) -> str:
         meta.append(f"{p.employees} employees" + (f", {p.tier}" if p.tier else ""))
     if meta:
         L.append("PROFILE: " + "; ".join(meta))
-    L.append(f"CALLING: {p.prospect_first_name or '(name unknown)'}, {p.prospect_title or 'title unknown'}"
-             f" (SF contact {p.prospect_sf_contact_id or 'id unknown'}) | {p.local_time or 'unscheduled'} ({p.window or '-'}, {p.timezone or '-'})")
+    L.append(f"CALLING: {p.prospect_first_name or 'the contact (first name unknown)'}, "
+             f"{p.prospect_title or 'title unknown'}"
+             f" (SF contact {p.prospect_sf_contact_id or 'id unknown'}) | "
+             f"{p.local_time or 'unscheduled'} ({p.window or '-'}, {p.timezone or '-'})")
     if p.sdr_target:
         L.append("SDR TARGET: yes (internal flag, do not mention on the call)")
     if p.signals:
         L.append("SIGNALS (real, sourced):")
         for s in p.signals:
             L.append(f"  - {s.label} | {s.evidence} | source: {s.source_label} | {s.verdict_reason}")
+        if not p.has_real_trigger:
+            L.append("TRIGGER: none usable (interest signal only, or date not trustworthy): say so "
+                     "(TRIGGER: None found) and write a fit-based opener.")
     else:
         L.append("SIGNALS: none. There is no real trigger: say so (TRIGGER: None found) and write a fit-based opener.")
     for f in p.ambiguity_flags:
@@ -454,7 +592,7 @@ def _sort_key_rank(ra: RankedAccount):
 
 
 def _bucket(items: Sequence[RankedAccount], reason_of) -> list[BucketItem]:
-    return [BucketItem(r.account.name, reason_of(r)) for r in items]
+    return [BucketItem(_clean(r.account.name), _clean(reason_of(r))) for r in items]
 
 
 def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by_account: Mapping[str, list[Signal]],
@@ -464,7 +602,8 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
 
     ``limit`` keeps the top N by score, THEN orders them by call time (grouped by timezone window).
     ``accounts`` / ``prospects`` are fallbacks only (prospect lookup when the RankResult lacks one).
-    ``history`` maps account_key -> ContactHistory."""
+    ``history`` maps account_key -> ContactHistory. ``rank`` is the position among ALL ranked accounts
+    (dropped ones included), so tags can skip a number."""
     if now.tzinfo is None:
         raise ValueError("now must be timezone-aware")
     if limit is not None and limit < 0:
@@ -483,11 +622,12 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
     picked: list[tuple[int, RankedAccount, Prospect]] = []
     for pos, ra in enumerate(ordered, 1):
         key = account_key(ra.account)
+        name = _clean(ra.account.name)
         if ra.skipped_reason:
-            sheet.dropped.append(BucketItem(ra.account.name, f"in ranked but has skipped_reason: {ra.skipped_reason}"))
+            sheet.dropped.append(BucketItem(name, f"in ranked but has skipped_reason: {_clean(ra.skipped_reason)}"))
             continue
         if ra.local_call_time is None or ra.window is None:
-            sheet.dropped.append(BucketItem(ra.account.name, "no scheduled call time"))
+            sheet.dropped.append(BucketItem(name, "no scheduled call time"))
             continue
         chosen = (rank_result.prospects.get(key) or [None])[0]
         if chosen is None:
@@ -496,7 +636,10 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
                 cand.extend(by_acct.get(i, []) if i else [])
             chosen = pick_prospect(cand, config) if cand else None
         if chosen is None:
-            sheet.dropped.append(BucketItem(ra.account.name, "no callable prospect found"))
+            sheet.dropped.append(BucketItem(name, "no callable prospect found"))
+            continue
+        if chosen.do_not_call or chosen.opted_out_email:
+            sheet.dropped.append(BucketItem(name, "chosen prospect is do-not-call / opted out"))
             continue
         picked.append((pos, ra, chosen))
     if limit is not None:
@@ -521,13 +664,13 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
         for pos, ra, pr in grouped[gk]:
             n += 1
             sigs = _signals_for(ra, signals_by_account)
-            why = build_why(ra, sigs, config)
+            why = build_why(ra, sigs, config, now)
             pk = account_key(ra.account)
-            fn = _first_name(pr.name)
-            why.insert(0, f"Prospect: {fn or 'name unknown'}, {pr.title or 'title unknown'}")
+            why.insert(0, f"Prospect: {_who(pr.name)}, {_clean(pr.title) if pr.title else 'title unknown'}")
             ln = SheetLine(entry=SheetEntry(ranked=ra, prospect=pr), rank=pos, call_no=n, group=label,
-                           run_date=run_date, why_chosen=why, flags=_flags(ra, sigs) + _contact_flags(pr),
-                           packet=build_packet(ra, pr, sigs, config, history.get(pk)))
+                           run_date=run_date, why_chosen=why,
+                           flags=_flags(ra, sigs, config, now) + _contact_flags(pr),
+                           packet=build_packet(ra, pr, sigs, config, history.get(pk), now))
             glines.append(ln)
             sheet.lines.append(ln)
         sheet.groups.append((label, glines))
@@ -539,7 +682,7 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
     sheet.skipped = _bucket(rank_result.skipped, lambda r: r.skipped_reason or "unknown")
     counts: dict[str, int] = {}
     for r in rank_result.skipped:
-        k = (r.skipped_reason or "unknown").split(" (rank ")[0].split(" until ")[0]
+        k = _clean((r.skipped_reason or "unknown").split(" (rank ")[0].split(" until ")[0])
         counts[k] = counts.get(k, 0) + 1
     sheet.skipped_reason_counts = dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
     return sheet
@@ -550,27 +693,33 @@ def _when(ln: SheetLine) -> str:
     return ln.local_call_time.strftime("%a %H:%M %Z")
 
 
-def _bucket_lines(title: str, items: list[BucketItem]) -> list[str]:
+def _bucket_data(sheet: Sheet) -> list[tuple[str, list[BucketItem]]]:
+    return [("NEEDS PROSPECT (find a contact; never a task)", sheet.needs_prospect),
+            ("SPILLED (held for a later day; no task tonight)", sheet.spilled),
+            ("SKIPPED", sheet.skipped),
+            ("DROPPED FROM SHEET (ranked but not sheetable)", sheet.dropped)]
+
+
+def _bucket_lines(title: str, items: list[BucketItem], limit: int | None, esc=lambda s: s) -> list[str]:
     if not items:
         return []
+    shown = items if limit is None else items[:limit]
     out = [f"{title} ({len(items)}):"]
-    out += [f"  - {b.name}: {b.reason}" for b in items[:BUCKET_LIST_LIMIT]]
-    if len(items) > BUCKET_LIST_LIMIT:
-        out.append(f"  ... and {len(items) - BUCKET_LIST_LIMIT} more")
+    out += [f"  - {esc(b.name)}: {esc(b.reason)}" for b in shown]
+    if len(shown) < len(items):
+        out.append(f"  ... and {len(items) - len(shown)} more")
     return out
 
 
-def _bucket_section(sheet: Sheet) -> list[str]:
-    out = _bucket_lines("NEEDS PROSPECT (find a contact; never a task)", sheet.needs_prospect)
-    out += _bucket_lines("SPILLED (held for a later day; no task tonight)", sheet.spilled)
-    out += _bucket_lines("SKIPPED", sheet.skipped)
-    out += _bucket_lines("DROPPED FROM SHEET (ranked but not sheetable)", sheet.dropped)
-    if sheet.skipped_reason_counts:
-        out.append("Top skip reasons: " + "; ".join(f"{k} ({v})" for k, v in list(sheet.skipped_reason_counts.items())[:5]))
-    return out
+def _skip_counts(sheet: Sheet, esc=lambda s: s) -> list[str]:
+    if not sheet.skipped_reason_counts:
+        return []
+    return ["Top skip reasons: " + "; ".join(f"{esc(k)} ({v})" for k, v in list(sheet.skipped_reason_counts.items())[:5])]
 
 
-def render_sheet_text(sheet: Sheet) -> str:
+def render_sheet_text(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT) -> str:
+    """Terminal table. ``bucket_limit`` caps each bucket's names (default 25); None lists EVERY account
+    (use None for the run log: CLAUDE.md rule 5)."""
     L = [f"CALL SHEET {sheet.run_date.isoformat()}: {len(sheet.lines)} of {sheet.ranked_total} callable accounts"
          + (f" (top {sheet.limit} by score)" if sheet.limit is not None else "")
          + f" | needs prospect {len(sheet.needs_prospect)}, spilled {len(sheet.spilled)}, skipped {len(sheet.skipped)}"]
@@ -582,51 +731,63 @@ def render_sheet_text(sheet: Sheet) -> str:
         for ln in lines:
             pr = ln.prospect
             why = "; ".join(ln.why_chosen[1:3]) if len(ln.why_chosen) > 1 else ln.why_chosen[0]
-            row = (f"{ln.call_no:>2}. {_when(ln):<14} {_short(ln.account.name, 34):<34} "
-                   f"{_first_name(pr.name) or '?'}, {_short(pr.title or '?', 28)} | score {ln.score:.0f} (#{ln.rank}) | {_short(why, 120)}")
+            row = (f"{ln.call_no:>2}. {_when(ln):<14} {_short(ln.account_name, 34):<34} "
+                   f"{_who(pr.name)}, {_short(_clean(pr.title or '?'), 28)} | score {ln.score:.0f} (#{ln.rank}) | {_short(why, 120)}")
             if ln.flags:
                 row += " | flags: " + ", ".join(ln.flags)
             L.append(row)
-    extra = _bucket_section(sheet)
+    extra = []
+    for title, items in _bucket_data(sheet):
+        extra += _bucket_lines(title, items, bucket_limit)
+    extra += _skip_counts(sheet)
     if extra:
         L += ["", *extra]
-    return "\n".join(L) + "\n"
+    return _scrub("\n".join(L)) + "\n"
 
 
-def render_sheet_markdown(sheet: Sheet) -> str:
+def render_sheet_markdown(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT) -> str:
+    """The short summary doc. Names, titles and evidence are markdown-escaped and shortened."""
     L = [f"# Call sheet {sheet.run_date.isoformat()}", "",
          f"{len(sheet.lines)} accounts built from {sheet.ranked_total} callable"
          + (f" (top {sheet.limit} by score, then ordered by local call time)" if sheet.limit is not None else "")
          + ". Nothing was sent or written to Nooks. Contact details are not shown; the writer looks them up by prospect id.", ""]
     for label, lines in sheet.groups:
-        L.append(f"## {label}")
+        L.append(f"## {_md(label)}")
         L.append("")
         for ln in lines:
             pr = ln.prospect
-            L.append(f"### {ln.call_no}. {ln.account.name} ({_when(ln)})")
-            L.append(f"- Call: {_first_name(pr.name) or 'name unknown'}, {pr.title or 'title unknown'}")
+            L.append(f"### {ln.call_no}. {_md(ln.account_name, 80)} ({_when(ln)})")
+            L.append(f"- Call: {_md(_who(pr.name), 40)}, {_md(pr.title or 'title unknown', 80)}")
             L.append(f"- Score: {ln.score:.1f} (rank {ln.rank}); " + ", ".join(
-                f"{k} {v:g}" for k, v in ln.ranked.score_breakdown.items() if v))
+                f"{_md(k)} {v:g}" for k, v in ln.ranked.score_breakdown.items() if v))
             L.append("- Why chosen:")
-            L += [f"  - {w}" for w in ln.why_chosen]
+            L += [f"  - {_md(w, 220)}" for w in ln.why_chosen]
             if ln.packet.facts_note:
-                L.append(f"- Facts: {ln.packet.facts_note}")
+                L.append(f"- Facts: {_md(ln.packet.facts_note, 300)}")
             L.append("")
-    extra = _bucket_section(sheet)
+    extra = []
+    esc = lambda s: _md(s, 200)  # noqa: E731
+    for title, items in _bucket_data(sheet):
+        block = _bucket_lines(title, items, bucket_limit, esc)
+        if block:
+            extra.append(f"**{block[0]}**")
+            extra += [("- " + x.strip()[2:]) if x.startswith("  - ") else f"- {x.strip()}" for x in block[1:]]
+    sc = _skip_counts(sheet, esc)
+    if sc:
+        extra.append(sc[0])
     if extra:
-        L += ["## Not on the sheet", ""]
-        L += [("- " + x.strip()[2:] if x.startswith("  - ") else f"**{x}**") for x in extra]
-        L.append("")
-    return "\n".join(L)
+        L += ["## Not on the sheet", ""] + extra + [""]
+    return _scrub("\n".join(L))
 
 
 def sheet_to_json(sheet: Sheet) -> str:
     def line(ln: SheetLine) -> dict:
         return {
-            "call_no": ln.call_no, "rank": ln.rank, "group": ln.group, "account": ln.account.name,
+            "call_no": ln.call_no, "rank": ln.rank, "group": ln.group, "account": ln.account_name,
             "account_key": ln.packet.account_key, "sf_contact_id": ln.prospect.sf_contact_id,
             "nooks_prospect_id": ln.prospect.nooks_id,
-            "prospect_first_name": _first_name(ln.prospect.name), "prospect_title": ln.prospect.title,
+            "prospect_first_name": _first_name(ln.prospect.name),
+            "prospect_title": _clean(ln.prospect.title) if ln.prospect.title else None,
             "window": ln.ranked.window, "local_call_time": ln.local_call_time.isoformat(),
             "score": ln.score, "score_breakdown": dict(ln.ranked.score_breakdown),
             "why_chosen": list(ln.why_chosen), "flags": list(ln.flags), "packet": ln.packet.to_dict()}
@@ -640,6 +801,9 @@ def sheet_to_json(sheet: Sheet) -> str:
 
 # ---------------------------------------------------------------- Nooks task payload (build only)
 OPENER_FIELDS = ("opener", "fact_1", "fact_2", "gatekeeper", "trigger")
+_PLACEHOLDER_TEXT = {"none", "na", "nil", "null", "nan", "undefined", "unknown", "tbd", "todo"}
+# OPENER and GATEKEEPER must be real text; the three honest 'none verified' forms are only for the others.
+_STRICT_FIELDS = ("opener", "gatekeeper")
 
 
 def priority_for(score: float) -> str:
@@ -653,39 +817,101 @@ def task_tag(run_date: date, rank: int) -> str:
     return f"[{TAG_PREFIX} {run_date.isoformat()} #{rank}]"
 
 
-def nooks_task_payload(line: SheetLine, opener_fields: Mapping[str, str], nooks_prospect_id: str | None, *,
-                       owner_id: str = OWNER_ID_PLACEHOLDER) -> dict:
-    """Build the task-create ``data`` dict. Pure: no I/O. Refuses on any empty opener field, when the
-    line is not a genuine callable sheet line (needs_prospect / spilled / skipped are never SheetLines),
-    or when ``nooks_prospect_id`` is None/blank (the id is resolved lazily in Phase 3, one lookup per
-    contact; the sheet's own prospect may have nooks_id None). Before calling this, the caller MUST have
-    run ``recheck_blocked(line, resolved_prospect, state)`` on the resolved Nooks prospect."""
+def _field_text(name: str, value: object, account: str) -> str:
+    if not isinstance(value, str):
+        raise SheetError(f"{account}: opener field {name} must be a string, got {type(value).__name__}")
+    text = " ".join(value.translate(_ZERO_WIDTH).replace(" ", " ").split())
+    core = re.sub(r"[\W_]+", "", text).lower()
+    if not core:
+        raise SheetError(f"{account}: empty opener field: {name}")
+    if core in _PLACEHOLDER_TEXT:
+        raise SheetError(f"{account}: opener field {name} is a placeholder ({text!r}), not real text")
+    if name in _STRICT_FIELDS and core.startswith(("noneverified", "nonefound")):
+        raise SheetError(f"{account}: opener field {name} must be real text, not 'none verified'")
+    if _has_contact_data(text):
+        raise SheetError(f"{account}: opener field {name} contains an email address or phone number")
+    return text
+
+
+def _check_owner(owner_id: object, dry_run: bool) -> str:
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise SheetError("owner_id is required: a non-blank string")
+    oid = owner_id.strip()
+    if oid == OWNER_ID_PLACEHOLDER:
+        if not dry_run:
+            raise SheetError("owner_id is still the placeholder: pass the real Nooks owner id (or dry_run=True)")
+    elif not ID_PATTERN.fullmatch(oid):
+        raise SheetError("owner_id must match [A-Za-z0-9_-]{1,128}")
+    return oid
+
+
+def _resolve_prospect(line: SheetLine, resolved: Prospect) -> Prospect:
+    """Normalise and verify the resolved Nooks prospect. Returns a copy carrying the normalised ids."""
+    name = line.account_name
+    if not isinstance(resolved, Prospect):
+        raise SheetError(f"{name}: resolved_prospect must be a Prospect")
+    nid = (resolved.nooks_id or "").strip() if isinstance(resolved.nooks_id, str) else ""
+    if not nid:
+        raise SheetError(f"{name}: no resolved Nooks prospect id (never guess or use None)")
+    if not ID_PATTERN.fullmatch(nid):
+        raise SheetError(f"{name}: resolved Nooks prospect id has unexpected characters")
+    want = normalise_sf_id(line.entry.prospect.sf_contact_id) if line.entry.prospect else None
+    got = normalise_sf_id(resolved.sf_contact_id)
+    if not want:
+        raise SheetError(f"{name}: sheet contact has no SF contact id: cannot verify who Nooks resolved")
+    if not got:
+        raise SheetError(f"{name}: resolved prospect has no SF contact id: cannot verify identity")
+    if want != got:
+        raise SheetError(f"{name}: resolved prospect is a different contact ({got} != {want})")
+    return replace(resolved, nooks_id=nid, sf_contact_id=got)
+
+
+def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, opener_fields: Mapping[str, str],
+                 owner_id: str, *, dry_run: bool = False, now: datetime | None = None) -> dict:
+    """THE way to build a Nooks task-create ``data`` dict. Pure: no I/O.
+
+    In order: validates owner_id (required; the placeholder only with ``dry_run=True``); checks the line is
+    a genuine scheduled sheet line (needs_prospect / spilled / skipped accounts are never SheetLines); strips
+    and normalises the resolved Nooks prospect id and the SF ids BEFORE any comparison; requires both SF
+    contact ids and that they match; runs ``state.is_blocked(.., 'any')`` on the resolved prospect AND on the
+    sheet contact (phone / email of both) and raises ``BlockedError`` if either is blocked; validates the
+    opener fields (real text, no email / phone, ``NOTE_MAX_CHARS`` cap); and builds the payload with exactly
+    the id it checked. ``now`` (aware), when given, refuses a due time that has already passed."""
     if not isinstance(line, SheetLine):
         raise SheetError("payloads are built from sheet lines only")
+    name = line.account_name
+    oid = _check_owner(owner_id, dry_run)
     ra = line.ranked
     if ra.skipped_reason or ra.local_call_time is None or ra.window is None:
-        raise SheetError(f"{line.account.name}: not a scheduled callable account")
-    if not isinstance(nooks_prospect_id, str) or not nooks_prospect_id.strip():
-        raise SheetError(f"{line.account.name}: no resolved Nooks prospect id (never guess or use None)")
-    missing = [f for f in OPENER_FIELDS if not str(opener_fields.get(f, "")).strip()]
-    if missing:
-        raise SheetError(f"{line.account.name}: empty opener field(s): {', '.join(missing)}")
+        raise SheetError(f"{name}: not a scheduled callable account")
     if ra.local_call_time.tzinfo is None:
         raise SheetError("local_call_time must be timezone-aware")
-    f = {k: " ".join(str(opener_fields[k]).split()) for k in OPENER_FIELDS}
+    if now is not None:
+        if now.tzinfo is None:
+            raise ValueError("now must be timezone-aware")
+        if ra.local_call_time <= now:
+            raise SheetError(f"{name}: due time {ra.local_call_time.isoformat()} has already passed")
+    checked = _resolve_prospect(line, resolved_prospect)
+    for who, p in (("resolved prospect", checked), ("sheet contact", line.entry.prospect)):
+        blocked, reason = is_blocked(p, state, "any")
+        if blocked:
+            raise BlockedError(f"{name}: {who} blocked: {reason}")
+    f = {k: _field_text(k, opener_fields.get(k), name) for k in OPENER_FIELDS}
     note = "\n".join([
         task_tag(line.run_date, line.rank),
         f"OPENER: {f['opener']}", f"FACT 1: {f['fact_1']}", f"FACT 2: {f['fact_2']}",
         f"GATEKEEPER: {f['gatekeeper']}", f"TRIGGER: {f['trigger']}"])
-    return {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": owner_id,
-            "prospectId": nooks_prospect_id.strip(), "priority": priority_for(ra.score), "note": note}
+    if len(note) > NOTE_MAX_CHARS:
+        raise SheetError(f"{name}: note is {len(note)} characters, over the {NOTE_MAX_CHARS} cap (not truncated)")
+    return {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": oid,
+            "prospectId": checked.nooks_id, "priority": priority_for(ra.score), "note": note}
 
 
-# ---------------------------------------------------------------- Phase 3 resolution helpers
 def sheet_needs_prospect_resolution(sheet: Sheet) -> list[str]:
     """SF contact ids whose Nooks prospect id Phase 3 must look up (one filter_crmId lookup each), in call
     order, de-duplicated. Lines whose prospect already has a nooks_id need no lookup. A line with neither
-    id cannot be resolved: it is NOT listed here and ``nooks_task_payload`` refuses it (flag 'no contact id')."""
+    id cannot be resolved: it is NOT listed here and ``prepare_task`` refuses it (flag 'no contact id').
+    After resolving, call ``prepare_task``: it re-runs the do-not-contact check by Nooks prospect id."""
     out, seen = [], set()
     for ln in sheet.lines:
         p = ln.entry.prospect
@@ -696,18 +922,3 @@ def sheet_needs_prospect_resolution(sheet: Sheet) -> list[str]:
             seen.add(cid)
             out.append(cid)
     return out
-
-
-def recheck_blocked(line: SheetLine, resolved_prospect: Prospect, state: State) -> tuple[bool, str]:
-    """(ok, reason) for a Nooks prospect resolved in Phase 3. ok=False means do NOT build a payload.
-
-    Wraps ``state.is_blocked`` (do-not-call by Nooks prospect id, phone or email, plus email opt-out) run on the
-    RESOLVED prospect, since the dry-run contact had no Nooks id. Also refuses a resolved prospect with no
-    Nooks id or whose SF contact id differs from the sheet's contact (wrong person)."""
-    if not (resolved_prospect.nooks_id or "").strip():
-        return False, "resolved prospect has no Nooks id"
-    want = line.entry.prospect.sf_contact_id if line.entry.prospect else None
-    if want and resolved_prospect.sf_contact_id and want != resolved_prospect.sf_contact_id:
-        return False, f"resolved prospect is a different contact ({resolved_prospect.sf_contact_id} != {want})"
-    blocked, reason = is_blocked(resolved_prospect, state)
-    return (False, reason or "blocked") if blocked else (True, "")
