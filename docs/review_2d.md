@@ -5,7 +5,7 @@ Reviewer session: `session_01QShr1H7ghpKeoYqfRwTjBe`. Reviewed commit `7b98a97` 
 were not edited. Added: this file, `docs/review_2d_labels.json` (committed **before** the lint was run on it),
 `docs/review_2d_real_packets.json` (real 2c `ResearchPacket.to_dict()` output from the synthetic world), `tests/test_review_2d_scratch.py`.
 
-## Verdict: PASS WITH FIXES (not ready to wire into 2c / 2e until blockers B1 to B6 are fixed)
+## Verdict (round 1): PASS WITH FIXES. **Round 2 verdict is at the end of this file: FINAL PASS** (blockers fixed, held-out measured)
 
 The design is sound and the code is clean: pure functions, deterministic, no I/O beyond `load_voice_config`, fails closed on most
 paths, nothing in it or the skills can send or write anything. But measured on a 161-case adversarial corpus and an 84-case "normal
@@ -237,3 +237,174 @@ Caveats: it is tuned by looking at the same corpus it is scored on, so the 89% /
 ## 11. UNVERIFIED / not done
 
 - Python 3.11 specifically (only 3.13 available). Real LLM output (all blocks here are hand-written). Alex's voice and taste (examples not provided). Multi-signal ordering in 2c packets. That 25 words is about 8 seconds. Gmail/Nooks behaviour of the DRAFT STYLE label line (how the label is stripped before it reaches a Nooks field is a 2c/3a question).
+
+
+---
+
+# Round 2: re-review of `phase2/2d-opener-lint` @ `3439150` (merged into `phase2/2d-review`)
+
+Offline, read-only, FAKE data. No connector call. Worker files not edited. The coordinator warned that the worker tuned against my round-1 set, so the
+headline here is a **new held-out set** written after the fixes, against **real `ResearchPacket` objects** built by `src/callsheet.py`.
+
+## R0. Verdict: **FINAL PASS**
+
+No failing item. Every round-1 blocker (B1 to B6) and high finding (H1 to H4) is fixed with evidence below; the CLI works as the skill says; the
+worker's two test-support edits are acceptable (one should be scoped). The lint is **good enough to gate openers in a workflow where Alex reads every one**,
+provided the remaining control is a deliberate skim with the packet beside the text (R4). It is **not** a substitute for that skim: about 1 in 6 content errors still gets through.
+
+| Headline (held-out 2, `docs/review_2d_heldout2.json`, 210 cases, labels committed in `108fd01` before the run) | Result |
+|---|---|
+| Existing suite | **2157 passed**, plain and with `-W error` (worker's number confirmed; 2185 passed + 1 skipped + 10 xfailed with my scratch file) |
+| Determinism | identical results over 3 `PYTHONHASHSEED` values on all 210 cases |
+| **Recall on 148 new bad blocks** (any *error*) | **124 / 148 = 83.8%** (95% interval about 78% to 89%). 84.4% if H-B145 is dropped: my label was wrong, that email is 76 words (limit 79) |
+| Recall for the intended reason | 117 / 148 = 79.1% raw; ~83% once `UNSUPPORTED_CLAIM` is accepted as the right code for wrong relative dates (my label named a different code, the lint still errors) |
+| **False positives on 62 new good blocks** | **0 / 62 = 0%** (95% upper bound about 5%) |
+| False positives on 15 extra natural gatekeeper lines | 0 / 15 |
+| Round-1 corpora re-run (worker tuned on these) | 161 / 161 bad caught; 2 / 32 good flagged (both "2 weeks"/"14 days" on fixtures that carry no `age_days`); natural openers 2 / 84 flagged (other-city names) |
+
+**Reading the numbers honestly.** The worker's own fresh batches scored 84%, 74%, 60% before it tuned. My 84% sits at the top of that range. Two reasons it is not higher or lower than theirs:
+(1) my set mixes mechanical errors (shape, label, `!`, emoji, links, phones, send language: 33 of the 148 and about 97% caught) with content errors; on **content errors only** recall is **about 82%**; (2) I wrote every error myself, with knowledge of what a lint might not catch, which makes the set harder than real, mostly non-adversarial LLM mistakes, but it also shares my blind spots. Treat **75% to 85% on content errors** as the planning number, not 100%, and do not quote the worker's 100% (it was tuned on the set).
+
+## R1. Round-1 findings: FIXED / NOT FIXED (evidence)
+
+| Finding | Status | Evidence |
+|---|---|---|
+| **B1** hyphen / alnum company names (Smith-Jones, Zip2Pay, 3M, Co-op, O'Brien & Sons) | **FIXED** | verbatim FACT/TRIGGER with each name: 0 violations (probe f); `test_F01`, `test_F16` now pass |
+| **B2** `sentence_start_words` | **FIXED** | key removed from `voice.yaml` and from `SCHEMA`; natural ANZ openers 42 / 84 flagged to **2 / 84**; "Honestly, Maybe, Perhaps, Morning, CX, WA, Nov" all pass (`test_F12` x7). Remaining benign hits: other-city names (Melbourne for a Perth account) and `Q4` |
+| **B3** `ambiguity_flags` ignored | **FIXED** | `ambiguity_flags` and `signals[].ambiguous` each switch the role rule on (probe a); `test_F02`; held-out role cases 5 / 6 caught |
+| **B4** source label vs id, dates | **FIXED** | either string accepted for FACT and TRIGGER (H-G62 passes with label only on the TRIGGER line); date on an undated fact `FACT_DATE_INVENTED` (H-B016), wrong trigger date `TRIGGER_DATE_INVENTED` (H-B015); `test_F03`, `test_F13` |
+| **B5** config fails open | **FIXED** | `load_voice_config` validates: typo'd key `banned_phrase`, `calibrated: "false"` string, missing file, bad regex all exit **2** from the CLI (probe); junk `alex_examples` rejected at validation (`test_F14`). `check_*` also raises `VoiceConfigError` on a bad dict |
+| **B6a** unicode | **FIXED** | zero-width, Cyrillic lookalikes and non-Latin letters now an error (`UNICODE_SUSPECT`); NBSP folded so `quick<NBSP>call` is `BANNED_PHRASE` (probe c); fullwidth digits/`！` normalised |
+| **B6b** send language | **FIXED** | now applied to opener, gatekeeper, FACT and email; "I've sent you a calendar invite", "I'll send over", "sending you" all error (H-B094, H-B126). One gap left: "send them a free report" in a gatekeeper line (N7c) |
+| **H1** event word from a packet fact | **FIXED** | `test_F08`; held-out good emails H-G54 ("You are also hiring...") pass |
+| **H2** one ask is only a warning | **FIXED** | now an error; a single `?` with "can I send you a calendar invite" errors (probe d); `test_F09`. "Right?" tags exempt per the skill |
+| **H3** round letters / meaning-changing paraphrase | **PARTLY FIXED** | funding round, currency, magnitude and amount are now verbatim-checked: held-out wrong round / amount / currency 22 of 22 caught. A meaning change in other words is still not caught (R3, 7 of 15 missed). The skill and guide say so plainly |
+| **H4** number words | **FIXED, one hole** | "six hundred", "twenty million" caught (`test_F10`). `two days ago` passes for a 9-day-old signal because the derived numbers mix days with week counts (N8) |
+| **H5** hype stems, **M1 to M7** | **FIXED** | all round-1 misses now caught; `guide` is a soft word; gatekeeper receptionist English 0 / 15 false positives; intent is never a trigger (5 of 5 held-out intent cases caught); history claims 3 / 3; invented citation dates caught; sign-off, bullets, "Re:" and quotes around a line are errors |
+| **Skills** | **FIXED** | CLI command with exit codes; **retry rule** (3 tries then exactly `NEEDS HUMAN: <codes>`); two separate templates (label on / off); examples headed "FAKE ... Do not copy the wording: structure only"; `ambiguity_flags`, null first name ("Hi there"), intent, history-is-not-a-fact and "text only, never writes" are all stated; email skill forbids `createEmail` and note tools |
+| **voice.yaml** | **FIXED** | INFERRED lists are now *soft* (`OPENER_PENDO_FEATURE_SOFT`, `GATEKEEPER_PITCH_SOFT` warnings) with hard phrases separate; `must_not_phrases` added |
+
+## R2. Held-out measurement (details)
+
+World: 14 FAKE accounts (new names, 8 trigger kinds, ages 2 to 60 days, ambiguous roles, stale and intent-only signals, missing first name, one-fact and zero-fact packets, two-signal packet, no-state NZ), built through `cs.build_sheet` / `build_packet` (`docs/review_2d_heldout2_packets.json`).
+Cases: 171 openers (including 12 gatekeeper-line variants and 25 gatekeeper / shape cases) and 39 emails; 62 good, 148 bad. Errors written the way an LLM makes them: wrong round / amount / currency, invented adjectives, wrong tense, plausible employee counts, "their new CPO", mixing two accounts, copied example wording, a LinkedIn post, "congrats on the funding" for an exec-move packet, a competitor, a wrong city, "last week" for 14 days, CTA stuffing, a pitch in the gatekeeper, politeness filler, "quick", send language, a missing label, markdown / quotes / fences.
+
+### Recall by error family (families assigned by a regex on my category tags; counts approximate)
+
+| Family | n | caught | recall |
+|---|---|---|---|
+| Wrong number, currency, round, count | 22 | 22 | 100% |
+| Wrong place | 6 | 6 | 100% |
+| Role assumed (ambiguity flag) | 3 | 3 | 100% |
+| Citation / source / date lines | 4 | 4 | 100% |
+| Surface: `!`, emoji, link, phone, email address | 5 | 5 | 100% |
+| Email-only: history claim, send language, two asks | 5 | 5 | 100% |
+| Block shape, label, markdown, quotes, length | 13 | 12 | 92% |
+| Stale or intent signal used as news | 9 | 8 | 89% |
+| Wrong person / title / name / pronoun | 14 | 11 | 79% |
+| Pendo pitch, stats, hype, feature, sales-speak | 18 | 14 | 78% |
+| Invented fact / descriptor / career / social post | 18 | 13 | 72% |
+| Relative time wrong | 7 | 5 | 71% |
+| Event / meaning changed (word swap, tense, event type) | 15 | 10 | 67% |
+| Competitor named | 3 | 2 | 67% |
+| Gatekeeper line (pitch, trigger, send) | 5 | 3 | 60% |
+
+### Per-code table (code I expected; n = cases; "intended" = that code or one of its alternatives fired)
+
+| Intended code (first listed) | n | raised any error | raised an intended code | missed |
+|---|---|---|---|---|
+| `UNSUPPORTED_CLAIM` | 21 | 9 | 8 | B008, B023, B029, B033, B036, B040, B059, B060, B064, B087, B095, B140 |
+| `PROPER_NOUN_UNSUPPORTED` | 20 | 19 | 19 | B141 |
+| `NUMBER_UNSUPPORTED` | 18 | 16 | 16 | B006, B093 |
+| `INVENTED_TRIGGER` | 12 | 11 | 11 | B065 |
+| `TRIGGER_MISMATCH` | 10 | 8 | 8 | B046, B061 |
+| `BANNED_PHRASE` | 7 | 7 | 7 |  |
+| `RELATIVE_TIME_UNVERIFIED` | 6 | 5 | 0 | B022 |
+| `FACT_UNSUPPORTED` | 6 | 6 | 6 |  |
+| `ROLE_ASSUMED` | 6 | 5 | 5 | B051 |
+| `GATEKEEPER_PITCH` | 4 | 1 | 1 | B108, B110, B114 |
+| `SHAPE_EXTRA` | 4 | 4 | 4 |  |
+| `HISTORY_CLAIM` | 3 | 3 | 3 |  |
+| `FACT_SOURCE_UNKNOWN` | 2 | 2 | 2 |  |
+| `TRIGGER_LINE_CLAIMED` | 2 | 2 | 2 |  |
+| `OPENER_PENDO_FEATURE` | 2 | 2 | 2 |  |
+| `GATEKEEPER_NO_ROLE` | 2 | 2 | 2 |  |
+| `DRAFT_STYLE_LABEL_MISSING` | 2 | 2 | 2 |  |
+| `FACT_SOURCE_MISMATCH` | 1 | 1 | 1 |  |
+| `TRIGGER_DATE_INVENTED` | 1 | 1 | 1 |  |
+| `FACT_DATE_INVENTED` | 1 | 1 | 1 |  |
+| `FACT_DUPLICATE` | 1 | 1 | 0 |  |
+| `OPENER_MULTIPLE_QUESTIONS` | 1 | 1 | 1 |  |
+| `EXCLAMATION` | 1 | 1 | 1 |  |
+| `EMOJI` | 1 | 1 | 1 |  |
+| `LINK` | 1 | 1 | 1 |  |
+| `PHONE_NUMBER` | 1 | 1 | 1 |  |
+| `OPENER_TOO_LONG` | 1 | 1 | 1 |  |
+| `GATEKEEPER_TOO_LONG` | 1 | 1 | 1 |  |
+| `SHAPE_MISSING` | 1 | 1 | 1 |  |
+| `TRIGGER_SOURCE_MISMATCH` | 1 | 1 | 1 |  |
+| `EMAIL_SEND_LANGUAGE` | 1 | 1 | 1 |  |
+| `EMAIL_MULTIPLE_ASKS` | 1 | 1 | 1 |  |
+| `SUBJECT_FAKE_THREAD` | 1 | 1 | 1 |  |
+| `EMAIL_LINE_COUNT` | 1 | 1 | 1 |  |
+| `EMAIL_ADDRESS` | 1 | 1 | 1 |  |
+| `EMAIL_BULLETS` | 1 | 1 | 1 |  |
+| `EMAIL_SIGNOFF` | 1 | 1 | 1 |  |
+| `EMAIL_TOO_LONG` | 1 | 0 | 0 | B145 |
+
+(`UNSUPPORTED_CLAIM` row: 12 of the 21 were missed, 9 caught; `RELATIVE_TIME_UNVERIFIED` row: the lint raises `UNSUPPORTED_CLAIM` as an error when the packet has `age_days`, which is the right behaviour, so I count those 5 as caught.)
+
+### Top miss patterns (24 misses, 23 after my one mislabel)
+
+1. **Meaning changes in plain words in the spoken opener** (7): "completed the acquisition" / "acquired" for "agreed to acquire", "merger", app to "web portal", "small" to "big retailers", "hired a Head of Product" (the contact's own title), "Congrats on becoming Chief Experience Officer" (the hire is someone else). The lint matches names, numbers, event words and round letters, not sentences. This is the known, documented limit.
+2. **Invented descriptors and career claims in lowercase prose** (5): "renewable energy company", "one of Australia's biggest banks", "patient app", "previously led digital at a major miner", "Congrats on the CTO role". No name, number or event word to trip on.
+3. **A stale signal restated as news** (1): gumnut's 60-day-old "is migrating its ecommerce platform" passes because "migrating" is not an event word and the signal is correctly marked stale. The evidence of a stale or intent signal should be treated as forbidden content, not just its event word.
+4. **Sales-speak and competitors** (4): "the leading digital adoption platform", "Pendo helps teams see...", "Gainsight users often switch" (a sentence-initial competitor name is skipped by the new name rule; mid-sentence is caught), email versions of the same.
+5. **Gatekeeper line** (3): "product analytics" is only a *soft* warning, the trigger person's name repeated, "send them a free report".
+6. **CTA with a duration** (1): "twenty minutes on your calendar" (durations in minutes are exempt from the number-word rule).
+7. **Pronouns** (1): "his new role / alongside him" for a named person of unknown gender.
+8. **Relative time** (2): "two days ago" for 9 days; "last week" for 14 days (debatable label).
+
+### False positives: none on good blocks; known benign hits elsewhere
+`Q4` is read as a name; a different Australian city in "I'm ringing Melbourne teams" (Perth account) is flagged as unverifiable; "2 minutes" is fine, "2 weeks" with no `age_days` in the packet is flagged.
+
+## R3. New findings (all LOW / MEDIUM; none blocks the pass). Each has an xfail test in `tests/test_review_2d_scratch.py`
+
+| ID | Severity | Finding | Fix |
+|---|---|---|---|
+| N1 | MEDIUM, by design | Meaning-changing plain-words paraphrase in the opener passes | Not lintable. Add `completed, finalised, closed, signed, went live, shipped` to `unsupported_unless_in_packet`; add "agreed to X" must not become "X-ed"; rest is the skim / verifier |
+| N2 | MEDIUM | Stale / intent evidence restated as news passes (`test_N2`) | When `has_real_trigger` is false, any opener sentence sharing 2 or more content words with a stale or intent signal's evidence is an error |
+| N3 | MEDIUM | Lowercase invented descriptors, careers | Add `previously, formerly, joined from, used to, one of the (biggest, largest, leading), market leader` to `unsupported_unless_in_packet`; `test_N9` stays open |
+| N4 | LOW | Gendered pronouns for a named person (`test_N4`) | error on `he, she, his, her, him` in opener / email unless in the packet |
+| N5 | MEDIUM | "Pendo is the leading ...", "Pendo helps / gives / lets ...", competitor at sentence start (`test_N5a`, `test_N5b`) | patterns `\bpendo (is|helps|gives|lets|makes)\b`, `\b(leading|number one|best) .* platform\b`; a `competitors` list (Gainsight, WalkMe, Whatfix, Appcues, Userpilot, Amplitude, Mixpanel, Heap, FullStory, Hotjar, Qualtrics, Medallia) checked everywhere, including sentence start |
+| N6 | LOW | "minutes on your calendar" (`test_N6`) | ban `calendar, book a, grab (some )?time` in the opener |
+| N7 | MEDIUM | Gatekeeper: "product analytics" is only soft; trigger person's name; "send them a free report" (`test_N7a-c`) | make `analytics` and the Pendo feature phrases hard in the gatekeeper; reject any trigger-evidence name or content word; widen send pattern to `send (them\|him\|her\|over)` |
+| N8 | LOW | `_derived_numbers` (:542) mixes days and week counts, so "two days ago" fits a 9-day age (`test_N8`) | keep day numbers and week numbers separate and require the unit next to the number |
+| N9 | LOW | `Q4`, other Australian city flagged | allow `Q[1-4]`; add a short list of ANZ cities to `allowed_proper_nouns` or accept the cost |
+| N10 | LOW | 2c does not emit `must_not_phrases`; the six `must_not_claim` sentences have no quoted phrases so they match nothing (the built-in claim patterns do the work) | 2c: emit `must_not_phrases: ["existing customer", "case study"]`, or drop the field; keep `trigger_kind` (emitted, unused: fine) |
+| N11 | LOW | Fixture `tests/fixtures/text_packets.json` is still the old packet dialect (`trigger`, `flags`, `location`) | acceptable: the legacy fallbacks are tested and the real-packet contract is covered by `tests/test_textcheck_review.py` (builds packets with `cs.build_sheet`); label the file "legacy shape" |
+
+## R4. Is it good enough to gate openers when Alex reads every one? Yes. What the remaining control must be
+
+**Verdict: yes, with the skim as a designed control, not an afterthought.**
+- The lint reliably removes the errors that are hardest for a human to spot while skimming: wrong numbers, currencies, funding rounds, places, names, invented triggers, stale and intent signals presented as news, role assumptions, unsourced or mis-dated facts, history claims, send language, unicode tricks, wrong shape (95% to 100% in those families, 0 false positives on 62 good blocks, 2 of 84 on natural openers). A rejected block costs one regenerate; the 3-try then `NEEDS HUMAN` rule makes the failure visible.
+- It misses roughly **1 in 6 content errors**, and those misses are the ones a human also finds hardest: a plausible sentence that quietly changes what the packet says ("completed" for "agreed to acquire", "a major miner", "renewable").
+- **Remaining control (recommended, cheap):** (1) Alex's skim, shown **side by side**: the sheet prints the opener next to the packet's TRIGGER evidence and the two FACT lines, so he compares sentences rather than recalling the news; every opener sentence that contains a verb or adjective not found in the packet is **underlined / listed** ("not in packet: completed, renewable"), which is a mechanical diff the lint can already compute (a `NOT_IN_PACKET_WORDS` warning list); (2) optional **verifier pass**: a second, separate model call given only the packet and the opener, asked one closed question ("List any claim in the OPENER not stated in the packet; reply NONE or the list"). Its output is a *warning* in the log, never a gate, because it can be wrong in both directions; (3) keep `calibrated: false` and the DRAFT STYLE label until Alex has supplied his examples; (4) never skip the dry-run default: nothing is written without `--live`.
+- Plan on a real miss rate of about 1 in 6 *of the content errors that occur*, and most LLM errors are not adversarial, so in practice a few percent of openers will carry a wrong detail that the lint cannot see. This is acceptable only because a person reads each line before it is used.
+
+## R5. Packet reconciliation with the real 2c packet (re-check): no blocking mismatch left
+Checked against `src/callsheet.py` on this branch (merged from 2c, `ResearchPacket.to_dict()`): `ambiguity_flags`, `signals[].{kind,evidence,source,source_label,date,age_days,status,ambiguous}`, `has_real_trigger`, `available_facts[].{text,source}`, `contact_history`, `city`, `state`, `industry`, `employees`, `prospect_first_name` (null handled), `prospect_title` are all read. A stale signal with `has_real_trigger: false` is treated as no trigger. The call-log "Previous contact" fact is filtered out of citable facts. Both source strings are accepted. Dates are ISO. Packets with one fact and zero facts lint correctly (`none verified`). Left over: `must_not_phrases` is read but never emitted (N10); `trigger_kind` is emitted but unused; fixture dialect (N11); `age_days` day / week mixing (N8). Nothing needs a mapping table.
+
+## R6. CLI check: works as the skill says
+`python -m src.textcheck opener|email --packet P --text FILE|- [--voice V]`: good block via stdin exit **0** `OK: no violations`; bad block exit **1** with `ERROR CODE: message` lines; missing packet file, invalid JSON, non-UTF-8 text, missing voice file, typo'd voice key, `calibrated: "false"` all exit **2** with `ERROR cannot run the lint`; bad kind exits 2 (argparse); a JSON list as packet exits 1 (`PACKET_INVALID`); empty text exits 1. Email mode parses `SUBJECT:` / `BODY:`. One real-world catch: it must be run from the repo root (`python -m src.textcheck` from another directory fails with `No module named src`); the skills say "run" without saying "from the repo root", add those three words (or `cd` into it in the scheduled-run prompt).
+
+## R7. The worker's test-support edits: acceptable
+- `tests/test_integration_pipeline.py`: the import allowlist in `test_l_no_network_or_process_imports` gains `argparse` and `sys`. The forbidden-import list (requests, urllib, socket, subprocess, anthropic, mcp ...) is untouched and the forbidden-call-name scan still passes, so no network or process access was opened. But the allowlist is shared by **every** `src/*.py`: scope it to `textcheck.py` only (`{"textcheck.py": {"argparse", "sys"}}`) so another module cannot start using `sys` unnoticed. LOW.
+- `tests/fixtures/text_packets.json`: still FAKE (invented names, `.example.com`, no real email or phone found by regex); legacy packet dialect (N11). OK.
+- Worker's counts hold: 2157 passed plain and `-W error`. The worker's labelled-corpus gate in the tests runs on my round-1 set, so it will pass by construction; it is a regression gate, not evidence of generalisation.
+
+## R8. What I could not verify
+Real LLM output (every block is hand-written), Alex's voice (no examples), Python 3.11 specifically (3.13 only), multi-signal ordering beyond the one two-signal packet, the true 8-second cost of 25 words, and how the DRAFT STYLE line is stripped before it reaches a Nooks field (a 2c / 3a question). The held-out set shares my blind spots; a second independent author would tighten the estimate.
+
+## R9. Files added in this round
+`docs/review_2d_heldout2.json` (labels; committed before the run), `docs/review_2d_heldout2_packets.json` (real 2c packets from a FAKE world), `tests/test_review_2d_scratch.py` (updated: round-1 findings are now regression tests, the held-out report test, 10 xfail tests for N2 to N9). Reproduce: `python -m pytest tests/test_review_2d_scratch.py -q -s -k heldout2`.
