@@ -234,3 +234,121 @@ Mutations on a scratch copy (each run with `-x`):
 ## What I could not verify
 
 Real ZoomInfo scoop wording, type names for `Open Position` / `Management Move` (marked UNVERIFIED by 1a), the real topic list, the real `search_intent` shape, and whether `publishedDate` is stable for re-published scoops. My 85 rows are invented and written by me, so the precision and recall figures are indicative only.
+
+
+---
+
+# Re-review after fixes (worker commit e5d618b, merged into this branch)
+
+Offline, read-only, invented data only. Held-out labels were written and committed first (`docs/review_1e_heldout.json`, commit ceba7d6; round 2 in `docs/review_1e_heldout2.json`), then run.
+
+## Verdict: **PASS WITH CAVEATS** (no blocking failure; two medium items and one design decision for Alex)
+
+## 1. Tests and determinism
+| Check | Result |
+|---|---|
+| `pytest tests -q` | 353 passed |
+| `pytest tests -q -W error` | 353 passed |
+| `PYTHONHASHSEED` 0, 7, 123 on `test_signals.py` | 211 passed each |
+| Radar over the fixture, 40 shuffles of scoops and accounts | identical |
+
+## 2. Status of earlier findings
+| Finding | Status | Evidence |
+|---|---|---|
+| H1 role false positives | **FIXED** on my original 85 rows | `_NEGATIVE` window (`signals.py:129-143`). All 10 earlier FPs and the 3 FNs (Chief Customer Officer, Customer Service and Support, Head of Mobile) now correct. Only 3 rows disagree with my original labels: 76, 77, 85, which the worker relabelled (see below). New weakness: held-out round 2 (section 3) |
+| H2 weak hiring keywords | **FIXED** | `WEAK_KEEP_KEYWORDS`, `hiring_context` (`signals.py:154-170`). "support staff for the hospital ward", "drivers for its delivery platform", "warehouse support" all dropped, in both held-out sets |
+| H3 kind precedence | **FIXED** | `_by_weight` (`signals.py:77`). Spot checks below |
+| M1 recall misses | **FIXED** except "Chief Information and Digital Officer" (section 3) | |
+| M2 join keys | **FIXED** | `_key` (`signals.py:336`): `{1: acct}` and `" 1 "` match, `"01"` does not (correct) |
+| M3 UNVERIFIED docs | **PARTLY** | in code and `docs/signals_notes.md`; shared docs are for the coordinator |
+| M4 zero-strength intent / source id | **FIXED** | score 60 is skipped with a reason; source `zoominfo_intent:<company>:<topic>` |
+| M5 tautological tests | **FIXED** | literal values pinned; all 3 earlier survivors now killed (M3/M4/M18 below) |
+| M6 "Onboarding" intent | **FIXED** | only "product onboarding" / "user onboarding" |
+| L2, L3 | documented in `docs/signals_notes.md` | |
+| L1 duplicate id, L4 unused `config` | not fixed (accepted) | |
+
+**On the worker's relabel of rows 76/77/85** (nurse / paralegal / medical hire with "digital", "app" or "product launch"). I originally labelled them keep and called them arguable. Dropping them is the safer policy and I accept it, but it is a policy change, not a bug fix, and it costs a little recall. It is documented in `docs/signals_notes.md`.
+
+## 3. Held-out test (the important one)
+128 fresh rows (round 1), labels committed before running. 67 keep / 61 drop. Rows I flagged `judge` are my own borderline calls and are reported separately. Wording covers passive voice, "joins as", "steps into the role of", "has been named", promoted/departs, comma and "and" titles, acronyms (CPO/CDO/CIO/CTO/CXO/VPE), role in the 2nd sentence, mixed relevant+negative words, ANZ phrasing, hiring plans, Project/Pain with and without topics, funding/M&A/partnership/launch mixes, age boundaries.
+
+| Set | TP | FN | FP | TN | Precision | Recall |
+|---|---|---|---|---|---|---|
+| Round 1, all 128 rows | 62 | 5 | 1 | 60 | 98.4% | 92.5% |
+| Round 1, excluding my judge rows (111) | 57 | 2 | 0 | 52 | **100%** | **96.6%** |
+| Round 2 (28 rows, deliberately NEW negative vocabulary), excluding judge | 8 | 1 | 6 | 1 | **57%** | 89% |
+
+Round 1 is mostly the same vocabulary family the worker tuned against, so it flatters the rules. Round 2 was written to avoid the worker's `_NEGATIVE` words, and it shows what real-world data will do.
+
+**Round 1 misses**
+| ID | Text (fake) | Why |
+|---|---|---|
+| H015 | "recruited a Head of Platform Engineering" | a word sits between title and domain; `_TITLE_THEN_DOMAIN` allows only `global/regional/senior/group/...` |
+| H019 | "new Chief Information and Digital Officer" | `Chief` + `Information` is not a domain pair; the acronym regex needs `chief information officer` literally |
+| H029 (judge) | "Head of Self-Service Experience" | not a listed domain; acceptable |
+| H033 (judge) | "Chief Customer Officer to unify sales, success and support" | the `sales` word within 3 tokens after the role triggers `_NEGATIVE`; this is the known "negative word after a real buyer role" weakness |
+| H064 (judge) | "plans to hire 30 engineers ... to build its customer app" | bare `engineers` is weak; acceptable |
+| H030 (judge, FP) | "formerly Head of Product, will step up as interim CEO" | role appears only as a past title |
+
+**Round 2 misses**
+| ID | Text (fake) | Pattern |
+|---|---|---|
+| G001-G005 | "Product Manager, Fresh Produce", "Product Manager, Dairy", "Head of Product, Wine Portfolio", "Head of Product Quality Assurance (food plant)", "Director of Product Assurance, Pharmaceuticals" | the word *product* in a company that sells physical products or retail category management. Text alone cannot separate this from a software product manager |
+| G026 | "Executive Assistant to the CTO" | `CTO` alone is accepted as a role; the person is an assistant |
+| G013 | "Chief Information and Technology Officer" | same hole as H019 |
+| G006/7/9/10/17/19 (judge) | plant "Technology Manager", retail "Head of Customer Service", "Head of Product Engineering, Mining Equipment", "Head of Digital Mining Operations", "Product Lead, Home Loans", "CMO replacing the Chief Digital Officer" | industry-context ambiguity; I labelled these drop, the rules keep them |
+
+**Funding / M&A / partnership / launch / Project / ages** in round 1: all labelled rows correct, including "Fund Y has invested $3 million in Example Co" (keep), investor notes (drop), age 45 keep / 46 drop, unknown types dropped.
+
+**Recommended fixes, ranked by value**
+1. **Make the industry problem visible rather than solved by regex** (value: high). "Product Manager, Dairy" will keep getting through. Pass the account's own signal (does the account have a digital product? ICP/ZoomInfo industry) into the ranker, and have the call sheet show `reason` so Alex sees "kept: new hire in a relevant role: 'Product Manager'" and can judge. Do not keep tuning the regex against retail vocabulary.
+2. Add a negative-lookbehind for "assistant to", "executive assistant", "PA to" before a role acronym or title (`signals.py:123`); one-line fix for G026.
+3. Add "chief information and digital", "chief information and technology", "chief data and ..." handling: extend `_ROLE_ACRONYMS` with `chief\s+information\s+and\s+(?:digital|technology)\s+officer` (`signals.py:123`); fixes H019, G013.
+4. Allow one free word between title+of and domain in `_TITLE_THEN_DOMAIN` (`Head of Platform Engineering`, `Head of Cloud Platform Engineering`), and add a pinned test.
+5. Limit `_NEGATIVE` to the role phrase plus words up to the first clause break or `to/who/will`, so "Chief Customer Officer to unify sales, success and support" is kept (H033).
+6. `_MARKETING` (`signals.py:126`) is now redundant: mutation M9 (removing it) changes no test and no output on my sets because `_NEGATIVE` already contains `marketing`. Remove it or add a test showing it matters.
+
+## 4. Competing types, 5 hand-checked pairs (expected written first)
+| Types | Expected | Actual |
+|---|---|---|
+| Executive Move + Funding | exec_move (0.90 > 0.70) | exec_move |
+| Funding + Partnership | funding (0.70 > 0.45) | funding |
+| Product Launch + Project (CX topic) | product_launch (tie 0.80, alphabetical) | product_launch |
+| New Hire + Hiring Plans | new_hire (0.65 > 0.55) | new_hire |
+| M&A + Funding + Partnership | funding (0.70 > 0.60 > 0.45) | funding |
+| Exec (fails: CFO) + Product Launch | product_launch | product_launch |
+| Project (no buyer topic, fails) + Hiring (ok) | hiring_plan | hiring_plan |
+
+Strength hand checks: exec_move 21 d = 0.9 x 0.5^(21/45) = 0.6513 (code 0.6513); exec_move 45 d = 0.45; new_hire 30 d = 0.4095; funding 45 d = 0.1585. All match.
+
+## 5. Mutation re-run (21 mutations in a scratch copy of the merged tree)
+Killed by a test: age `>=`; hiring drop-wins-always; `COMBINE_DAMPING` 1.0 (was a survivor); default half-life 30 (survivor); exec half-life 45 -> 21; new_hire half-life 45 -> 21; exec weight 0.9 -> 0.6; intent weight 0.5 -> 1.0; dedupe off; `top_n` slice off; kind choice reversed; tie-break reversed (my first version was an equivalent mutant; the corrected one is killed by `test_every_type_pair_picks_highest_weight_kind[product_launch-project_pain]`); `_NEGATIVE` off; negative window 3 -> 0 words; weak words emptied; zero-strength intent emitted; intent cap off (was a survivor); "onboarding" topic allowed; investee rule off; future-dated not clamped.
+**Survived:** only the `_MARKETING` removal (M9), an equivalent mutant (redundant code, recommendation 6). Baseline 211 passed.
+
+## 6. Intent versus a real scoop (item 4)
+Today `intent_to_signals` is not used by `trigger_radar`, and the row shape is UNVERIFIED, so no ranking effect yet. If the ranker adds it, the practical effect with the trigger weight of 40 points (assuming points = 40 x strength):
+- Maximum intent (score 100, audience A, undated) = 0.50 = 20 points.
+- Funding 30 days old = 0.7 x 0.5^(30/21) = 0.26 = 10.4 points; funding 45 days old = 0.1585 = 6.3 points.
+So the notes are right: a top-scoring unverified intent row beats a real, dated but decayed scoop, and a lower cap of 0.3 (12 points) would still beat the 30-day funding scoop. An undated intent row also never decays.
+
+**Recommendation.** A cap alone does not give the property you want. Use both: (a) when an account has any real scoop signal, intent counts only as an "other" in `combined_strength` (damped by 0.5) and is never the `best_signal`, so the opener quotes the dated event; (b) while the shape is UNVERIFIED, cap standalone intent at 0.3 and give it a 21-day decay even when `recorded_date` is missing (treat missing date as "age unknown, use 21 days", not "age zero"). The call sheet must label an intent-only account "interest signal, not a dated event" so no opener presents it as news (CLAUDE.md rule 6).
+
+## 7. Half-life versus `max_age_days` (item 5)
+With a 45-day half-life the exec_move strength is 0.45 on day 45 and the account vanishes on day 46: a cliff. At that point it still outranks a 7-day partnership (0.357) and a 20-day product launch (0.4134). Other kinds are at 0.16 on day 45, so the cliff is harmless for them. In practice the connector pull was last-30-days in 1a, so the cliff rarely bites until the pull window is widened.
+
+**Recommendation.** Make the cut-off per kind: exec_move and new_hire 90 days (factor 0.25, strength about 0.22), all others 45 (or 30 for partnership and hiring plans), plus a minimum strength floor (about 0.10) with a logged reason, instead of a single global number. This needs a config key (`signals.max_age_days_by_kind`) and a wider scoop pull window for people moves; both belong to the coordinator (`src/config.py`, scoop query in Phase 2b). Scoops count against a record limit, so widen only the people-move query.
+
+## 8. Other
+- **Chief Data Officer.** I agree it stays a drop by default. Pendo's buyers (product, digital, CX, support, IT, digital workplace, engineering) own the in-app experience; a CDO buys data and BI platforms. A "Chief Data and Analytics Officer" at a product-led company is borderline, but the dropped verdict carries a visible reason, so Alex can override it. If he wants it, add `chief data and analytics` to `_ROLE_ACRONYMS` deliberately rather than loosening `_DOMAIN`.
+- UNVERIFIED intent text is still missing from the shared docs (`docs/interfaces.md`, `connector_notes.md` UNVERIFIED list); the coordinator said they will add it.
+
+## Failing items and severities
+None blocking. In priority order:
+1. **Medium, `signals.py:123`:** acronym and title matching accepts roles held by someone else (`Executive Assistant to the CTO`) and misses "Chief Information and Digital/Technology Officer" (H019, G013, G026).
+2. **Medium, `signals.py:129-143` and `115-121`:** negative window drops "Chief Customer Officer to unify sales, success and support"; `Head of Platform Engineering` is missed (H015, H033).
+3. **Design, whole module:** the word *product* in non-software companies (round 2 precision 57%) cannot be fixed by regex; needs account-level context in the ranker and visible reasons on the call sheet.
+4. **Low, `signals.py:126`:** `_MARKETING` redundant (equivalent mutant).
+5. **Intent ranking risk and exec_move cut-off cliff:** see sections 6 and 7; decisions for the coordinator, not defects in the module today.
+
+## What I could not verify
+Real ZoomInfo wording, real topic names, the real intent shape, whether `publishedDate` is stable on republished scoops, and how the 1f ranker will use the numbers (I assumed points = 40 x strength). Round 2 is small (28 rows), so its 57% figure is a warning sign, not a measured rate.
