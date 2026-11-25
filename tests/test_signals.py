@@ -1086,7 +1086,7 @@ def test_intent_counts_only_as_damped_other_in_combined():
     assert S.combined_strength([_sig(SignalKind.FUNDING, 0.16), _isig(0.3)]) == 0.286
     assert S.combined_strength([_isig(0.3)]) == 0.3
     # two intents, no real: best intent 0.3, the other damped
-    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.405     # same kind: extra capped at 0.15
+    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.37      # same kind: extra = min(0.5 * 0.2, 0.15)
 
 
 def test_intent_cannot_lift_combined_above_real_plus_damped_intent():
@@ -1635,7 +1635,7 @@ def test_funding_acquirer_of_company_on_ma_type_unaffected(config):
 
 # ------------------------------------------------------------ partnership
 def test_partnership_weights(config, accounts):
-    plain = one(config, "Partnership", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.", name="Beta Corp")
+    plain = one(config, "Partnership", "Beta Corp signs a sponsorship deal with Fin Co.", name="Beta Corp")
     assert plain.factor == pytest.approx(2 / 3) and plain.notes == (S.PARTNERSHIP_NOTE,)
     assert sig_for(config, plain, accounts).strength == 0.1696      # round(0.3 * 0.5 ** (5/21), 4) * 2/3
     rich = one(config, "Partnership", "Beta Corp partners with Fin Co to build a customer mobile app.", name="Beta Corp")
@@ -1843,7 +1843,7 @@ def test_dry_run_examples_through_the_radar(config):
         Scoop("2", "Z2", "Pickles Auctions", "Pickles Auctions to be acquired by EQT.", TODAY - timedelta(days=3), ("Funding",), ()),
         Scoop("3", "Z3", "Goodman Group", d, TODAY - timedelta(days=3), ("Mergers & Acquisitions (M&A)",), ()),
         Scoop("4", "Z4", "NEXTDC Ltd", d, TODAY - timedelta(days=3), ("Mergers & Acquisitions (M&A)",), ()),
-        Scoop("5", "Z5", "Beta Corp", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.", TODAY - timedelta(days=3), ("Partnership",), ()),
+        Scoop("5", "Z5", "Beta Corp", "Beta Corp signs a sponsorship deal with Fin Co.", TODAY - timedelta(days=3), ("Partnership",), ()),
     ]
     out = {e.account.name: e for e in S.trigger_radar(scoops, accts, config, TODAY, top_n=None)}
     assert out["Pickles Auctions"].signal.kind is SignalKind.MA                      # was scored as Funding
@@ -2099,8 +2099,8 @@ CATAPULT = [  # nine launch scoops for one fake company, strengths like the dry 
 
 def test_nine_launches_do_not_stack_towards_one():
     c = S.combined_strength(CATAPULT)
-    # repeated scoop counts once; best 0.59, then two same-kind extras at 0.15 each: 1 - 0.41 * 0.85 * 0.85 = 0.7038
-    assert c == 0.7038
+    # repeated scoop counts once; best 0.59; extras count min(0.5 * s, 0.15): 0.15, 0.135, then 0.015 (0.30 total)
+    assert c == 0.7031
     assert 0.59 < c < 0.75
 
 
@@ -2117,7 +2117,7 @@ def test_same_kind_extras_capped_each_and_in_total():
     sigs = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
             L(0.1, "c", "Gamma Co launched Gamma Hub.")]
     # extras: min(0.5, 0.15) = 0.15, then min(0.1, 0.15, 0.30 - 0.15) = 0.1
-    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.9, 4)
+    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.95, 4)
 
 
 def test_only_the_strongest_counted_entries_count():
@@ -2450,7 +2450,7 @@ def test_one_signal_per_kind_scores_are_unchanged():
 
 
 def test_catapult_nine_launches_unchanged_by_the_new_order():
-    assert S.combined_strength(CATAPULT) == 0.7038
+    assert S.combined_strength(CATAPULT) == 0.7031
 
 
 def test_intent_is_never_best_even_with_the_new_order():
@@ -2462,7 +2462,7 @@ def test_new_kind_ranks_among_extras_by_contribution():
     sigs = [_sig(SignalKind.EXEC_MOVE, 0.9, src="e"), _sig(SignalKind.FUNDING, 0.1, src="f1"),
             _sig(SignalKind.FUNDING, 0.1, src="f2"), _sig(SignalKind.FUNDING, 0.1, src="f3")]
     # funding lead counts 0.05; extras 0.1 + 0.1; best + three others = all four entries
-    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.9 * 0.9, 4)
+    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.95 * 0.95, 4)
 
 
 # ------------------------------------------------------------ (3) place words are not product names
@@ -2511,7 +2511,7 @@ def test_hardware_without_a_software_noun_is_still_physical(config):
 
 def test_allow_base_form_and_enable_permit_variants():
     assert S.ma_role("Acme is willing to allow Bigco to acquire a stake in Acme.", "Acme Holdings") == "target"
-    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "unclear"      # Zeta is the object
     assert S.ma_role("Acme will permit Bigco to acquire Zeta.", "Bigco Ltd") == "acquirer"
 
 
@@ -2549,3 +2549,247 @@ def test_same_deal_note_still_matches_with_names_only():
 
 def test_note_prefixes_constant_is_gone():
     assert not hasattr(S, "NOTE_PREFIXES")
+
+
+# ============================================================ fix-triggers3: scheme wording, percentage without 'stake'
+@pytest.mark.parametrize("d", [
+    "Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.",
+    "Acme shareholders approve a scheme for Bigco to acquire Acme.",
+    "Acme gets approval from FIRB for Bigco to acquire Acme.",
+    "Acme's board recommends a scheme of arrangement for Bigco to acquire all shares in Acme.",
+    "Acme secures court approval for Bigco and Cargo to acquire the company.",
+])
+def test_scheme_and_regulator_wording_makes_the_company_the_target(d):
+    assert S.ma_role(d, "Acme Holdings") == "target"
+
+
+@pytest.mark.parametrize("name", ["Bigco Ltd"])
+def test_scheme_buyer_side_is_the_acquirer(name):
+    assert S.ma_role("Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.", name) == "acquirer"
+    assert S.ma_role("Acme gets approval from FIRB for Bigco to acquire Acme.", name) == "acquirer"
+
+
+def test_scheme_target_weight_and_reason(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.",
+            name="Acme Holdings")
+    assert v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme signs agreement with Bigco to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme gets approval from the ACCC to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme, supported by an agreement with Bigco to acquire Zeta, expands.", "Acme Holdings", "acquirer"),
+    ("Acme seeks approval for the deal to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme raised funds for growth and plans to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme won approval for its plan to acquire Zeta.", "Acme Holdings", "acquirer"),
+])
+def test_existing_acquirer_cases_still_hold_after_the_for_change(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_for_span_needs_a_named_company():
+    assert S.ma_role("Acme secures approval for it to acquire Zeta.", "Acme Holdings") == "acquirer"
+    assert S.ma_role("Acme secures approval for Bigco to acquire Zeta.", "Acme Holdings") == "unclear"
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 30% of Acme.", "Bigco acquires 19.9% of Acme.", "Bigco has agreed to buy 49.9% of Acme.",
+    "Bigco to acquire 5% of Acme.",
+])
+def test_percentage_without_the_word_stake_is_a_minority_target(d, config):
+    assert S.classify_ma(d, "Acme Holdings") == ("target", 0.35, S.MA_TARGET_MINORITY_NOTE)
+    v = one(config, "Mergers & Acquisitions (M&A)", d, name="Acme Holdings")
+    assert v.factor == pytest.approx(0.7) and v.notes == (S.MA_TARGET_MINORITY_NOTE,)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 50% of Acme.", "Bigco to acquire 51% of Acme.", "Bigco to acquire 100% of Acme.",
+    "Bigco to acquire all of Acme.", "Bigco to acquire the remaining 49% of Acme.",
+    "Bigco to acquire the remaining 30% of Acme in a full takeover.", "Bigco to acquire Acme.",
+])
+def test_half_or_more_all_full_remaining_stay_half_weight_targets(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_acquirer_side_is_still_minority():
+    assert S.classify_ma("Bigco to acquire 30% of Acme.", "Bigco Ltd")[:2] == ("acquirer", 0.25)
+
+
+def test_growth_percentages_do_not_make_a_minority_target():
+    assert S.classify_ma("Acme, up 30% in revenue, to be acquired by Bigco.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Revenue grew 30% as Bigco agreed to acquire Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_with_the_stake_word_unchanged():
+    assert S.classify_ma("Goodman Group to acquire a 9.9% stake in NEXTDC.", "NEXTDC Ltd")[:2] == ("target", 0.35)
+
+
+# ============================================================ Iren-shaped partnership stacking (third dry run): a score must not RISE
+def old_combined(strengths):
+    """The formula before the per-kind stacking rules: best in full, every other signal at 0.5."""
+    best, rest = max(strengths), 1.0
+    for x in sorted(strengths, reverse=True)[1:]:
+        rest *= 1 - 0.5 * x
+    return round(1 - (1 - best) * rest, 4)
+
+
+def partnership_trio(strengths=(0.29, 0.19, 0.19)):
+    return [Signal("A", SignalKind.PARTNERSHIP, st, f"p{i}", datetime(2026, 11, 20 - 8 * i, tzinfo=timezone.utc),
+                   f"Iren signs a customer contract number {i}.", "Z") for i, st in enumerate(strengths)]
+
+
+def test_three_same_kind_partnerships_do_not_score_above_the_old_formula():
+    sigs = partnership_trio()
+    assert old_combined([0.29, 0.19, 0.19]) == 0.4185
+    assert S.combined_strength(sigs) == 0.4185                    # was 0.487 (a +2.7 point rise at weight 40)
+
+
+def test_new_combined_never_exceeds_the_old_formula_property():
+    import itertools
+    kinds = [SignalKind.PARTNERSHIP, SignalKind.FUNDING, SignalKind.PRODUCT_LAUNCH, SignalKind.EXEC_MOVE]
+    vals = [0.05, 0.1, 0.19, 0.29, 0.45, 0.6, 0.9]
+    n = 0
+    for combo in itertools.product(range(len(kinds)), vals, vals, vals):
+        k, a, b, c = combo
+        sigs = [Signal("A", kinds[k], a, "a", None, "Alpha Co did Alpha one.", "Z"),
+                Signal("A", kinds[k], b, "b", None, "Beta Co did Beta two.", "Z"),
+                Signal("A", kinds[(k + 1) % 4], c, "c", None, "Gamma Co did Gamma three.", "Z")]
+        assert S.combined_strength(sigs) <= old_combined([a, b, c]) + 1e-9, combo
+        n += 1
+    assert n == 4 * 7 ** 3
+
+
+def test_same_kind_extras_never_count_more_than_half_their_strength():
+    sigs = partnership_trio((0.5, 0.19, 0.1))
+    assert S.combined_strength(sigs) == round(1 - 0.5 * (1 - 0.095) * (1 - 0.05), 4)
+
+
+def test_strong_extras_are_capped_at_0_15_each():
+    sigs = partnership_trio((0.9, 0.8, 0.7))
+    assert S.combined_strength(sigs) == pytest.approx(1 - 0.1 * 0.85 * 0.85, abs=1e-4)   # 0.5 * 0.8 and 0.5 * 0.7 both exceed 0.15
+
+
+# ------------------------------------------------------------ infrastructure / compute / ARR contracts are not partnerships
+@pytest.mark.parametrize("desc", [
+    "Iren signs $4bn ARR contracts for AI compute.", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.",
+    "Beta Corp secures a GPU supply agreement.", "Beta Corp signs a 200MW power purchase agreement.",
+    "Beta Corp signs a hyperscaler hosting contract.", "Beta Corp wins a take-or-pay offtake deal.",
+    "Beta Corp signs colocation contracts with a cloud provider.", "Beta Corp signs a multi-year compute deal.",
+])
+def test_infrastructure_contracts_are_dropped_as_partnerships(config, desc):
+    v = one(config, "Partnership", desc, name="Beta Corp")
+    assert not v.keep
+    assert v.reason == ("Dropped: infrastructure or capacity contract (compute, data centre, ARR, power), "
+                        "not a product partnership")
+
+
+@pytest.mark.parametrize("desc", [
+    "Beta Corp partners with Fin Co to build a customer mobile app on GPU compute.",
+    "Beta Corp signs a data-centre deal to host its digital platform for customers.",
+    "Beta Corp signs a software partnership with a cloud provider.",
+])
+def test_infrastructure_wording_with_product_words_is_kept(config, desc):
+    assert one(config, "Partnership", desc, name="Beta Corp").keep
+
+
+def test_plain_partnership_without_infra_words_still_kept_at_0_20(config):
+    v = one(config, "Partnership", "Beta Corp signs a sponsorship deal with Fin Co.", name="Beta Corp")
+    assert v.keep and v.factor == pytest.approx(2 / 3)
+
+
+def test_infrastructure_rule_only_applies_to_partnerships(config):
+    assert one(config, "Funding", "Beta Corp raised $50 million to expand data centre capacity.", name="Beta Corp").keep
+    assert one(config, "Product Launch", "Beta Corp launched a new cloud API for compute capacity.", name="Beta Corp").keep
+
+
+def test_infrastructure_words_are_whole_words():
+    assert not S._INFRASTRUCTURE_DEAL.search("Beta Corp signs a partnership on narrative, warrants and ironwork")
+    assert S._INFRASTRUCTURE_DEAL.search("a 50 MW deal") and S._INFRASTRUCTURE_DEAL.search("$4bn ARR contracts")
+
+
+@pytest.mark.parametrize("desc", ["Beta Corp signs a capacity agreement.", "Beta Corp signs a hyperscaler agreement.",
+                                  "Beta Corp signs a hosting agreement."])
+def test_each_infrastructure_word_works_on_its_own(config, desc):
+    assert not one(config, "Partnership", desc, name="Beta Corp").keep
+
+
+# ============================================================ review of 54be0d4: '% of' next to the verb, 'for' needs the right object
+@pytest.mark.parametrize("d,name", [
+    ("Bigco to acquire Acme, which generates 30% of its revenue from Asia.", "Acme Holdings"),
+    ("Bigco to acquire Acme; 40% of staff will transfer.", "Acme Holdings"),
+    ("Bigco to be acquired by Acme, 30% of Bigco shareholders support.", "Bigco Ltd"),
+    ("Bigco to acquire Acme after 30% of Acme shareholders backed the offer.", "Acme Holdings"),
+    ("Bigco to acquire Acme, with 20% of Acme's board departing.", "Acme Holdings"),
+])
+def test_percentages_about_something_else_do_not_make_a_minority_target(d, name):
+    assert S.classify_ma(d, name)[:2] == ("target", 0.5)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 30% of Acme.", "Bigco acquires 19.9% of Acme.", "In talks for Bigco to acquire 49% of Acme.",
+    "Bigco buys 25% of Acme.", "Bigco agreed to purchase 10% of Acme.",
+    "Bigco lifts holding to 30% of Acme.", "Bigco to acquire a further 20% of Acme.", "Bigco takes 15% of Acme.",
+    "Bigco has bought 12.5% of Acme.",
+])
+def test_percentage_next_to_the_verb_with_the_target_right_after_of_is_minority(d):
+    assert S.classify_ma(d, "Acme Holdings") == ("target", 0.35, S.MA_TARGET_MINORITY_NOTE)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 50% of Acme.", "Bigco to acquire 100% of Acme.", "Bigco to acquire the remaining 49% of Acme.",
+    "Bigco to acquire all of Acme.", "Bigco lifts holding to 55% of Acme.", "Bigco to acquire 75% of Acme.",
+])
+def test_half_or_more_and_remaining_stay_half_weight(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_a_different_company_is_not_this_companys_minority_stake():
+    assert S.classify_ma("Bigco to acquire 30% of Zeta and Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Bigco to acquire 30% of Zeta and all of Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_full_takeover_wording_blocks_the_percent_of_rule():
+    assert S.classify_ma("Bigco to acquire 30% of Acme in a full takeover.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Bigco to acquire 30% of Acme, with majority control.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_lifts_holding_reads_as_buyer_and_target():
+    d = "Bigco lifts holding to 55% of Acme."
+    assert S.ma_role(d, "Bigco Ltd") == "acquirer" and S.ma_role(d, "Acme Holdings") == "target"
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Acme Holdings", "unclear"),
+    ("Acme raises funding for Bigco to acquire Zeta.", "Acme Holdings", "unclear"),
+    ("Acme sets up a fund for Zeta to acquire startups.", "Acme Holdings", "unclear"),
+    ("Acme gets approval from FIRB for Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme made a deal for Bigco to buy it.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco to acquire the company.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco to acquire 30% of the business.", "Acme Holdings", "target"),
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Bigco Ltd", "acquirer"),
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Zeta Pty", "target"),
+])
+def test_for_phrase_target_only_when_the_buyer_acquires_that_company(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_nextdc_goodman_digital_realty_still_hold_after_the_object_rule():
+    assert S.ma_role(NEXTDC_TEXT, "NEXTDC Ltd") == "target"
+    assert S.ma_role(NEXTDC_TEXT, "Goodman Group") == "acquirer"
+    assert S.ma_role(NEXTDC_TEXT, "Digital Realty Trust") == "acquirer"
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme is for sale; Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme is for sale. Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme is for sale; Bigco to acquire Acme.", "Bigco Ltd", "acquirer"),
+    ("Acme to acquire Zeta; Acme is a listed firm.", "Acme Holdings", "acquirer"),
+    ("Acme grew 30% as Bigco agreed to acquire Acme.", "Acme Holdings", "acquirer"),      # same clause: known limit
+])
+def test_earlier_sentence_mention_does_not_make_the_company_the_buyer(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_catapult_nine_launches_value():
+    assert S.combined_strength(CATAPULT) == 0.7031
