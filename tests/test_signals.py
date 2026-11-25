@@ -2511,7 +2511,7 @@ def test_hardware_without_a_software_noun_is_still_physical(config):
 
 def test_allow_base_form_and_enable_permit_variants():
     assert S.ma_role("Acme is willing to allow Bigco to acquire a stake in Acme.", "Acme Holdings") == "target"
-    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "unclear"      # Zeta is the object
     assert S.ma_role("Acme will permit Bigco to acquire Zeta.", "Bigco Ltd") == "acquirer"
 
 
@@ -2589,7 +2589,7 @@ def test_existing_acquirer_cases_still_hold_after_the_for_change(d, name, role):
 
 def test_for_span_needs_a_named_company():
     assert S.ma_role("Acme secures approval for it to acquire Zeta.", "Acme Holdings") == "acquirer"
-    assert S.ma_role("Acme secures approval for Bigco to acquire Zeta.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme secures approval for Bigco to acquire Zeta.", "Acme Holdings") == "unclear"
 
 
 @pytest.mark.parametrize("d", [
@@ -2711,3 +2711,85 @@ def test_infrastructure_words_are_whole_words():
                                   "Beta Corp signs a hosting agreement."])
 def test_each_infrastructure_word_works_on_its_own(config, desc):
     assert not one(config, "Partnership", desc, name="Beta Corp").keep
+
+
+# ============================================================ review of 54be0d4: '% of' next to the verb, 'for' needs the right object
+@pytest.mark.parametrize("d,name", [
+    ("Bigco to acquire Acme, which generates 30% of its revenue from Asia.", "Acme Holdings"),
+    ("Bigco to acquire Acme; 40% of staff will transfer.", "Acme Holdings"),
+    ("Bigco to be acquired by Acme, 30% of Bigco shareholders support.", "Bigco Ltd"),
+    ("Bigco to acquire Acme after 30% of Acme shareholders backed the offer.", "Acme Holdings"),
+    ("Bigco to acquire Acme, with 20% of Acme's board departing.", "Acme Holdings"),
+])
+def test_percentages_about_something_else_do_not_make_a_minority_target(d, name):
+    assert S.classify_ma(d, name)[:2] == ("target", 0.5)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 30% of Acme.", "Bigco acquires 19.9% of Acme.", "In talks for Bigco to acquire 49% of Acme.",
+    "Bigco buys 25% of Acme.", "Bigco agreed to purchase 10% of Acme.",
+    "Bigco lifts holding to 30% of Acme.", "Bigco to acquire a further 20% of Acme.", "Bigco takes 15% of Acme.",
+    "Bigco has bought 12.5% of Acme.",
+])
+def test_percentage_next_to_the_verb_with_the_target_right_after_of_is_minority(d):
+    assert S.classify_ma(d, "Acme Holdings") == ("target", 0.35, S.MA_TARGET_MINORITY_NOTE)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 50% of Acme.", "Bigco to acquire 100% of Acme.", "Bigco to acquire the remaining 49% of Acme.",
+    "Bigco to acquire all of Acme.", "Bigco lifts holding to 55% of Acme.", "Bigco to acquire 75% of Acme.",
+])
+def test_half_or_more_and_remaining_stay_half_weight(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_a_different_company_is_not_this_companys_minority_stake():
+    assert S.classify_ma("Bigco to acquire 30% of Zeta and Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Bigco to acquire 30% of Zeta and all of Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_full_takeover_wording_blocks_the_percent_of_rule():
+    assert S.classify_ma("Bigco to acquire 30% of Acme in a full takeover.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Bigco to acquire 30% of Acme, with majority control.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_lifts_holding_reads_as_buyer_and_target():
+    d = "Bigco lifts holding to 55% of Acme."
+    assert S.ma_role(d, "Bigco Ltd") == "acquirer" and S.ma_role(d, "Acme Holdings") == "target"
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Acme Holdings", "unclear"),
+    ("Acme raises funding for Bigco to acquire Zeta.", "Acme Holdings", "unclear"),
+    ("Acme sets up a fund for Zeta to acquire startups.", "Acme Holdings", "unclear"),
+    ("Acme gets approval from FIRB for Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme made a deal for Bigco to buy it.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco to acquire the company.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco to acquire 30% of the business.", "Acme Holdings", "target"),
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Bigco Ltd", "acquirer"),
+    ("Acme seeks approval for Bigco to acquire Zeta.", "Zeta Pty", "target"),
+])
+def test_for_phrase_target_only_when_the_buyer_acquires_that_company(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_nextdc_goodman_digital_realty_still_hold_after_the_object_rule():
+    assert S.ma_role(NEXTDC_TEXT, "NEXTDC Ltd") == "target"
+    assert S.ma_role(NEXTDC_TEXT, "Goodman Group") == "acquirer"
+    assert S.ma_role(NEXTDC_TEXT, "Digital Realty Trust") == "acquirer"
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme is for sale; Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme is for sale. Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme is for sale; Bigco to acquire Acme.", "Bigco Ltd", "acquirer"),
+    ("Acme to acquire Zeta; Acme is a listed firm.", "Acme Holdings", "acquirer"),
+    ("Acme grew 30% as Bigco agreed to acquire Acme.", "Acme Holdings", "acquirer"),      # same clause: known limit
+])
+def test_earlier_sentence_mention_does_not_make_the_company_the_buyer(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_catapult_nine_launches_value():
+    assert S.combined_strength(CATAPULT) == 0.7031

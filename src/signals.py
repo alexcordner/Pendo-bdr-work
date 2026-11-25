@@ -501,12 +501,17 @@ _DEAL_ACTIVE = re.compile(
     r"(?<!\w)(?:(?:to\s+)?acquire|acquires|acquired|acquiring|(?:to\s+)?buy|buys|bought|(?:to\s+)?purchase|purchases|"
     r"(?:to\s+)?take\s+over|takes\s+over|snaps?\s+up|"
     r"(?:(?:to\s+)?takes?|taking|(?:has\s+)?taken|took)\s+(?:an?\s+)?(?:\S+\s+)?stake\s+in|"
-    r"(?:takeover|acquisition|buyout)\s+(?:bid\s+|offer\s+)?(?:of|for))(?!\w)", _FLAGS)
+    r"(?:takeover|acquisition|buyout)\s+(?:bid\s+|offer\s+)?(?:of|for)|"
+    r"(?:lifts?|raises?|increases?|boosts?)\s+(?:its\s+)?(?:holding|stake|shareholding)\s+(?:in\s+\S+\s+)?to|"
+    r"(?:takes?|taking|took|taken)\s+(?:an?\s+)?\d{1,3}(?:\.\d+)?\s?%\s+of)(?!\w)", _FLAGS)
 # Funding scoops that are really "X is being acquired" (ZoomInfo types them Funding): reclassified as M&A.
 _TARGET_WORDING = _DEAL_PASSIVE
 _MONEY_RECEIVED = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes|series\s+[a-z]|seed)(?!\w)", _FLAGS)
 _PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?%")
-_PERCENT_OF = re.compile(r"\d{1,3}(?:\.\d+)?\s?%\s+of(?!\w)", _FLAGS)
+# '<n>% of <target>' counts only right after an acquire / holding verb: 'to acquire 30% of Acme', 'buys 19.9% of Acme',
+# 'lifts holding to 30% of Acme'. A percentage about revenue or staff ('which generates 30% of its revenue') does not.
+_PERCENT_OF_VERB = (r"(?:acquir\w*|buy|buys|buying|bought|purchas\w*|take|takes|taking|took|taken|holding|stake|"
+                    r"shareholding|hold|holds|holding)")
 _STAKE = re.compile(r"(?<!\w)(?:stake|shareholding|minority\s+interest)(?!\w)", _FLAGS)
 _MAJORITY = re.compile(r"(?<!\w)(?:majority|controlling|100\s?%|full|all\s+of|outright|wholly|remaining)(?!\w)", _FLAGS)
 _DIGITAL_BUSINESS = re.compile(
@@ -538,6 +543,12 @@ _CAPITALISED_WORD = re.compile(r"(?<!\w)[A-Z][\w&-]*")
 # counterparties or regulators; the company named earlier is still the buyer).
 
 
+# After 'to acquire': 'it', 'the company', 'a 9.9% stake in the company': the object is the company named earlier.
+_OBJECT_IS_COMPANY = re.compile(
+    r"\s*(?:(?:an?\s+|the\s+)?[\w.%\s]{0,25}?(?:stake|shares?|interests?|%)\s+(?:in|of)\s+)?(?:the\s+(?:company|business|group)|it)(?!\w)",
+    _FLAGS)
+
+
 def ma_role(description: str, company_name: str) -> str:
     """'target', 'acquirer' or 'unclear': the scoop company's role in an M&A description. Deterministic text rules.
     Passive wording ('to be acquired by', 'acquired by', 'merger with', 'sold to') makes the company the target unless
@@ -563,13 +574,32 @@ def ma_role(description: str, company_name: str) -> str:
         # the buyers are named between 'for' / 'allow' / 'enable' and 'to acquire'; the company named BEFORE that is the target
         if _mentions(third.group("subject"), name):
             return "acquirer"
-        return "target" if _mentions(before[:third.start()], name) or _mentions(after, name) else "unclear"
-    if _mentions(before, name):
+        # the company is the target only when the buyer is acquiring THAT company (named after the verb, or 'it' /
+        # 'the company'): 'Acme seeks approval for Bigco to acquire Zeta' says nothing about Acme being bought
+        if _mentions(after, name) or _OBJECT_IS_COMPANY.match(after):
+            return "target"
+        return "unclear"
+    # the company named in the SAME clause before the verb is the buyer; named only in an earlier sentence
+    # ('Acme is for sale; Bigco to acquire Acme') and again after the verb, it is the target
+    clause = re.split(r"[.;]", before)[-1]
+    if _mentions(clause, name):
         return "acquirer"
-    return "target" if _mentions(after, name) else "unclear"
+    if _mentions(after, name):
+        return "target"
+    return "acquirer" if _mentions(before, name) else "unclear"
 
 
-def _is_minority_stake(description: str) -> bool:
+def _percent_of_target(text: str, name: str) -> float | None:
+    """The percentage in '<verb> <n>% of <company name>' (acquire / buy / purchase / take / holding / stake to ...),
+    else None. The verb must sit directly before the percentage and the company right after 'of'."""
+    if not name:
+        return None
+    m = re.search(rf"(?<!\w){_PERCENT_OF_VERB}\s+(?:to\s+)?(?:an?\s+|a\s+further\s+|further\s+)?(\d{{1,3}}(?:\.\d+)?)\s?%"
+                  rf"\s+of\s+(?:the\s+)?{re.escape(name)}(?!\w)", text, _FLAGS)
+    return float(m.group(1)) if m else None
+
+
+def _is_minority_stake(description: str, name: str = "") -> bool:
     """True for a minority-stake purchase: a percentage under 50, 'minority', or a 'stake' with no majority wording."""
     text = description or ""
     pct = _PERCENT.search(text)
@@ -577,7 +607,8 @@ def _is_minority_stake(description: str) -> bool:
     if pct_val is not None and pct_val < 50 and _STAKE.search(text):
         return True
     # '30% of Acme', '19.9% of Acme' (no word 'stake'); 'the remaining 49% of Acme' / 'all' / 'full' stay full acquisitions
-    if pct_val is not None and pct_val < 50 and _PERCENT_OF.search(text) and not _MAJORITY.search(text):
+    pct_of = _percent_of_target(text, name)
+    if pct_of is not None and pct_of < 50 and not _MAJORITY.search(text):
         return True
     if re.search(r"(?<!\w)minority(?!\w)", text, _FLAGS):
         return True
@@ -606,7 +637,7 @@ def classify_ma(description: str, company_name: str) -> tuple[str, float, str]:
     acquisition 0.50, acquirer of a minority stake or unrelated business 0.25, unclear 0.25."""
     role = ma_role(description, company_name)
     if role == "target":
-        if _is_minority_stake(description):
+        if _is_minority_stake(description, _name_token(company_name)):
             return role, MA_TARGET_MINORITY_WEIGHT, MA_TARGET_MINORITY_NOTE
         return role, KIND_BASE_WEIGHT[SignalKind.MA], MA_TARGET_NOTE
     if role == "acquirer":
