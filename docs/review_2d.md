@@ -263,7 +263,7 @@ provided the remaining control is a deliberate skim with the packet beside the t
 | Round-1 corpora re-run (worker tuned on these) | 161 / 161 bad caught; 2 / 32 good flagged (both "2 weeks"/"14 days" on fixtures that carry no `age_days`); natural openers 2 / 84 flagged (other-city names) |
 
 **Reading the numbers honestly.** The worker's own fresh batches scored 84%, 74%, 60% before it tuned. My 84% sits at the top of that range. Two reasons it is not higher or lower than theirs:
-(1) my set mixes mechanical errors (shape, label, `!`, emoji, links, phones, send language: 33 of the 148 and about 97% caught) with content errors; on **content errors only** recall is **about 82%**; (2) I wrote every error myself, with knowledge of what a lint might not catch, which makes the set harder than real, mostly non-adversarial LLM mistakes, but it also shares my blind spots. Treat **75% to 85% on content errors** as the planning number, not 100%, and do not quote the worker's 100% (it was tuned on the set).
+(1) my set mixes mechanical errors (shape, label, `!`, emoji, links, phones, send language, citation lines: 27 of the 148, 26 caught = 96%) with content errors; on the other 121 (**content errors, including gatekeeper lines**) recall is 98 / 121 = **81%**; (2) I wrote every error myself, with knowledge of what a lint might not catch, which makes the set harder than real, mostly non-adversarial LLM mistakes, but it also shares my blind spots. Treat **about 75% to 85% on content errors** as the planning number, not 100%, and do not quote the worker's 100% (it was tuned on the set).
 
 ## R1. Round-1 findings: FIXED / NOT FIXED (evidence)
 
