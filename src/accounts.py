@@ -509,6 +509,13 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
 _MAX_GROUP = 6
 _MIN_DISTINCTIVE = 5
 _MIN_SHARED_CONTACTS = 3
+# Scale guards. A distinctive word shared by more than _MAX_BUCKET accounts is a common word: its
+# accounts are NOT compared pairwise by name (that is O(k^2)). They get ``large_name_group`` and can
+# still be flagged through hash indexes ((employees, first token), shared contact names) or by the
+# domain / id rules. Buckets of <= _MAX_BUCKET behave exactly as plain pairwise comparison.
+_MAX_BUCKET = 200
+_MAX_INDEX_GROUP = 200      # a (employees, first token) group bigger than this is not paired
+_MAX_CONTACT_SHARE = 50     # a contact name held by more accounts than this is noise
 EV_DOMAIN = "same website domain"
 EV_ID = "shared id"
 EV_CONTACTS = "name+shared contacts"
@@ -620,6 +627,37 @@ def _contact_sets(accounts: list[Account],
             if a.sf_account_id else frozenset() for a in accounts]
 
 
+def _index_candidates(members: list[int], accounts: list[Account], cores: list[tuple[str, ...]],
+                      csets: list[frozenset[str]], cand: set[tuple[int, int]]) -> None:
+    """Name-containment candidates for accounts in oversized name buckets, found WITHOUT pairwise
+    scans: only accounts that share an index key are compared (and must still pass _names_match)."""
+    # (employees, first distinctive token) -> accounts
+    by_hc: dict[tuple[int, str], list[int]] = defaultdict(list)
+    for i in members:
+        if accounts[i].employees is not None and cores[i]:
+            by_hc[(accounts[i].employees, cores[i][0])].append(i)
+    for idxs in by_hc.values():
+        if 1 < len(idxs) <= _MAX_INDEX_GROUP:
+            for x in range(len(idxs)):
+                for y in range(x + 1, len(idxs)):
+                    if _names_match(cores[idxs[x]], cores[idxs[y]]):
+                        cand.add((idxs[x], idxs[y]))
+    # contact name -> accounts (skip names shared by many accounts), then count shared names per pair
+    by_name: dict[str, list[int]] = defaultdict(list)
+    for i in members:
+        for c in csets[i]:
+            by_name[c].append(i)
+    shared: Counter = Counter()
+    for idxs in by_name.values():
+        if 1 < len(idxs) <= _MAX_CONTACT_SHARE:
+            for x in range(len(idxs)):
+                for y in range(x + 1, len(idxs)):
+                    shared[(idxs[x], idxs[y])] += 1
+    for (i, j), c in shared.items():
+        if c >= _MIN_SHARED_CONTACTS and _names_match(cores[i], cores[j]):
+            cand.add((i, j))
+
+
 def _detect(accounts: list[Account],
             contacts: Mapping[str, Collection[str]] | None = None) -> _Groups:
     n = len(accounts)
@@ -662,11 +700,19 @@ def _detect(accounts: list[Account],
             if len(t) >= _MIN_DISTINCTIVE and t not in _WEAK_WORDS:
                 bucket[t].append(i)
     cand: set[tuple[int, int]] = set()
+    big_members: set[int] = set()
+    large_buckets: list[list[int]] = []
     for idxs in bucket.values():
+        if len(idxs) > _MAX_BUCKET:
+            large_buckets.append(idxs)
+            big_members.update(idxs)
+            continue
         for x in range(len(idxs)):
             for y in range(x + 1, len(idxs)):
                 if _names_match(cores[idxs[x]], cores[idxs[y]]):
                     cand.add((idxs[x], idxs[y]))
+    if big_members:
+        _index_candidates(sorted(big_members), accounts, cores, csets, cand)
     name_ev: dict[tuple[int, int], set[str]] = {}
     for i, j in cand:
         kinds = set()
@@ -679,20 +725,20 @@ def _detect(accounts: list[Account],
             name_ev[(i, j)] = kinds
     name_comps = _components(n, name_ev)
     large_name = [m for m in name_comps if len(m) > _MAX_GROUP]
+    large_name_out = large_name + [sorted(b) for b in large_buckets]
     capped = {i for m in large_name for i in m}
     for (i, j), kinds in name_ev.items():
         if i not in capped and j not in capped:
             for k in kinds:
                 add(i, j, k)
 
-    comps = _components(n, ev)
-    groups, reasons = [], []
-    for m in sorted(comps, key=lambda m: m[0]):
-        mset = set(m)
-        groups.append(sorted(m))
-        reasons.append({k for (a, b), kinds in ev.items() if a in mset and b in mset for k in kinds})
-    pairs = {k: v for k, v in ev.items()}
-    return _Groups(groups, reasons, pairs, sorted(sorted(m) for m in large_name),
+    comps = sorted(_components(n, ev), key=lambda m: m[0])
+    group_of = {i: g for g, m in enumerate(comps) for i in m}
+    groups = [sorted(m) for m in comps]
+    reasons: list[set[str]] = [set() for _ in comps]
+    for (a, _b), kinds in ev.items():
+        reasons[group_of[a]] |= kinds
+    return _Groups(groups, reasons, dict(ev), sorted(sorted(m) for m in large_name_out),
                    sorted(sorted(m) for m in large_domain))
 
 
@@ -815,7 +861,7 @@ def summarise(result: AccountListResult) -> str:
     detail = ", ".join(f"{k}: {breakdown[k]}" for k in sorted(breakdown)) or "none"
     lines.append(f"possible duplicate pairs: {len(pairs)} (evidence: {detail}; top 10 listed with names)")
     for x, y, kinds in sorted(pairs, key=lambda p: (-len(p[2]), p[0].name.casefold(), p[1].name.casefold()))[:10]:
-        lines.append(f"    {x.name} ~ {y.name} [{', '.join(kinds)}]")
+        lines.append(f"    [{', '.join(kinds)}] {x.name} ~ {y.name}")
     for flag in (FLAG_LARGE_NAME_GROUP, FLAG_LARGE_DOMAIN_GROUP):
         c = sum(1 for a in kept if flag in a.flags)
         if c:

@@ -88,3 +88,16 @@ evidence:
 - `AccountListResult.duplicate_pairs` holds (account, account, evidence kinds). `summarise()` prints
   `possible duplicate pairs: N (evidence: kind: count, ...; top 10 listed with names)` with each pair's evidence kind,
   plus large-group counts. Pairs with a dropped twin are not counted but the twin is still named in the kept note.
+
+### Scale (phase2/fix-dupes2)
+- A distinctive name token shared by more than 200 accounts (`_MAX_BUCKET`) is a common word: those accounts are NOT
+  compared pairwise by name (O(k^2)). They all get `large_name_group` and can still be flagged by the domain / id
+  rules, or by name containment plus corroboration found through hash indexes: `(employees, first distinctive token)`
+  groups (ignored above 200 accounts) and an inverted index on contact names (names held by more than 50 accounts are
+  noise). A pair found this way must still pass the whole-token name containment test. Buckets of <= 200 behave
+  exactly as the plain pairwise rules (tested against a brute-force reference).
+- Measured (this container): detector on 12,000 accounts sharing one word ~0.2 s; 12,000 realistic names ~0.2 s;
+  whole `build_account_list` on 12,000 rows ~0.5 s. Tests assert < 5 s, < 3 s and < 30 s.
+- `summarise()` lists each pair as `[evidence kinds] A ~ B` (evidence first). Real dry run 2 showed same-domain pairs
+  with identical names ("Adita Technologies ~ Adita Technologies"): probably one company entered twice in Salesforce;
+  still flag only, never merge.
