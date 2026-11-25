@@ -67,7 +67,7 @@ class Account:
     @property
     def size_unknown(self) -> bool:
         """True when headcount is missing. Such accounts are KEPT and flagged (note 'size_unknown'),
-        never silently dropped; the ranker gives them no icp_fit points."""
+        never silently dropped; the ranker gives them a neutral 7.5 icp_fit points (0.3 x 25)."""
         return self.employees is None
 
 

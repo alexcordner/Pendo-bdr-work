@@ -43,7 +43,7 @@ Raise `LoaderError` (subclass of ValueError) on malformed rows: `account_from_sf
 ## Design decisions
 1. **Country.** Billing wins if ANZ, else HQ. `non_anz_billing_anz_hq=True` only when billing held a real non-ANZ value (null/blank/junk is not flagged). Both non-ANZ gives `country=None`. Whether to include the flagged group is 1d's call (decision 5).
 2. **Timezone.** NSW/ACT use the default (Sydney), confident (`guessed=False`). Only the country-default fallback is guessed. For flagged accounts billing state and city are ignored; the chain starts at HQ state. Unresolvable gives `timezone=None`.
-3. **`employees=None`** is kept and flagged: note `size_unknown`, `Account.size_unknown` is True. 1d must not drop it (the size cap only applies when headcount is known); 1f gives it no icp_fit points.
+3. **`employees=None`** is kept and flagged: note `size_unknown`, `Account.size_unknown` is True. 1d must not drop it (the size cap only applies when headcount is known); 1f gives it a neutral 7.5 icp_fit points (0.3 x 25); a KNOWN size outside every tier gets 0.
 4. **`Prospect.do_not_call`** is False from the loader. 1c sets it with `replace` from `disposition_name == config.dispositions.do_not_call`. Never compare ids.
 5. **Unlinked calls** have `prospect_id=None`; match on `to_e164`. Unknown disposition id gives `disposition_name=None`.
 6. **Dispositions** are named in `config.dispositions` (the wrong-number name is the real `Bad Number / Wrong Number`). A test checks they all exist in the fixture list. Under-20s rule is `limits.no_contact_max_duration_s`.
@@ -87,7 +87,7 @@ sig = Signal(None, SignalKind.FUNDING, 0.8, f"zoominfo_scoop:{s.id}", s.publishe
 ```python
 from src.config import tier_for, next_working_windows
 from src.models import RankedAccount
-tier = tier_for(cfg, acct.employees)                      # None => no icp_fit points
+tier = tier_for(cfg, acct.employees)                      # None => unknown size: neutral 7.5 pts; known-but-outside-tiers: 0
 pts = cfg.signals.weights.sdr_target_boost if acct.is_sdr_target else 0
 windows = next_working_windows(cfg, acct.timezone, now_utc)   # skip with skipped_reason if acct.timezone is None
 ra = RankedAccount(acct, score=..., score_breakdown={...}, window=windows[0].name, local_call_time=windows[0].start)
