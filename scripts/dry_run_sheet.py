@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.safeout import UnsafeOutput, write_private  # noqa: E402
 from src import callsheet  # noqa: E402
 from src.config import load_config  # noqa: E402
 from src.pipeline import PipelineStopped, _parse_now, run_pipeline  # noqa: E402
@@ -66,10 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print(counts_text)
     out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "dry_run_sheet.txt").write_text(text + "\n\n" + counts_text + "\n", encoding="utf-8")
-    (out / "dry_run_sheet.md").write_text(md + "\n\n" + counts_text + "\n", encoding="utf-8")
-    print(f"wrote {out / 'dry_run_sheet.txt'} and {out / 'dry_run_sheet.md'}")
+    try:    # real names and ids: only under output/ (gitignored), mode 0600 (scripts/safeout.py, review 2f)
+        a = write_private(out / "dry_run_sheet.txt", text + "\n\n" + counts_text + "\n")
+        b = write_private(out / "dry_run_sheet.md", md + "\n\n" + counts_text + "\n")
+    except UnsafeOutput as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"wrote {a} and {b}")
     return 0
 
 

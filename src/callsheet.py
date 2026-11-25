@@ -796,6 +796,11 @@ def _group_index(pools: Sequence[Account]) -> dict[str, int]:
     seen: dict[str, Account] = {}
     for a in pools:
         seen.setdefault(account_key(a), a)
+    # Only what the account builder flagged collapses (an unflagged list is not re-detected here: that would repeat
+    # the builder's pairwise name work over every account on each sheet build).
+    if not any(acc_mod.FLAG_POSSIBLE_DUPLICATE in a.flags or any(n.startswith("possible_duplicate") for n in a.notes)
+               for a in seen.values()):
+        return {}
     out: dict[str, int] = {}
     for n, members in enumerate(acc_mod.duplicate_groups(seen.values())):
         for m in members:

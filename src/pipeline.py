@@ -214,7 +214,8 @@ def _flag_counts(res, result) -> dict[str, int]:
         "needs_prospect_junk_title": sum(1 for c in result.needs_prospect_codes.values() if c == "junk_title"),
         "chosen_personal_email": sum(1 for p in chosen if cs_mod.email_reason(p) == "personal_email"),
         "possible_duplicate_accounts": sum(1 for a in res.accounts if acc_mod.FLAG_POSSIBLE_DUPLICATE in a.flags),
-        "possible_duplicate_groups": len(acc_mod.duplicate_groups(res.accounts)),
+        "possible_duplicate_groups": (len(acc_mod.duplicate_groups(res.accounts))
+                                      if any(acc_mod.FLAG_POSSIBLE_DUPLICATE in a.flags for a in res.accounts) else 0),
     }
 
 

@@ -746,7 +746,7 @@ def test_b_dnc_contacts_never_chosen_even_on_best_account(world, tmp_path):
     echo = got[name_of(world, 5)][1]
     assert r.ranked[0] is echo and echo.score >= 99                    # best score on the sheet...
     assert [p.nooks_id for p in r.prospects[ranker.account_key(echo.account)]] == ["FAKE-NK-P-0005-2"]   # ...but not Dana
-    assert "Pat Callable" in " ".join(echo.reasons)
+    assert "Prospect: Pat (" in " ".join(echo.reasons) and "Callable" not in " ".join(echo.reasons)   # first name only (2f: no surnames in logs)
     # duplicate-email prospect: every prospect on the account is blocked -> skipped with the reason
     fox = got[name_of(world, 6)]
     assert fox[0] == "skipped" and fox[1].skipped_reason.startswith("all prospects blocked")

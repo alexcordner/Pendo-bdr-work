@@ -1076,7 +1076,7 @@ def test_gmail_loop_reaches_a_covered_set(world, cfg, tmp_path, monkeypatch):
     monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
     from scripts import gmail_queue as gq
     from scripts import merge_pages as mp
-    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    raw = write_raw(world, tmp_path / "output" / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])   # merge_pages writes only under output/
     q, meta, page = tmp_path / "output" / "q.json", tmp_path / "output" / "meta.json", tmp_path / "page.json"
     gq.main(["queue", "--raw-dir", str(raw), "--state-dir", str(tmp_path / "s"), "--now", NOW.isoformat(), "--out", str(q)])
     gq.main(["hashes", "--addresses", str(q), "--out", str(meta)])

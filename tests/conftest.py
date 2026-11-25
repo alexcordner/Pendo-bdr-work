@@ -17,6 +17,20 @@ def load_fixture(name: str):
         return json.load(f)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _output_root(tmp_path_factory):
+    """scripts/safeout.py only writes under APAC_OUTPUT_ROOT (default: the repo's output/). Tests write under pytest's
+    temp tree, so that tree is the allowed root for the session; tests of the refusal set their own root."""
+    import os
+    old = os.environ.get("APAC_OUTPUT_ROOT")
+    os.environ["APAC_OUTPUT_ROOT"] = str(tmp_path_factory.getbasetemp())
+    yield
+    if old is None:
+        os.environ.pop("APAC_OUTPUT_ROOT", None)
+    else:
+        os.environ["APAC_OUTPUT_ROOT"] = old
+
+
 @pytest.fixture(scope="session")
 def config():
     return load_config(ROOT / "config" / "config.yaml")

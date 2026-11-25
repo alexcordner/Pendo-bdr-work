@@ -49,6 +49,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from scripts.safeout import UnsafeOutput, safe_out_path  # noqa: E402
+
 # Keys tried in this order when a page is a dict (rule 2-7 above).
 KNOWN_ROW_KEYS = ("data", "records", "threads", "results", "items", "rows")
 
@@ -493,8 +497,12 @@ def main(argv: list[str] | None = None) -> int:
                       paged=args.last_page_reached is not None)
     for k, v in extra.items():
         dump["meta"].setdefault(k, v)
-    args.raw_dir.mkdir(parents=True, exist_ok=True)
-    out = args.raw_dir / f"{args.name}.json"
+    try:    # real data: only under output/ (gitignored), never through a symlink (scripts/safeout.py, review 2f)
+        out = safe_out_path(args.raw_dir / f"{args.name}.json")
+    except UnsafeOutput as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(dump, ensure_ascii=False), encoding="utf-8")
     tmp.replace(out)                       # atomic: a half-written dump is never left behind
