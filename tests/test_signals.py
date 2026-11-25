@@ -103,7 +103,6 @@ def test_funded_company_with_investor_named_kept(verdicts):
 
 
 @pytest.mark.parametrize("desc", [
-    "Acme Ventures invested in Gamma Apps.",
     "Gamma Apps has invested in a startup.",
     "Gamma Apps is investing in a new fund.",
 ])
@@ -113,6 +112,11 @@ def test_investor_phrasings_dropped(config, desc):
 
 def test_funding_received_without_invest_verb_kept(config):
     assert judge(config, desc="Gamma Apps closed a Series B round.").keep
+
+
+def test_investee_kept_when_company_is_object_of_invest(config):
+    assert judge(config, desc="Acme Ventures invested $3M in Gamma Apps.").keep
+    assert judge(config, desc="Acme Ventures made an investment in Gamma Apps.").keep
 
 
 def test_ceo_only_exec_move_dropped(verdicts):
@@ -295,8 +299,12 @@ def test_decay_monotonic_non_increasing():
     assert all(a >= b for a, b in zip(vals, vals[1:])) and vals[0] == 1.0
 
 
-def test_decay_half_life():
-    assert math.isclose(S.recency_factor(S.RECENCY_HALF_LIFE_DAYS), 0.5)
+def test_decay_half_life_literal_numbers():
+    assert S.RECENCY_HALF_LIFE_DAYS == 21.0
+    assert S.recency_factor(21) == 0.5
+    assert S.recency_factor(42) == 0.25
+    assert round(S.recency_factor(10), 4) == 0.7189        # 0.5 ** (10/21)
+    assert S.recency_factor(45, 45) == 0.5
 
 
 def test_decay_negative_days_clamped():
@@ -331,8 +339,29 @@ def test_kind_ordering_same_age():
     assert w[SignalKind.EXEC_MOVE] > w[SignalKind.FUNDING] > w[SignalKind.PARTNERSHIP]
 
 
-def test_fresh_exec_move_strength_equals_base_weight():
-    assert S.signal_strength(SignalKind.EXEC_MOVE, 0) == S.KIND_BASE_WEIGHT[SignalKind.EXEC_MOVE]
+def test_strength_table_literal_numbers():
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 0) == 0.9
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 21) == 0.6513       # 0.9 * 0.5 ** (21/45)
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 45) == 0.45         # one 45-day half-life
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 90) == 0.225
+    assert S.signal_strength(SignalKind.NEW_HIRE, 45) == 0.325
+    assert S.signal_strength(SignalKind.PRODUCT_LAUNCH, 10) == 0.5751  # 0.8 * 0.5 ** (10/21)
+    assert S.signal_strength(SignalKind.FUNDING, 45) == 0.1585         # 0.7 * 0.5 ** (45/21)
+    assert S.signal_strength(SignalKind.PARTNERSHIP, 21) == 0.225
+    assert S.signal_strength(SignalKind.INTENT, 0) == 0.5
+
+
+def test_per_kind_half_lives():
+    assert S.half_life_for(SignalKind.EXEC_MOVE) == 45.0 and S.half_life_for(SignalKind.NEW_HIRE) == 45.0
+    for k in (SignalKind.FUNDING, SignalKind.MA, SignalKind.PRODUCT_LAUNCH, SignalKind.PARTNERSHIP,
+              SignalKind.PROJECT_PAIN, SignalKind.HIRING_PLAN, SignalKind.INTENT):
+        assert S.half_life_for(k) == 21.0
+
+
+def test_old_exec_move_outranks_newer_partnership():
+    # 40-day-old exec move (0.9 * 0.5**(40/45) = 0.486) beats a 10-day-old partnership (0.45 * 0.5**(10/21) = 0.323)
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 40) == 0.486
+    assert S.signal_strength(SignalKind.PARTNERSHIP, 10) == 0.3235
 
 
 # ------------------------------------------------------------ scoops_to_signals
@@ -362,7 +391,7 @@ def test_signal_fields(batch):
     assert sig.kind is SignalKind.EXEC_MOVE and sig.sf_account_id == "FAKE-SIG-A1" and sig.zoominfo_id == "FAKE-ZI-2001"
     assert sig.evidence == "<Person> was appointed VP of Product."
     assert sig.source_date == datetime(2026, 11, 20, tzinfo=timezone.utc)
-    assert math.isclose(sig.strength, S.signal_strength(SignalKind.EXEC_MOVE, 5))
+    assert sig.strength == 0.8333                       # 0.9 * 0.5 ** (5/45)
 
 
 def test_source_label_constant():
@@ -443,6 +472,15 @@ def test_best_signal_empty_and_none_only():
 
 def test_combined_empty_is_zero():
     assert S.combined_strength([]) == 0.0
+
+
+def test_combined_literal_numbers():
+    f = lambda *xs: S.combined_strength([_sig(SignalKind.FUNDING, x, src=f"s{i}") for i, x in enumerate(xs)])
+    assert S.COMBINE_DAMPING == 0.5
+    assert f(0.5, 0.4) == 0.6                # 1 - 0.5 * (1 - 0.5*0.4)
+    assert f(0.4, 0.5) == 0.6
+    assert f(0.5, 0.4, 0.2) == 0.64          # 1 - 0.5 * 0.8 * 0.9
+    assert f(0.5, 0.5) == 0.625
 
 
 def test_combined_single_equals_strength():
@@ -601,9 +639,17 @@ def intent_rows():
 def test_intent_only_relevant_topics_scored(intent_rows, accounts, config):
     skipped = []
     out = S.intent_to_signals(intent_rows, accounts, config, TODAY, skipped)
-    topics = {s.source.split(":")[1] for s in out}
+    topics = {s.source.split(":", 2)[2] for s in out}
     assert topics <= S.INTENT_TOPICS
-    assert any("Payroll" in r[0].get("topic", "") and "not a Pendo-relevant" in r[1] for r in skipped)
+    assert any(r[0].get("topic") == "Payroll Software" and "not a Pendo-relevant" in r[1] for r in skipped)
+
+
+def test_intent_standalone_onboarding_not_a_topic(accounts, config):
+    skipped = []
+    row = {"company_id": "FAKE-ZI-2001", "topic": "Onboarding", "signal_score": 100, "audience_strength": "A"}
+    assert S.intent_to_signals([row], accounts, config, TODAY, skipped) == []
+    assert "not a Pendo-relevant" in skipped[0][1]
+    assert "onboarding" not in S.INTENT_TOPICS and {"product onboarding", "user onboarding"} <= S.INTENT_TOPICS
 
 
 def test_intent_every_row_accounted_for(intent_rows, accounts, config):
@@ -616,8 +662,17 @@ def test_intent_skip_reasons(intent_rows, accounts, config):
     skipped = []
     S.intent_to_signals(intent_rows, accounts, config, TODAY, skipped)
     reasons = " | ".join(r for _, r in skipped)
-    for needle in ("outside 60-100", "not in A-E", "no matching account", "missing topic or company_id", "superseded"):
+    for needle in ("outside 60-100", "not in A-E", "no matching account", "missing topic or company_id",
+                   "superseded", "strength 0.0"):
         assert needle in reasons
+
+
+def test_intent_score_60_skipped_not_zero_signal(accounts, config):
+    row = {"company_id": "FAKE-ZI-2001", "topic": "Digital Experience", "signal_score": 60, "audience_strength": "A"}
+    skipped = []
+    assert S.intent_to_signals([row], accounts, config, TODAY, skipped) == []
+    assert skipped and "strength 0.0" in skipped[0][1]
+    assert S.intent_to_signals([{**row, "signal_score": 61}], accounts, config, TODAY)[0].strength == 0.025
 
 
 def test_intent_highest_score_wins_per_company_topic(intent_rows, accounts, config):
@@ -626,15 +681,30 @@ def test_intent_highest_score_wins_per_company_topic(intent_rows, accounts, conf
     assert len(dx) == 1 and "score 90" in dx[0].evidence
 
 
-def test_intent_strength_formula_capped_and_bounded(intent_rows, accounts, config):
+def test_intent_literal_strengths(accounts, config):
+    def strength(score, aud, date=None, topic="Digital Experience"):
+        r = {"company_id": "FAKE-ZI-2001", "topic": topic, "signal_score": score, "audience_strength": aud}
+        if date:
+            r["recorded_date"] = date
+        return S.intent_to_signals([r], accounts, config, TODAY)[0].strength
+    assert S.INTENT_MAX_STRENGTH == 0.5
+    assert strength(100, "A") == 0.5                      # 1.0 capped at 0.5
+    assert strength(90, "A") == 0.5                       # 0.75 capped
+    assert strength(80, "B") == 0.425                     # 0.5 * 0.85
+    assert strength(75, "C") == 0.2625                    # 0.375 * 0.7
+    assert strength(70, "E") == 0.1                       # 0.25 * 0.4
+    assert strength(100, "A", "2026-11-20") == 0.4239     # 0.5 * 0.5 ** (5/21)
+    assert strength(100, "A", "2026-10-25") == 0.1797     # 31 days: 0.5 * 0.5 ** (31/21)
+
+
+def test_intent_never_exceeds_a_fresh_scoop_of_half_strength(intent_rows, accounts, config):
     out = S.intent_to_signals(intent_rows, accounts, config, TODAY)
-    assert all(0.0 <= s.strength <= S.INTENT_MAX_STRENGTH for s in out)
-    undated = next(s for s in out if s.zoominfo_id == "FAKE-ZI-2002")     # score 100, A, no date: capped
-    assert undated.strength == S.INTENT_MAX_STRENGTH
+    assert out and all(s.strength <= 0.5 for s in out)
+    assert S.signal_strength(SignalKind.EXEC_MOVE, 0) > max(s.strength for s in out)
 
 
 def test_intent_recency_decay_applies_when_dated(accounts, config):
-    row = {"company_id": "FAKE-ZI-2001", "topic": "Onboarding", "signal_score": 100, "audience_strength": "A"}
+    row = {"company_id": "FAKE-ZI-2001", "topic": "Product Onboarding", "signal_score": 100, "audience_strength": "A"}
     fresh = S.intent_to_signals([{**row, "recorded_date": "2026-11-25"}], accounts, config, TODAY)[0]
     old = S.intent_to_signals([{**row, "recorded_date": "2026-10-25"}], accounts, config, TODAY)[0]
     assert old.strength < fresh.strength
@@ -642,16 +712,25 @@ def test_intent_recency_decay_applies_when_dated(accounts, config):
 
 def test_intent_audience_ordering(accounts, config):
     def strength(aud):
-        r = {"company_id": "FAKE-ZI-2001", "topic": "Onboarding", "signal_score": 75, "audience_strength": aud}
+        r = {"company_id": "FAKE-ZI-2001", "topic": "User Onboarding", "signal_score": 75, "audience_strength": aud}
         return S.intent_to_signals([r], accounts, config, TODAY)[0].strength
     vals = [strength(a) for a in "ABCDE"]
     assert vals == sorted(vals, reverse=True) and vals[0] > vals[-1]
 
 
-def test_intent_kind_and_links(intent_rows, accounts, config):
+def test_intent_kind_source_and_links(intent_rows, accounts, config):
     out = S.intent_to_signals(intent_rows, accounts, config, TODAY)
-    assert all(s.kind is SignalKind.PROJECT_PAIN and s.sf_account_id for s in out)
+    assert all(s.kind is SignalKind.INTENT and s.sf_account_id for s in out)
     assert all("UNVERIFIED" in s.evidence for s in out)
+    assert {s.source for s in out} == {"zoominfo_intent:FAKE-ZI-2001:digital experience",
+                                       "zoominfo_intent:FAKE-ZI-2002:product analytics"}
+
+
+def test_intent_sources_unique_across_accounts(accounts, config):
+    rows = [{"company_id": c, "topic": "Digital Experience", "signal_score": 90, "audience_strength": "A"}
+            for c in ("FAKE-ZI-2001", "FAKE-ZI-2002")]
+    out = S.intent_to_signals(rows, accounts, config, TODAY)
+    assert len({s.source for s in out}) == 2
 
 
 def test_intent_works_without_skipped_list_and_non_dict_rows(accounts, config):
@@ -659,7 +738,7 @@ def test_intent_works_without_skipped_list_and_non_dict_rows(accounts, config):
 
 
 def test_intent_rejects_bool_and_string_scores(accounts, config):
-    rows = [{"company_id": "FAKE-ZI-2001", "topic": "Onboarding", "signal_score": v, "audience_strength": "A"}
+    rows = [{"company_id": "FAKE-ZI-2001", "topic": "Digital Adoption", "signal_score": v, "audience_strength": "A"}
             for v in (True, "90")]
     skipped = []
     assert S.intent_to_signals(rows, accounts, config, TODAY, skipped) == [] and len(skipped) == 2
@@ -669,3 +748,178 @@ def test_intent_deterministic(intent_rows, accounts, config):
     a = S.intent_to_signals(intent_rows, accounts, config, TODAY)
     b = S.intent_to_signals(list(reversed(intent_rows)), list(reversed(accounts)), config, TODAY)
     assert a == b
+
+
+# ------------------------------------------------------------ H3: multi-type scoops pick the highest-weight passing kind
+_ALL_KIND_TYPES = {
+    SignalKind.FUNDING: "Funding", SignalKind.EXEC_MOVE: "Executive Move", SignalKind.NEW_HIRE: "New Hire",
+    SignalKind.MA: "Mergers & Acquisitions (M&A)", SignalKind.PRODUCT_LAUNCH: "Product Launch",
+    SignalKind.PARTNERSHIP: "Partnership", SignalKind.PROJECT_PAIN: "Project", SignalKind.HIRING_PLAN: "Hiring Plans",
+}
+_PASS_ALL = "<P> joins as Head of Product. Gamma raised $1m, is hiring a Product Manager and launched an app."
+
+
+@pytest.mark.parametrize("a,b", [(a, b) for i, a in enumerate(_ALL_KIND_TYPES) for b in list(_ALL_KIND_TYPES)[i + 1:]],
+                         ids=lambda k: k.value)
+def test_every_type_pair_picks_highest_weight_kind(config, a, b):
+    v = judge(config, desc=_PASS_ALL, types=(_ALL_KIND_TYPES[a], _ALL_KIND_TYPES[b]), topics=("Customer Experience",))
+    assert v.keep
+    wa, wb = S.KIND_BASE_WEIGHT[a], S.KIND_BASE_WEIGHT[b]
+    if wa != wb:
+        assert v.kind is (a if wa > wb else b)
+    else:
+        assert v.kind.value == min(a.value, b.value)      # equal weights: alphabetical by kind name
+
+
+def test_exec_move_plus_ma_is_exec_move(config):
+    v = judge(config, desc="<P> joins as Head of Product after Gamma acquired Tiny Co.",
+              types=("Executive Move", "Mergers & Acquisitions (M&A)"), topics=())
+    assert v.kind is SignalKind.EXEC_MOVE
+
+
+def test_project_plus_partnership_is_project_pain(config):
+    v = judge(config, desc="Gamma partnered with a vendor on its CX project.", types=("Project", "Partnership"),
+              topics=("Customer Experience",))
+    assert v.kind is SignalKind.PROJECT_PAIN
+
+
+def test_multi_type_failing_higher_kind_falls_to_lower(config):
+    # exec move fails (no relevant role) so the partnership kind is what is left
+    v = judge(config, desc="Gamma partnered with a vendor; <P> is the new CEO.", types=("Executive Move", "Partnership"), topics=())
+    assert v.keep and v.kind is SignalKind.PARTNERSHIP
+
+
+def test_kind_order_derived_from_weights_not_a_separate_list():
+    assert not hasattr(S, "KIND_PRECEDENCE")
+    ordered = S._by_weight(list(_ALL_KIND_TYPES))
+    weights = [S.KIND_BASE_WEIGHT[k] for k in ordered]
+    assert weights == sorted(weights, reverse=True)
+
+
+# ------------------------------------------------------------ H1: role table (85 reviewer rows) and regressions
+def _role_table_results(config):
+    rows = load_fixture("signals_role_table.json")["rows"]
+    out = []
+    for r in rows:
+        sc = Scoop(f"R{r['n']}", "Z", "Example Co", r["description"], TODAY, (r["type"],), (r["type"],))
+        out.append((r, S.filter_scoops([sc], config, TODAY)[0].keep))
+    return out
+
+
+def test_role_table_has_85_rows():
+    assert len(load_fixture("signals_role_table.json")["rows"]) == 85
+
+
+def test_role_table_precision_and_recall(config):
+    res = _role_table_results(config)
+    tp = sum(1 for r, k in res if k and r["expected"] == "keep")
+    fp = [r["n"] for r, k in res if k and r["expected"] == "drop"]
+    fn = [r["n"] for r, k in res if not k and r["expected"] == "keep"]
+    assert tp / (tp + len(fp)) >= 0.90, f"precision misses: {fp}"
+    assert tp / (tp + len(fn)) >= 0.95, f"recall misses: {fn}"
+
+
+def test_role_table_exact_known_misses(config):
+    """Pins the remaining misses so a regression or an improvement is noticed (docs/signals_notes.md lists them)."""
+    res = _role_table_results(config)
+    assert sorted(r["n"] for r, k in res if k != (r["expected"] == "keep")) == []
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co hires Head of Product Supply and Logistics.",
+    "Example Co names a Head of Product Compliance.",
+    "Example Co appoints a Head of Product Development, Manufacturing.",
+    "Example Co appoints Technology Procurement Director.",
+    "Example Co has appointed a Director of Support Services (aged care).",
+    "Example Co hires Social Media Manager for product campaigns.",
+    "Example Co welcomes a Customer Support Officer.",
+    "Example Co hires a Product Sales Manager.",
+    "Example Co appoints a Head of Digital Finance.",
+])
+def test_non_buyer_titles_with_buyer_words_dropped(desc):
+    assert S.relevant_role(desc) is None
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co appoints Chief Customer Officer.",
+    "Example Co hired a Head of Customer Service and Support.",
+    "Example Co appoints a Head of Mobile.",
+    "Example Co hires a Head of Product Development.",
+    "Example Co hires a VP Customer Care.",
+])
+def test_recall_fixes(desc):
+    assert S.relevant_role(desc)
+
+
+def test_for_connector_no_longer_links_title_to_domain():
+    assert S.relevant_role("Example Co hires a Sales Director for the product range.") is None
+    assert S.relevant_role("Example Co hires a Director for product.") is None
+
+
+def test_negative_words_only_inspect_the_role_phrase_not_the_whole_sentence():
+    assert S.relevant_role("Example Co appoints a Head of Product. The legal team welcomed the news.")
+    assert S.relevant_role("Example Co appoints Head of Product; formerly in finance at a bank.")
+
+
+# ------------------------------------------------------------ H2: hiring keywords
+def test_support_staff_hospital_ward_dropped(config):
+    v = judge(config, desc="Example Co is hiring support staff for the hospital ward.", types=("Hiring Plans",), topics=())
+    assert not v.keep and "weak keyword 'support'" in v.reason
+
+
+def test_drivers_for_delivery_platform_dropped(config):
+    v = judge(config, desc="Example Co is hiring drivers for its delivery platform.", types=("Open Position",), topics=())
+    assert not v.keep and "driver" in v.reason
+
+
+@pytest.mark.parametrize("desc", [
+    "Hiring mobile launch staff.", "Hiring platform operators.", "Hiring an app tester.", "Hiring engineering interns.",
+])
+def test_weak_keywords_alone_do_not_keep_hiring(config, desc):
+    assert not judge(config, desc=desc, types=("Hiring Plans",), topics=()).keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Hiring a Senior Product Manager.", "Hiring two UX designers.", "Hiring mobile app developers.",
+    "Hiring a Customer Success Manager.", "Hiring a Head of Digital.",
+])
+def test_buyer_roles_keep_hiring(config, desc):
+    assert judge(config, desc=desc, types=("Hiring Plans",), topics=()).keep
+
+
+def test_strong_keyword_keeps_hiring_without_drop_word(config):
+    assert judge(config, desc="Example Co is hiring across its digital team.", types=("Hiring Plans",), topics=()).keep
+
+
+def test_topic_keeps_hiring_but_does_not_rescue_generic_drop(config):
+    assert judge(config, desc="Example Co is hiring.", types=("Open Position",), topics=("Product Management",)).keep
+    v = judge(config, desc="Example Co has more open roles in Medical & Health.", types=("Open Position",),
+              topics=("Product Management",))
+    assert not v.keep           # documented in docs/signals_notes.md (review L2)
+
+
+def test_nurse_with_digital_app_but_no_role_dropped(config):
+    assert not judge(config, desc="Example Co is hiring a nurse to support its new digital health app.",
+                     types=("Hiring Plans",), topics=()).keep
+
+
+# ------------------------------------------------------------ join key normalisation (review M2)
+def test_join_keys_normalised(config):
+    acct = Account("SF1", "Gamma", zoominfo_id=" 123 ")
+    sc = make_scoop(cid="123")
+    out = S.scoops_to_signals(S.filter_scoops([sc], config, TODAY), {123: acct}, config, TODAY)
+    assert len(out.signals) == 1 and out.signals[0].zoominfo_id == "123" and out.unmatched == []
+    radar = S.trigger_radar([sc], [acct], config, TODAY)
+    assert [e.account.sf_account_id for e in radar] == ["SF1"]
+
+
+def test_leading_zero_ids_do_not_match(config):
+    out = S.scoops_to_signals(S.filter_scoops([make_scoop(cid="01")], config, TODAY),
+                              {"1": Account("SF1", "G", zoominfo_id="1")}, config, TODAY)
+    assert out.signals == [] and len(out.unmatched) == 1
+
+
+def test_scoop_company_id_whitespace_stripped(config):
+    out = S.scoops_to_signals(S.filter_scoops([make_scoop(cid=" 123 ")], config, TODAY),
+                              {"123": Account("SF1", "G", zoominfo_id="123")}, config, TODAY)
+    assert len(out.signals) == 1 and out.unmatched == []

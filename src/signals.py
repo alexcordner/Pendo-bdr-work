@@ -33,13 +33,20 @@ KIND_BASE_WEIGHT: dict[SignalKind, float] = {
     SignalKind.NEW_HIRE: 0.65,        # relevant hire that is not framed as an exec move
     SignalKind.MA: 0.60,              # integration brings platform consolidation
     SignalKind.HIRING_PLAN: 0.55,     # hiring product / CX / engineering roles
-    SignalKind.PARTNERSHIP: 0.45,     # weakest: often marketing noise
+    SignalKind.PARTNERSHIP: 0.45,     # often marketing noise
+    SignalKind.INTENT: 0.50,          # UNVERIFIED connector shape: never stronger than half a fresh scoop
     SignalKind.NONE: 0.0,
 }
 
-#: Recency decay is exponential: factor = 0.5 ** (age_days / RECENCY_HALF_LIFE_DAYS).
-#: With 21 days: 1.0 today, 0.5 at 3 weeks, ~0.23 at the 45-day config cut-off.
+#: Recency decay is exponential: factor = 0.5 ** (age_days / half_life). Default half-life 21 days:
+#: 1.0 today, 0.5 at 3 weeks, ~0.23 at the 45-day config cut-off.
 RECENCY_HALF_LIFE_DAYS = 21.0
+#: Per-kind overrides. A new leader's buying window lasts months, so people moves decay more slowly.
+#: Every kind not listed here uses RECENCY_HALF_LIFE_DAYS. The config's max_age_days cut-off still applies.
+KIND_HALF_LIFE_DAYS: dict[SignalKind, float] = {
+    SignalKind.EXEC_MOVE: 45.0,
+    SignalKind.NEW_HIRE: 45.0,
+}
 
 #: Several signals on one account: the best counts in full, every other one counts at this fraction.
 #: combined = 1 - (1 - best) * prod(1 - COMBINE_DAMPING * other). Always >= best and <= 1.0.
@@ -65,11 +72,11 @@ TYPE_TO_KIND: dict[str, SignalKind] = {
     "hiring plans": SignalKind.HIRING_PLAN,
     "open position": SignalKind.HIRING_PLAN,
 }
-#: When one scoop carries several types, the first kind in this list that passes its rules wins.
-KIND_PRECEDENCE: tuple[SignalKind, ...] = (
-    SignalKind.MA, SignalKind.FUNDING, SignalKind.PRODUCT_LAUNCH, SignalKind.EXEC_MOVE, SignalKind.NEW_HIRE,
-    SignalKind.PARTNERSHIP, SignalKind.PROJECT_PAIN, SignalKind.HIRING_PLAN,
-)
+#: When one scoop carries several types, the passing kind with the highest KIND_BASE_WEIGHT wins (so the
+#: precedence can never disagree with the strength table). Equal weights tie-break on the kind's name.
+def _by_weight(kinds) -> list[SignalKind]:
+    return sorted(kinds, key=lambda k: (-KIND_BASE_WEIGHT[k], k.value))
+
 
 #: Project / Pain Point scoops are kept ONLY with one of these topics (docs/decisions.md #9).
 PROJECT_TOPICS = frozenset({"customer experience", "product management", "customer success",
@@ -96,36 +103,67 @@ def _first_hit(text: str, keywords) -> str | None:
 
 
 # Role detection for Executive Move / New Hire / Management Move. The scoop has no title field, so we
-# read the description. A role counts only when a title word sits next to a Pendo-buyer domain word:
-# "Head of Product", "Chief Digital Officer", "VP, Customer Success", "Product Director", "IT Director".
-_TITLE = (r"chief|head|vp|svp|evp|avp|vice[\s-]+president|president|director|manager|lead|owner|officer|"
+# read the description. A role counts only when a title word sits next to a Pendo-buyer domain word
+# ("Head of Product", "Chief Digital Officer", "VP, Customer Success", "Product Director", "IT Director")
+# AND the words right after it do not turn it into a non-buyer function ("Head of Product Supply",
+# "Director of Support Services (aged care)"). See _NEGATIVE. 'officer' is deliberately not a title word
+# on its own ("Customer Support Officer" is junior); "Chief X Officer" matches through 'chief'.
+_TITLE = (r"chief|head|vp|svp|evp|avp|vice[\s-]+president|president|director|manager|lead|owner|"
           r"general\s+manager|gm")
-_DOMAIN = (r"product|digital|customer\s+experience|cx|customer\s+success|customer\s+support|support|"
-           r"user\s+experience|ux|engineering|technology|information\s+technology|digital\s+workplace|"
-           r"employee\s+experience|transformation")
+_DOMAIN = (r"product|digital|customer\s+experience|cx|customer\s+success|customer\s+support|customer\s+service|"
+           r"customer\s+care|customer\s+officer|support|user\s+experience|ux|engineering|technology|"
+           r"information\s+technology|digital\s+workplace|employee\s+experience|transformation|mobile")
 _SEP = r"[\s,/&:-]+"
 _TITLE_THEN_DOMAIN = re.compile(
-    rf"(?<!\w)(?:{_TITLE})(?!\w){_SEP}(?:(?:of|for|and)\s+)?(?:(?:global|regional|senior|group|apac|anz|asia\s+pacific)\s+)?"
+    rf"(?<!\w)(?:{_TITLE})(?!\w){_SEP}(?:(?:of|and)\s+)?(?:(?:global|regional|senior|group|apac|anz|asia\s+pacific)\s+)?"
     rf"(?:{_DOMAIN})(?!\w)", _FLAGS)
 _DOMAIN_THEN_TITLE = re.compile(
     rf"(?<!\w)(?:{_DOMAIN})(?!\w){_SEP}(?:\w+{_SEP}){{0,1}}(?:{_TITLE})(?!\w)", _FLAGS)
 # Acronyms and phrases that name a role on their own. 'IT' is matched case-sensitively so the pronoun 'it' never counts.
-_ROLE_ACRONYMS = re.compile(r"(?<!\w)(?:CTO|CPO|CDO|CIO|CXO)(?!\w)|(?i:chief\s+(?:technology|information|product|digital|experience)\s+officer)")
+_ROLE_ACRONYMS = re.compile(r"(?<!\w)(?:CTO|CPO|CDO|CIO|CXO)(?!\w)|(?i:chief\s+(?:technology|information|product|digital|experience|customer)\s+officer)")
 _IT_ROLE = re.compile(r"(?<!\w)(?:(?i:head|director|manager|lead|chief|vp|svp)[\s,]+(?:(?i:of)\s+)?IT(?!\w)|IT\s+(?i:director|manager|head|lead)(?!\w))")
 # Marketing titles contain a domain word but are not buyers ("Product Marketing Manager", "Digital Marketing Lead").
 _MARKETING = re.compile(r"(?:product|digital)\s+marketing", _FLAGS)
+# Words that, inside the role phrase or the 3 words after it, mean the role is some other function
+# ("Head of Product Supply and Logistics", "Technology Procurement Director", "Head of Product Compliance").
+_NEGATIVE = re.compile(
+    r"(?<!\w)(?:supply|compliance|procurement|purchasing|logistics|manufactur\w*|marketing|social\s+media|finance|"
+    r"financial|legal|facilit\w+|safety|sales|risk|warehouse|aged\s+care|hospital|clinical|nursing|network|"
+    r"support\s+services?|human\s+resources|hr|people|recruit\w*)(?!\w)", _FLAGS)
 
 
 def relevant_role(description: str) -> str | None:
     """The matched role phrase if the description names a product / digital / CX / customer success /
-    support / engineering / technology / IT / digital-workplace role, else None.
-    A bare 'CEO' or 'Chief Executive Officer' (or CFO, finance, legal...) is NOT relevant."""
+    support / engineering / technology / mobile / IT / digital-workplace role, else None.
+    A bare 'CEO' or 'Chief Executive Officer' (or CFO, finance, legal...) is NOT relevant, and neither is a
+    buyer word inside a non-buyer role (see _NEGATIVE)."""
     text = _MARKETING.sub(" ", description)
     for rx in (_ROLE_ACRONYMS, _IT_ROLE, _TITLE_THEN_DOMAIN, _DOMAIN_THEN_TITLE):
-        m = rx.search(text)
-        if m:
-            return " ".join(m.group(0).split())
+        for m in rx.finditer(text):
+            tail = re.split(r"[.;]", text[m.end():], maxsplit=1)[0]
+            context = m.group(0) + " " + " ".join(re.findall(r"[A-Za-z&]+", tail)[:3])
+            if not _NEGATIVE.search(context):
+                return " ".join(m.group(0).split())
     return None
+
+
+# Hiring notes need a buyer-role context before a keep keyword may beat a drop keyword (or count at all).
+# A role (relevant_role) or one of these phrases counts; bare weak words (support, platform, app, engineering,
+# mobile, launch, transformation) never do, because "support staff for the hospital ward" and
+# "drivers for its delivery platform" contain them.
+_HIRING_CONTEXT = re.compile(
+    r"(?<!\w)(?:product\s+(?:managers?|owners?|team|leads?|designers?|analysts?|operations)|ux|cx|"
+    r"customer\s+(?:success|experience)|mobile\s+(?:app\s+)?(?:developers?|engineers?)|"
+    r"digital\s+(?:product|experience|transformation|workplace)|software\s+(?:engineers?|developers?)|"
+    r"engineering\s+(?:managers?|leads?|team)|cto)(?!\w)", _FLAGS)
+#: Weak keywords from config keywords_keep: never enough on their own for a hiring note.
+WEAK_KEEP_KEYWORDS = frozenset({"support", "app", "platform", "engineering", "mobile", "launch", "transformation"})
+
+
+def hiring_context(description: str) -> str | None:
+    """Buyer-role context in a hiring note: a relevant role, or a strong role phrase. None if absent."""
+    m = _HIRING_CONTEXT.search(description)
+    return " ".join(m.group(0).split()) if m else relevant_role(description)
 
 
 _INVEST_VERB = re.compile(r"(?<!\w)invest(?:ed|s|ing|ment)(?!\w)", _FLAGS)
@@ -142,6 +180,8 @@ def _is_investor_note(scoop: Scoop) -> bool:
     name = re.sub(r"[^\w&' -]", "", scoop.company_name).strip().split(" ")[0] if scoop.company_name.strip() else ""
     if name and re.search(rf"(?<!\w){re.escape(name)}(?!\w)(?:(?!\.\s)[^;:\n]){{0,60}}?(?<!\w)invest(?:ed|s|ing)(?!\w)", text, _FLAGS):
         return True
+    if name and re.search(rf"invest(?:ed|s|ing|ment)(?:\s+(?:\$[\d.,]+\s*\w*|an?\s+\w+))?\s+in\s+(?:the\s+)?{re.escape(name)}(?!\w)", text, _FLAGS):
+        return False       # the company is the investee: it received the money
     return not _FUNDING_RECEIVED.search(text)
 
 
@@ -160,14 +200,21 @@ def age_days(published: datetime, today: date | datetime) -> int:
     return max(0, (_as_date(today) - _as_date(published)).days)
 
 
-def recency_factor(days: float) -> float:
-    """Exponential decay 0..1: 1.0 at 0 days, 0.5 at RECENCY_HALF_LIFE_DAYS. Monotonically non-increasing."""
-    return 0.5 ** (max(0.0, float(days)) / RECENCY_HALF_LIFE_DAYS)
+def half_life_for(kind: SignalKind) -> float:
+    """Half-life in days for a kind (KIND_HALF_LIFE_DAYS, else RECENCY_HALF_LIFE_DAYS)."""
+    return KIND_HALF_LIFE_DAYS.get(kind, RECENCY_HALF_LIFE_DAYS)
+
+
+def recency_factor(days: float, half_life: float | None = None) -> float:
+    """Exponential decay 0..1: 1.0 at 0 days, 0.5 at one half-life (default RECENCY_HALF_LIFE_DAYS).
+    Monotonically non-increasing in ``days``."""
+    hl = RECENCY_HALF_LIFE_DAYS if half_life is None else half_life
+    return 0.5 ** (max(0.0, float(days)) / hl)
 
 
 def signal_strength(kind: SignalKind, days: float) -> float:
-    """Base weight of the kind x recency decay, rounded to 4 dp, always within 0.0-1.0."""
-    s = KIND_BASE_WEIGHT[kind] * recency_factor(days)
+    """Base weight of the kind x recency decay (per-kind half-life), rounded to 4 dp, always within 0.0-1.0."""
+    s = KIND_BASE_WEIGHT[kind] * recency_factor(days, half_life_for(kind))
     return round(min(1.0, max(0.0, s)), 4)
 
 
@@ -206,18 +253,24 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
         return False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description"
 
     if kind is SignalKind.HIRING_PLAN:
-        # Generic hiring (nurses, drivers, legal, 'more open roles in Medical & Health') is dropped unless
-        # something in the description is clearly a buyer keyword.
-        keep_kw = _first_hit(desc, sg.keywords_keep)
+        # Generic hiring (nurses, drivers, legal, 'more open roles in Medical & Health') is dropped unless the
+        # note shows a buyer-role context. A topic hit counts as a keep signal but does NOT rescue a note that
+        # also has a drop keyword and no role context. Weak keywords (WEAK_KEEP_KEYWORDS) never keep a note alone.
+        context = hiring_context(desc)
         drop_kw = _first_hit(desc, sg.keywords_drop)
-        if drop_kw and not keep_kw:
-            return False, f"generic hiring note (matches drop keyword '{drop_kw}')"
+        if drop_kw and not context:
+            return False, f"generic hiring note (matches drop keyword '{drop_kw}', no buyer-role context)"
+        if context:
+            return True, f"hiring with buyer-role context: '{context}'"
         hit = sorted(topics & HIRING_TOPICS)
         if hit:
             return True, f"hiring with relevant topic: {', '.join(hit)}"
-        if keep_kw:
-            return True, f"hiring with buyer keyword '{keep_kw}' in the description"
-        return False, "hiring note with no relevant topic or buyer keyword"
+        strong = _first_hit(desc, [k for k in sg.keywords_keep if k.strip().lower() not in WEAK_KEEP_KEYWORDS])
+        if strong:
+            return True, f"hiring with buyer keyword '{strong}' in the description"
+        weak = _first_hit(desc, sg.keywords_keep)
+        extra = f" (only the weak keyword '{weak}')" if weak else ""
+        return False, "hiring note with no relevant topic, buyer role or strong keyword" + extra
 
     if kind is SignalKind.FUNDING:
         if _is_investor_note(scoop):
@@ -257,15 +310,14 @@ def filter_scoops(scoops: list[Scoop], config: Config, today: date | datetime) -
             continue
         passed: dict[SignalKind, str] = {}
         failed: list[str] = []
-        for k in KIND_PRECEDENCE:
-            if k in kinds:
-                ok, why = _judge_kind(k, s, config)
-                if ok:
-                    passed[k] = why
-                else:
-                    failed.append(why)
+        for k in _by_weight(kinds):
+            ok, why = _judge_kind(k, s, config)
+            if ok:
+                passed[k] = why
+            else:
+                failed.append(why)
         if passed:
-            best = next(k for k in KIND_PRECEDENCE if k in passed)
+            best = _by_weight(passed)[0]
             note = " (future-dated, treated as today)" if days < 0 else ""
             verdicts.append(ScoopVerdict(s, True, best, passed[best] + note))
         else:
@@ -279,6 +331,11 @@ class SignalBatch(NamedTuple):
 
     signals: list[Signal]          # one per kept scoop matched to an account, sorted deterministically
     unmatched: list[Scoop]         # kept scoops whose company_id matches no account (never discarded silently)
+
+
+def _key(value) -> str:
+    """Join-key normalisation: stripped string ('' for None)."""
+    return "" if value is None else str(value).strip()
 
 
 def _trim_evidence(text: str) -> str:
@@ -298,18 +355,20 @@ def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dic
     """Turn KEPT verdicts into Signals joined to accounts by ``Scoop.company_id == Account.zoominfo_id``.
 
     ``config`` is accepted for interface symmetry (and future per-kind weights); strength comes from the
-    module constants KIND_BASE_WEIGHT and RECENCY_HALF_LIFE_DAYS. A repeated scoop id is used once.
+    module constants KIND_BASE_WEIGHT, RECENCY_HALF_LIFE_DAYS and KIND_HALF_LIFE_DAYS. A repeated scoop id is used once.
+    Join keys are compared as stripped strings, so ' 123 ' and 123 both match '123'.
     Several scoops on one account all become signals; use ``best_signal`` / ``combined_strength``.
     """
     signals: list[Signal] = []
     unmatched: list[Scoop] = []
     seen: set[str] = set()
+    accounts_by_zoominfo_id = {_key(k): a for k, a in accounts_by_zoominfo_id.items() if _key(k)}
     for v in verdicts:
         if not v.keep or v.scoop.id in seen:
             continue
         seen.add(v.scoop.id)
         s = v.scoop
-        acct = accounts_by_zoominfo_id.get(s.company_id) if s.company_id else None
+        acct = accounts_by_zoominfo_id.get(_key(s.company_id))
         if acct is None:
             unmatched.append(s)
             continue
@@ -320,7 +379,7 @@ def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dic
             source=f"{SOURCE_PREFIX}:{s.id}",
             source_date=s.published_date,
             evidence=_trim_evidence(s.description),
-            zoominfo_id=s.company_id,
+            zoominfo_id=_key(s.company_id),
         ))
     signals.sort(key=_signal_sort_key)
     unmatched.sort(key=lambda sc: (sc.company_id, sc.id))
@@ -385,8 +444,8 @@ def trigger_radar(scoops: list[Scoop], accounts: list[Account], config: Config, 
         raise ValueError(f"top_n must be >= 0 or None, got {top_n}")
     by_zi: dict[str, Account] = {}
     for a in accounts:
-        if a.zoominfo_id and a.zoominfo_id not in by_zi:
-            by_zi[a.zoominfo_id] = a
+        if _key(a.zoominfo_id) and _key(a.zoominfo_id) not in by_zi:
+            by_zi[_key(a.zoominfo_id)] = a
     batch = scoops_to_signals(filter_scoops(scoops, config, today), by_zi, config, today)
 
     grouped: dict[str, list[Signal]] = {}
@@ -412,12 +471,13 @@ def trigger_radar(scoops: list[Scoop], accounts: list[Account], config: Config, 
 # been checked against the live connector (Phase 2b does that). Nothing here calls a connector. Expected row:
 #   {"company_id": "<ZoomInfo company id>", "topic": "Digital Experience",
 #    "signal_score": 60-100, "audience_strength": "A".."E", "recorded_date": "2026-11-20" (optional)}
-INTENT_TOPICS = frozenset({"digital experience", "product analytics", "customer experience", "onboarding",
-                           "digital adoption"})
+# 'onboarding' alone is NOT a topic (HR onboarding, customer onboarding...): it only counts combined with product / user words.
+INTENT_TOPICS = frozenset({"digital experience", "product analytics", "customer experience", "digital adoption",
+                           "product onboarding", "user onboarding"})
 #: Audience strength A (strongest) to E multiplies the score. Intent is weaker evidence than a dated event,
-#: so the strength is also capped at INTENT_MAX_STRENGTH.
+#: so the strength is also capped at INTENT_MAX_STRENGTH (= the INTENT base weight): half of a fresh scoop at most.
 INTENT_AUDIENCE_FACTOR = {"A": 1.0, "B": 0.85, "C": 0.7, "D": 0.55, "E": 0.4}
-INTENT_MAX_STRENGTH = 0.7
+INTENT_MAX_STRENGTH = KIND_BASE_WEIGHT[SignalKind.INTENT]   # 0.5
 INTENT_SCORE_RANGE = (60, 100)
 INTENT_SOURCE_PREFIX = "zoominfo_intent"
 
@@ -434,18 +494,20 @@ def _parse_intent_date(raw) -> datetime | None:
 
 def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config, today: date | datetime,
                       skipped: list[tuple[dict, str]] | None = None) -> list[Signal]:
-    """UNVERIFIED placeholder: intent rows -> Signals (kind PROJECT_PAIN, the closest existing kind: they are researching).
+    """UNVERIFIED placeholder: intent rows -> Signals (kind INTENT).
 
     Only Pendo-relevant topics (INTENT_TOPICS) count. strength = (score-60)/40 x audience factor, capped at
-    INTENT_MAX_STRENGTH, then decayed by recency when ``recorded_date`` is present (no date = no decay).
+    INTENT_MAX_STRENGTH (0.5), then decayed by recency when ``recorded_date`` is present (no date = no decay).
+    A row whose strength comes out at 0.0 (a score of exactly 60) is SKIPPED with a reason, never emitted as a zero signal.
+    Signal.source is 'zoominfo_intent:<company_id>:<topic>'.
     One signal per (company, topic): the highest score wins. Every row that is not turned into a signal is appended to
     ``skipped`` as (row, reason) when a list is passed, so nothing disappears silently.
     """
     skipped = skipped if skipped is not None else []
     by_zi = {}
     for a in accounts:
-        if a.zoominfo_id and a.zoominfo_id not in by_zi:
-            by_zi[a.zoominfo_id] = a
+        if _key(a.zoominfo_id) and _key(a.zoominfo_id) not in by_zi:
+            by_zi[_key(a.zoominfo_id)] = a
     best: dict[tuple[str, str], tuple[float, dict]] = {}
     lo, hi = INTENT_SCORE_RANGE
     for row in rows:
@@ -453,7 +515,7 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
             skipped.append(({"row": row}, "not a dict"))
             continue
         topic = str(row.get("topic") or "").strip()
-        cid = str(row.get("company_id") or "").strip()
+        cid = _key(row.get("company_id"))
         score, aud = row.get("signal_score"), str(row.get("audience_strength") or "").strip().upper()
         if not topic or not cid:
             skipped.append((row, "missing topic or company_id"))
@@ -478,11 +540,14 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
         aud = str(row["audience_strength"]).strip().upper()
         base = min(INTENT_MAX_STRENGTH, (score - lo) / (hi - lo) * INTENT_AUDIENCE_FACTOR[aud])
         when = _parse_intent_date(row.get("recorded_date"))
-        strength = round(min(1.0, max(0.0, base * (recency_factor(age_days(when, today)) if when else 1.0))), 4)
+        strength = round(min(1.0, max(0.0, base * (recency_factor(age_days(when, today), half_life_for(SignalKind.INTENT)) if when else 1.0))), 4)
         topic = str(row["topic"]).strip()
+        if strength <= 0.0:
+            skipped.append((row, f"strength 0.0 (signal_score {int(score)} is at the bottom of the {lo}-{hi} range): not a trigger"))
+            continue
         out.append(Signal(
-            sf_account_id=by_zi[cid].sf_account_id, kind=SignalKind.PROJECT_PAIN, strength=strength,
-            source=f"{INTENT_SOURCE_PREFIX}:{topic.lower()}", source_date=when,
+            sf_account_id=by_zi[cid].sf_account_id, kind=SignalKind.INTENT, strength=strength,
+            source=f"{INTENT_SOURCE_PREFIX}:{cid}:{topic.lower()}", source_date=when,
             evidence=f"ZoomInfo intent (UNVERIFIED shape): researching '{topic}', score {int(score)}, audience {aud}",
             zoominfo_id=cid,
         ))
