@@ -2513,3 +2513,39 @@ def test_allow_base_form_and_enable_permit_variants():
     assert S.ma_role("Acme is willing to allow Bigco to acquire a stake in Acme.", "Acme Holdings") == "target"
     assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "target"
     assert S.ma_role("Acme will permit Bigco to acquire Zeta.", "Bigco Ltd") == "acquirer"
+
+
+# ============================================================ exact note strings (final review item 6)
+def test_parenthetical_that_looks_like_a_note_prefix_is_plain_text():
+    for tail in ("(being acquired by Bigco)", "(role vacated at the old firm)", "(minority stake purchase by Fund)",
+                 "(debt facility of $5m)", "(reported talks with unions)", "(physical or unclear)", "(role ambiguous)"):
+        sig = Signal("A", SignalKind.EXEC_MOVE, 0.5, "s", None, f"Acme appoints new CDO {tail}", "Z")
+        assert S.signal_notes(sig) == [] and not S.is_ambiguous(sig)
+
+
+def test_real_note_after_a_lookalike_parenthetical_strips_only_the_real_note():
+    ev = "Acme appoints new CDO (being acquired by Bigco) (" + S.VACATED_NOTE + ")"
+    sig = Signal("A", SignalKind.EXEC_MOVE, 0.5, "s", None, ev, "Z")
+    assert S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+def test_every_known_note_is_read_back_exactly():
+    for note in sorted(S.KNOWN_NOTES):
+        sig = Signal("A", SignalKind.MA, 0.5, "s", None, f"Plain scoop text. ({note})", "Z")
+        assert S.signal_notes(sig) == [note]
+
+
+def test_truncated_or_extended_note_text_is_not_a_note():
+    for bad in (S.MA_TARGET_NOTE[:-1], S.MA_TARGET_NOTE + " today", S.VACATED_NOTE.upper(), "role vacated"):
+        sig = Signal("A", SignalKind.MA, 0.5, "s", None, f"Plain scoop text. ({bad})", "Z")
+        assert S.signal_notes(sig) == []
+
+
+def test_same_deal_note_still_matches_with_names_only():
+    ok = Signal("A", SignalKind.MA, 0.5, "s", None, "Text. (same deal as Bigco, Cargo)", "Z")
+    no = Signal("A", SignalKind.MA, 0.5, "s", None, "Text. (same deal as )", "Z")
+    assert S.signal_notes(ok) == ["same deal as Bigco, Cargo"] and S.signal_notes(no) == []
+
+
+def test_note_prefixes_constant_is_gone():
+    assert not hasattr(S, "NOTE_PREFIXES")

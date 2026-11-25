@@ -909,10 +909,18 @@ def _trim_evidence(text: str, reserve: int = 0) -> str:
 #: Appended to Signal.evidence of a kept people move whose 'product' role may be physical goods. The shared Signal
 #: model has no flag field, so the warning travels with the text the opener would quote. Use is_ambiguous(signal).
 AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
-#: Every warning note that can follow the evidence text, one ' (note)' per note. signal_notes() reads them back.
-NOTE_PREFIXES = ("role ambiguous", "physical or unclear product launch", "acquirer of a minority stake",
-                 "M&A direction unclear", "partnership without product", "debt facility", "financial or property",
-                 "reported talks", "minority stake purchase", "being acquired", "role vacated", SAME_DEAL_PREFIX.strip())
+
+
+#: The EXACT note strings (a scoop that happens to end in '(being acquired by Bigco)' is plain text, not a note).
+#: 'same deal as <names>' is dynamic, so it is matched as that exact prefix followed by names.
+KNOWN_NOTES = frozenset({
+    AMBIGUOUS_NOTE, LAUNCH_NOTE, FINANCIAL_LAUNCH_NOTE, DEBT_NOTE, RUMOUR_NOTE, MA_TARGET_NOTE, MA_TARGET_MINORITY_NOTE,
+    MA_ACQUIRER_FULL_NOTE, MA_MINORITY_NOTE, MA_UNCLEAR_NOTE, PARTNERSHIP_NOTE, VACATED_NOTE})
+_SAME_DEAL_NOTE = re.compile(rf"^{re.escape(SAME_DEAL_PREFIX)}\S.*$")
+
+
+def _is_known_note(text: str) -> bool:
+    return text in KNOWN_NOTES or bool(_SAME_DEAL_NOTE.match(text))
 
 
 def _suffix(notes) -> str:
@@ -926,7 +934,7 @@ def signal_notes(signal: Signal) -> list[str]:
     text = signal.evidence
     while True:
         m = re.search(r" \(([^()]*)\)$", text)
-        if not m or not m.group(1).startswith(NOTE_PREFIXES):
+        if not m or not _is_known_note(m.group(1)):
             break
         notes.insert(0, m.group(1))
         text = text[:m.start()]
