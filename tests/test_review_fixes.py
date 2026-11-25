@@ -229,3 +229,18 @@ def test_signal_validation():
         Signal("A", SignalKind.NONE, 1.5, "s", None, "x")
     assert {k.value for k in SignalKind} == {"funding", "exec_move", "new_hire", "ma", "product_launch",
                                              "partnership", "project_pain", "hiring_plan", "intent", "none"}
+
+
+# ---- review-driven (1d L3, 1c F10): shared id / email normalisers --------------------------------
+def test_normalise_sf_id_15_vs_18():
+    from src.loaders import normalise_sf_id
+    assert normalise_sf_id("001000000000001AAA") == "001000000000001"
+    assert normalise_sf_id("001000000000001") == "001000000000001"
+    assert normalise_sf_id(" 001Ab000000XyZq ") == "001Ab000000XyZq"       # case kept, trimmed
+    assert normalise_sf_id("FAKE-001") == "FAKE-001"                      # synthetic ids untouched
+    assert normalise_sf_id("") is None and normalise_sf_id(None) is None
+
+
+def test_normalise_email_plus_addressing():
+    from src.loaders import normalise_email_for_match as n
+    assert n("First.Last+crm@Example.com") == n("firstlast@example.com") == "firstlast@example.com"
