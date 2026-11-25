@@ -119,3 +119,112 @@ Fast enough by two orders of magnitude; the runtime is dominated by the fetch (5
 
 ## What I could not verify
 Live connector shapes and runtimes (offline by rule); `links.next`-based paging against a real spill; how a deferred-tool session handles the runbook end to end (read, not executed); the meaning of the sales opt-out fields; behaviour of `emailed_recently` against real Gmail dates (none exist in search results).
+
+---
+
+# Round 2: narrow re-review of `e8a1b4a` (fast-forward merged into this branch)
+
+Offline, read-only, synthetic data only. Extra scratch tests: `tests/test_review_2a_round2.py` (22 passing probes; some only print evidence).
+
+## Verdict: PASS WITH FIXES (no safety defect; two functional gaps must be fixed or consciously accepted before Phase 3)
+
+`pytest` 1559 passed (plain and `-W error`); 236 passed under `PYTHONHASHSEED` 0 and 7; with my two scratch files 1559 + 22 more, no xfail left. Perf with the new code (prospects built from Contacts, `nooks_prospects` empty): 12k accounts / 25k contacts / 2k calls 3.2 s, 114 MB RSS; 19.7k / 54k 5.4 s, 176 MB (down from 210 MB).
+
+## Round-1 findings F1-F7
+
+| # | Finding | Status | Evidence |
+|---|---|---|---|
+| F1 | Contacts as prospects; `nooks_prospects` optional, not a live blocker | FIXED | `intake.py:39` `(False, True)`; `SAFETY_PAGED` (`intake.py:48`) no longer lists it; `build_prospects` (`intake.py:532`) builds from `sf_contacts`; file absent and `rows: []` both pass live (`test_prospects_optional`) |
+| F2 | `hasMore` replaced by `links.next`; derive flag | FIXED, with gaps below | runbook §4 ("There is NO `hasMore` field"), `merge_pages.derive_last_page` (`merge_pages.py:185`) |
+| F3 | tagged-task last-sheet source | FIXED | `intake.py:636-690` (`SHEET_TAG`, `last_sheet_from_tasks`), union in `pipeline.py` step 9; same-day/future tags ignored, untagged ignored; unresolved tagged task blocks live. Minor: multi-tag note uses the first tag, not the newest (see N6) |
+| F4 | UTF-16 / BOM / garbage | FIXED | `intake.py:161` and `merge_pages.py:57` `decode_text`: BOM and BOM-less UTF-16, UTF-8-sig, garbage → loud error, never `UnicodeDecodeError` |
+| F5 | other-owner calls | FIXED | `intake.py:392` blocks live (`test_gate_other_owner_blocks`) |
+| F6 | scoop types/windows | FIXED (doc) | runbook §6: buyer types only, `employeeRangeMax=2000`, 90 d people / 45 d others, per-type counts in `run_meta.scoop_counts_by_type`, Open Position skipped. `config.yaml:87` still lists Open Position/Management Move in `scoop_types_keep`: harmless (a keep list for what may arrive), mention only |
+| F7 | DNC limits in the log | FIXED | `pipeline.py:49` `DNC_NOTE` is written into every log header |
+
+## Live-gate re-run (all as expected)
+Blocked live: partial calls; stale (+25 h); future `fetched_at`; missing Gmail; credits unknown or 2; other-owner calls; owner mismatch (stops); empty history; unknown disposition; first run with 3 calls (floor `MIN_FIRST_RUN_CALLS = 5`, `pipeline.py:302`); reset/corrupt state without tagged tasks; missing tasks file. Passes live: full data; `nooks_prospects` deleted or empty. Floor bypass attempt (a valid `state.json` with emptied `seen_calls`, then 3 calls): blocked anyway (`mark_dnc_rebuilt` shrink check). Dry run never records a sheet; `record_sheet=True` without live raises. PASS.
+
+## Probe table, row by row (docs vs `connector_notes_v2.md` and fixtures)
+
+| Row | Status | Note |
+|---|---|---|
+| a1 page_size 100 | FIXED | runbook §4, §7b |
+| a2 `links.next == null` | FIXED | runbook §4; derive rule on the FINAL page only (see N1) |
+| a3 owner filter always | FIXED | `filter_owner_id` named (runbook §4, §7b); other-owner calls block live |
+| a4 full history each run | FIXED | "about 17 pages... refetch in full every run" |
+| a5 Outreach DNC limit | FIXED | `DNC_NOTE`, runbook §4 |
+| a6 `to` oddities counted | FIXED | `pipeline.py:_to_stats`, log line "calls with a 'to' that is not E.164" |
+| b1 one-off tasks | FIXED | runbook §5: `filter_action=call`, `filter_sequenceState_state=null`, no status filter. NOTE the probe verified `filter_status=ready,pending` only; "no status filter returns completed tasks too" is UNVERIFIED |
+| b2 note tag | FIXED | see F3 |
+| c1 Contacts as prospects | FIXED | F1 |
+| c2 prospects not a precondition | FIXED | F1 |
+| c3 lazy Nooks ids, DNC re-check in Phase 3 | FIXED (doc) | `DNC_NOTE`, intake_schema:97, runbook §5. But see N2: the dry run cannot see DNC on unresolved ids |
+| d1 keyset 2000, ~10/~27 pages | FIXED | runbook §2, §3 |
+| d2 `HQ_Country__c` in WHERE; Python authority | FIXED | runbook §2 (AND-ed with BillingCountry, fallback to Python-only if short) |
+| d3 no `DoNotCall`; `Sales_Opt_Out_Email__c` | FIXED | fetched and COUNTED, not used to block (`intake.py` stat `contacts_sales_opt_out_email_unverified`, logged). Needs Alex's decision |
+| d4 `FieldDefinition` fallback | FIXED | runbook §2 |
+| e1 types, Open Position skipped | FIXED | runbook §6 |
+| e2 employeeRangeMax, windows, page size | FIXED | runbook §6, §7b. Date-filter parameter name still UNVERIFIED (honestly marked) |
+| e3 counts, credits, matched | FIXED | `pipeline.py` log: "scoops matched to your book: X of Y", per-type counts, credits |
+| e4 intent out | FIXED | runbook §6 |
+| f1 Gmail query per shortlisted contact | FIXED | runbook §7, §7e |
+| f2 query-window rule | FIXED, conservative | anchored on the search day (`pipeline.py` `email_today`, window must be >= cooldown else live blocked) |
+| g unattended-run notes | FIXED | runbook §7c-7f, §9 |
+
+**Cursor parameter name.** The probe fixture's `hint` reads: "Call `listCalls` again with `page_after` set to "<cursor>" and the same filters", and `links.next` carries `page[after]=<cursor>` (URL-encoded). So the runbook should say flatly: the tool parameter is **`page_after`**; its value is the quoted cursor from `hint` (preferred) or the URL-DECODED `page[after]` value from `links.next`; never pass the percent-encoded form. The runbook currently says "read the tool schema for the exact parameter name"; acceptable but should be firmed up (N5). `filter_time_gte` is correct and unused (full history).
+
+## New code review
+
+**`merge_pages --derive-last-page`** (attacks run directly on `derive_last_page`):
+
+| Input | Result |
+|---|---|
+| Nooks 3 pages, last `next=null` | True (correct) |
+| Nooks last page `next=""`, final empty page | True (correct) |
+| Nooks reordered so a page with a cursor is last | False (safe) |
+| **Nooks middle page missing** (a, c) | **True (wrong, undetectable from cursors alone)** |
+| **Nooks `next=null` page in the middle, more pages after** | **True (wrong, cheap to detect)** |
+| **Nooks same terminal page twice** | **True (wrong, cheap to detect)** |
+| **Nooks only the last page of the history in the manifest** | **True** |
+| Salesforce 2000 then 1999 | True (correct) |
+| Salesforce last page exactly 2000 rows with `done` true | False (safe; the session must fetch the next, empty, page → True) |
+| Salesforce 2000 + empty page | True (correct) |
+| **Salesforce middle page short (1000, harness cap), then 500** | **True (wrong)** |
+| **Salesforce duplicate/reordered ids, or a single short page** | **True** |
+| ZoomInfo 1..3 complete | True (correct) |
+| ZoomInfo missing / duplicated / reordered page, rows < totalResults, truncated second type | False (safe) |
+| ZoomInfo `totalResults` 250 → 400 on the last page | True (only the first page's total is used) |
+| ZoomInfo `page.total` changes mid-sequence (3,3,2) | True (wrong, edge) |
+| ZoomInfo empty last page with total 0 | True (correct) |
+
+N1 (**Medium**): the Nooks and Salesforce rules only inspect the FINAL page, so a wrong or partial manifest (the typical session mistake) yields `reached_last_page=true` and a DNC rebuild on a partial history. Cheap fixes in `derive_last_page`: Nooks: every non-final page must have a non-null `links.next` and row ids must be strictly ascending across the whole manifest; Salesforce: every non-final page must hold exactly `sf_limit` rows and Ids must be strictly ascending across pages (kills the short-middle-page and duplicate cases); ZoomInfo: `meta.page.total` and `totalResults` constant within a sequence. A missing middle page stays undetectable from the pages; add `--expect-pages N` (the session counts its calls) and fail on a mismatch, and have the runbook tell the session to write the count.
+
+**State keys (`sfc:<contact id>`).** `pipeline.py` `_surrogate` / `_restore`: the key never appears in the log, in `PipelineResult.prospects`, in `rank_result.prospects`, or in `state.json` (0 occurrences in a world run). PASS. **Shared phone, two Contacts** with a Do Not Call call by phone and no prospect id: BOTH are blocked (over-block, safe; `state._link_prospect` returns "ambiguous" for recording but the phone block applies). PASS.
+
+**Phone inference of Nooks ids** (`intake.infer_prospect_ids_from_calls`): one id to two phones → unresolved; one phone on two Contacts → unresolved; two Nooks ids on one single-Contact phone → the first (sorted) id wins, the second stays unresolved; a colleague's prospect id on a call to a number only one Contact lists would attach to that Contact (wrong-person attach). Residual risk is low (the dialled number normally belongs to the person dialled) and the direction for DNC is over-blocking; but it is not exact: UNVERIFIED on real data. **Low (N7).**
+
+**Tagged tasks** (`parse_sheet_tag`): impossible date (`2026-02-30`) → ignored; 5 MB note with a tag at the end → parsed without trouble; tag in the middle of a note → accepted; acct id of 16 chars is accepted (`[A-Za-z0-9]{15,18}`), 15/18 are the valid lengths (cosmetic); future/same-day ignored; a forged past tag can only suppress an account for one night (harmless). **N6 (Low):** with several tags in one note, `search` takes the FIRST (oldest) tag; use `finditer` and take the newest.
+
+**Gmail window anchoring:** anchored on `gmail_sent.json` `meta.fetched_at` (Sydney date), live blocked when `window_days` < cooldown. Correct. F13 (block up to ~7 days past the window): **acceptable** (conservative; the alternative needs message bodies).
+
+**UTF-16/BOM:** PASS in both `intake` and `merge_pages` (BOM UTF-16, BOM-less UTF-16-LE, UTF-8-sig, garbage).
+
+## New findings
+
+- **N2 (High): account-level cooldown memory is mostly lost when call prospect ids are not resolved.** `state.record_calls` records a call whose Nooks `prospect.id` is unknown on the PROSPECT only (`state.py:739` warning "no Salesforce account... cannot be cooled down"). With `nooks_prospects` no longer fetched, only phone-unique inference resolves ids. Repro `test_cooldown_lost_when_call_prospect_ids_unresolved`: 7 of 7 calls recorded with no account; in the 12k perf world 1,112 of 2,000 calls (56%) had no account, so only ~590 accounts carried call state. Live passes regardless. Effect: accounts dialled within the 3-day (no answer) or 14-day (connect) cooldown can be ranked again; the tagged-task source only covers the last sheet. Real-world rate is UNVERIFIED (depends on how many Contacts have a unique phone), but the log only prints `call_prospect_ids_left_unresolved`. Fix: (1) add a runbook step that fetches `listProspects filter_id=<uuid,...>` (10 ids per call is not needed; comma lists of uuids are supported) for every distinct prospect id on calls inside the longest cooldown window (about 14 days, probably under 100 ids), written to `nooks_prospects.json` (their `crmId` joins to Contacts); (2) make the pipeline report "calls in the last 14 days not tied to an account: X of Y" and block live above a threshold.
+- **N3 (High): Gmail coverage is not checked.** Live requires `gmail_sent.json` but not that every ranked prospect was searched. The ranked set changes once Gmail hits block people (the next account backfills), and those backfills were never searched. Fix: record the searched addresses (as normalised hashes) in the file's `meta`/`run_meta`, and make live require that every chosen prospect with an email is covered; re-run the dry run until the set is stable (fixpoint).
+- **N4 (Medium): a Do Not Call on a Nooks prospect id that matches no Contact is invisible to the dry run.** Repro `test_dnc_call_external_to_unresolved_prospect_id_is_invisible`: DNC call, `to="external"`, id unresolved → the id is stored in `state.dnc_prospect_ids` but no Contact is blocked and the log has no line for it. The design says Phase 3 re-checks by Nooks id, which is the right mitigation; add a log line "DNC prospect ids not tied to any Contact: N" and make that re-check a hard Phase 3 precondition (list it in PLAN.md).
+- **N5 (Low):** firm up the cursor parameter (`page_after`) and the URL-decoding in the runbook; add `getObjectSchema` to the ban list instead of the allow list (runbook §0 still lists it as allowed while §2 forbids it).
+- **N8 (Low):** runbook §0 bans by name; use an allow-list (`soqlQuery`, `getUserInfo`, `listCalls`, `listCallDispositions`, `listTasks`, `listProspects`, `search_scoops`, `search_threads`, `getMe`) so an unlisted ZoomInfo tool (`browse_engagements`, `conversation_intelligence`, `open_zoominfo`, `get_gtm_context`) is not called by accident. §7e says "never print the list" but then needs the session to read each address: the addresses will enter the session context (not git); say so explicitly.
+
+## Runbook as the executing session
+Read-only rules are at the top (§0); credit-spending tools are named; every spill snippet prints counts or a single cursor only (none prints a row; the Nooks cursor is an opaque base64 of an id). Steps are executable with exact parameters (§7b). The 65-110 call estimate is plausible (probe: SF 10 + 27, Nooks 17 + 1 + 1-3, scoops 6-10, Gmail <= 40). Gaps: N2 (no step for lazy prospect resolution of recent calls), N3 (no coverage record), N1 (`--expect-pages`), the date-filter parameter name for scoops is still unverified, and `filter_status` handling for completed tasks is unverified.
+
+## Leftover judgement calls
+- F13 undated email block up to ~7 days past the window: **acceptable.**
+- `not_anz` drop list capped at 25 + count: **acceptable** for rule 5 (server-side ANZ filter now shrinks it to a few hundred accounts; the count is logged); optional full list in a side file.
+- Decision 1 (no ZoomInfo company search source): **accept**. Decision 2 (Nooks→SF link in Python): **accept**, now mostly moot. Decision 3 (dry run saves `state.json`): **accept**, safe (live re-derives the marker each run from the current full file). Decision 4 (DNC re-marked rebuilt every run): **accept**. Decision 5 (Gmail optional for dry, required for live): **accept**, subject to N3.
+
+## Final: PASS WITH FIXES
+Blocking Phase 3 (not the dry run): **N2**, **N3**. Should fix with them: N1, N4. Nice to have: N5-N8.
