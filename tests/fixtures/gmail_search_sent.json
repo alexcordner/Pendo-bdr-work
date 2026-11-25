@@ -18,6 +18,12 @@
       ]
     }
   ],
+  "empty_result_example": {
+    "note": "Query built from the dot-STRIPPED address finds nothing; use the real dotted address.",
+    "query": "in:sent to:firstlast@example.com newer_than:7d",
+    "resultCountEstimate": "0",
+    "threads": []
+  },
   "dot_stripped_expected_match": {
     "query_address": "first.last@example.com",
     "returned_address": "firstlast@example.com"

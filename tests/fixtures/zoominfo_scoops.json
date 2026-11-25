@@ -352,6 +352,73 @@
     {
       "attributes": {
         "company": {
+          "id": "FAKE-ZI-1002",
+          "name": "Fakeville Software Pty Ltd"
+        },
+        "description": "Fakeville Software has an open position for a Head of Product Experience.",
+        "id": "FAKE-SCOOP-13",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T15",
+            "topic": "Open Position"
+          },
+          {
+            "id": "FAKE-T16",
+            "topic": "Product Management"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y12",
+            "type": "Open Position"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-13",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1003",
+          "name": "Sample Logistics Ltd"
+        },
+        "description": "Sample Logistics announced a management change: <Person> moves to Chief Digital Officer.",
+        "id": "FAKE-SCOOP-14",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T17",
+            "topic": "Management Move"
+          },
+          {
+            "id": "FAKE-T18",
+            "topic": "Digital Transformation"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y13",
+            "type": "Management Move"
+          }
+        ],
+        "contacts": [
+          {
+            "firstName": "<First>",
+            "id": 0,
+            "lastName": "<Last>"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-14",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
           "id": "FAKE-ZI-1001",
           "name": "Example Widgets Pty Ltd"
         },

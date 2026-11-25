@@ -1,5 +1,5 @@
 {
-  "_note": "SYNTHETIC listCalls shape. 40 calls: durations <10s 65%, 10-30s ~8%, >30s ~28%. 8 calls have prospect null / from 'external'. Four Left Voicemail (23-32s); eight No Answer calls of 34-64s (do not infer voicemail from duration).",
+  "_note": "SYNTHETIC listCalls shape. 40 calls: durations <10s 60%, 10-30s ~12%, >30s ~28%. 8 calls have prospect null / from 'external'. Four Left Voicemail (22-34s); eight No Answer calls of 35-63s (do not infer voicemail from duration); No Answer at 19s and 21s are the boundary cases for the under-20s no-contact rule.",
   "data": [
     {
       "id": "FAKE-CALL-001",
@@ -275,14 +275,11 @@
       "id": "FAKE-CALL-011",
       "source": "nooks_sep",
       "duration": 0,
-      "from": "+61400000000",
+      "from": "external",
       "to": "+61400000011",
       "direction": "outgoing",
       "recordingUrl": null,
-      "prospect": {
-        "id": "FAKE-NOOKS-PROSPECT-3",
-        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
-      },
+      "prospect": null,
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
@@ -301,15 +298,12 @@
     {
       "id": "FAKE-CALL-012",
       "source": "nooks_sep",
-      "duration": 0,
-      "from": "+61400000000",
+      "duration": 1,
+      "from": "external",
       "to": "+61400000012",
       "direction": "outgoing",
       "recordingUrl": null,
-      "prospect": {
-        "id": "FAKE-NOOKS-PROSPECT-1",
-        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-1"
-      },
+      "prospect": null,
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
@@ -328,7 +322,7 @@
     {
       "id": "FAKE-CALL-013",
       "source": "nooks_sep",
-      "duration": 0,
+      "duration": 2,
       "from": "external",
       "to": "+61400000013",
       "direction": "outgoing",
@@ -352,7 +346,7 @@
     {
       "id": "FAKE-CALL-014",
       "source": "nooks_sep",
-      "duration": 1,
+      "duration": 3,
       "from": "external",
       "to": "+61400000014",
       "direction": "outgoing",
@@ -376,7 +370,7 @@
     {
       "id": "FAKE-CALL-015",
       "source": "nooks_sep",
-      "duration": 2,
+      "duration": 4,
       "from": "external",
       "to": "+61400000015",
       "direction": "outgoing",
@@ -400,7 +394,7 @@
     {
       "id": "FAKE-CALL-016",
       "source": "nooks_sep",
-      "duration": 3,
+      "duration": 5,
       "from": "external",
       "to": "+61400000016",
       "direction": "outgoing",
@@ -424,7 +418,7 @@
     {
       "id": "FAKE-CALL-017",
       "source": "nooks_sep",
-      "duration": 4,
+      "duration": 6,
       "from": "external",
       "to": "+61400000017",
       "direction": "outgoing",
@@ -448,7 +442,7 @@
     {
       "id": "FAKE-CALL-018",
       "source": "nooks_sep",
-      "duration": 5,
+      "duration": 8,
       "from": "external",
       "to": "+61400000018",
       "direction": "outgoing",
@@ -472,17 +466,20 @@
     {
       "id": "FAKE-CALL-019",
       "source": "nooks_sep",
-      "duration": 6,
-      "from": "external",
+      "duration": 3,
+      "from": "+61400000000",
       "to": "+61400000019",
       "direction": "outgoing",
       "recordingUrl": null,
-      "prospect": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-2",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-2"
+      },
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-no-answer",
-        "_href": "/v1/callDispositions/disp-no-answer"
+        "id": "disp-bad-number",
+        "_href": "/v1/callDispositions/disp-bad-number"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -496,17 +493,20 @@
     {
       "id": "FAKE-CALL-020",
       "source": "nooks_sep",
-      "duration": 8,
-      "from": "external",
+      "duration": 5,
+      "from": "+61400000000",
       "to": "+61400000020",
       "direction": "outgoing",
       "recordingUrl": null,
-      "prospect": null,
+      "prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-3",
+        "_href": "/v1/prospects/FAKE-NOOKS-PROSPECT-3"
+      },
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-no-answer",
-        "_href": "/v1/callDispositions/disp-no-answer"
+        "id": "disp-bad-number",
+        "_href": "/v1/callDispositions/disp-bad-number"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -520,7 +520,7 @@
     {
       "id": "FAKE-CALL-021",
       "source": "nooks_sep",
-      "duration": 3,
+      "duration": 6,
       "from": "+61400000000",
       "to": "+61400000021",
       "direction": "outgoing",
@@ -532,8 +532,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-bad-number",
-        "_href": "/v1/callDispositions/disp-bad-number"
+        "id": "disp-do-not-call",
+        "_href": "/v1/callDispositions/disp-do-not-call"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -547,7 +547,7 @@
     {
       "id": "FAKE-CALL-022",
       "source": "nooks_sep",
-      "duration": 5,
+      "duration": 4,
       "from": "+61400000000",
       "to": "+61400000022",
       "direction": "outgoing",
@@ -559,8 +559,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-bad-number",
-        "_href": "/v1/callDispositions/disp-bad-number"
+        "id": "disp-hang-up",
+        "_href": "/v1/callDispositions/disp-hang-up"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -574,7 +574,7 @@
     {
       "id": "FAKE-CALL-023",
       "source": "nooks_sep",
-      "duration": 6,
+      "duration": 7,
       "from": "+61400000000",
       "to": "+61400000023",
       "direction": "outgoing",
@@ -586,8 +586,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-do-not-call",
-        "_href": "/v1/callDispositions/disp-do-not-call"
+        "id": "disp-wrong-person",
+        "_href": "/v1/callDispositions/disp-wrong-person"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -601,7 +601,7 @@
     {
       "id": "FAKE-CALL-024",
       "source": "nooks_sep",
-      "duration": 4,
+      "duration": 9,
       "from": "+61400000000",
       "to": "+61400000024",
       "direction": "outgoing",
@@ -613,8 +613,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-hang-up",
-        "_href": "/v1/callDispositions/disp-hang-up"
+        "id": "disp-left-company",
+        "_href": "/v1/callDispositions/disp-left-company"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -628,7 +628,7 @@
     {
       "id": "FAKE-CALL-025",
       "source": "nooks_sep",
-      "duration": 7,
+      "duration": 22,
       "from": "+61400000000",
       "to": "+61400000025",
       "direction": "outgoing",
@@ -640,8 +640,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-wrong-person",
-        "_href": "/v1/callDispositions/disp-wrong-person"
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -650,12 +650,12 @@
       "hungUpBy": "rep",
       "time": "2026-11-22T03:25:36.486Z",
       "createdAt": "2026-11-22T03:25:52.721Z",
-      "hasTranscript": false
+      "hasTranscript": true
     },
     {
       "id": "FAKE-CALL-026",
       "source": "nooks_sep",
-      "duration": 9,
+      "duration": 27,
       "from": "+61400000000",
       "to": "+61400000026",
       "direction": "outgoing",
@@ -667,8 +667,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-left-company",
-        "_href": "/v1/callDispositions/disp-left-company"
+        "id": "disp-voicemail",
+        "_href": "/v1/callDispositions/disp-voicemail"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -677,12 +677,12 @@
       "hungUpBy": "rep",
       "time": "2026-11-23T03:26:36.486Z",
       "createdAt": "2026-11-23T03:26:52.721Z",
-      "hasTranscript": false
+      "hasTranscript": true
     },
     {
       "id": "FAKE-CALL-027",
       "source": "nooks_sep",
-      "duration": 23,
+      "duration": 30,
       "from": "+61400000000",
       "to": "+61400000027",
       "direction": "outgoing",
@@ -709,7 +709,7 @@
     {
       "id": "FAKE-CALL-028",
       "source": "nooks_sep",
-      "duration": 25,
+      "duration": 34,
       "from": "+61400000000",
       "to": "+61400000028",
       "direction": "outgoing",
@@ -736,7 +736,7 @@
     {
       "id": "FAKE-CALL-029",
       "source": "nooks_sep",
-      "duration": 28,
+      "duration": 19,
       "from": "+61400000000",
       "to": "+61400000029",
       "direction": "outgoing",
@@ -748,8 +748,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-voicemail",
-        "_href": "/v1/callDispositions/disp-voicemail"
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -763,7 +763,7 @@
     {
       "id": "FAKE-CALL-030",
       "source": "nooks_sep",
-      "duration": 32,
+      "duration": 21,
       "from": "+61400000000",
       "to": "+61400000030",
       "direction": "outgoing",
@@ -775,8 +775,8 @@
       "sequence": null,
       "sequenceStep": null,
       "callDisposition": {
-        "id": "disp-voicemail",
-        "_href": "/v1/callDispositions/disp-voicemail"
+        "id": "disp-no-answer",
+        "_href": "/v1/callDispositions/disp-no-answer"
       },
       "owner": {
         "id": "FAKE-NOOKS-USER-ALEX"
@@ -790,7 +790,7 @@
     {
       "id": "FAKE-CALL-031",
       "source": "nooks_sep",
-      "duration": 41,
+      "duration": 36,
       "from": "+61400000000",
       "to": "+61400000031",
       "direction": "outgoing",
@@ -817,7 +817,7 @@
     {
       "id": "FAKE-CALL-032",
       "source": "nooks_sep",
-      "duration": 41,
+      "duration": 52,
       "from": "+61400000000",
       "to": "+61400000032",
       "direction": "outgoing",
@@ -844,7 +844,7 @@
     {
       "id": "FAKE-CALL-033",
       "source": "nooks_sep",
-      "duration": 39,
+      "duration": 38,
       "from": "+61400000000",
       "to": "+61400000033",
       "direction": "outgoing",
@@ -871,7 +871,7 @@
     {
       "id": "FAKE-CALL-034",
       "source": "nooks_sep",
-      "duration": 45,
+      "duration": 47,
       "from": "+61400000000",
       "to": "+61400000034",
       "direction": "outgoing",
@@ -898,7 +898,7 @@
     {
       "id": "FAKE-CALL-035",
       "source": "nooks_sep",
-      "duration": 41,
+      "duration": 35,
       "from": "+61400000000",
       "to": "+61400000035",
       "direction": "outgoing",
@@ -925,7 +925,7 @@
     {
       "id": "FAKE-CALL-036",
       "source": "nooks_sep",
-      "duration": 34,
+      "duration": 58,
       "from": "+61400000000",
       "to": "+61400000036",
       "direction": "outgoing",
@@ -952,7 +952,7 @@
     {
       "id": "FAKE-CALL-037",
       "source": "nooks_sep",
-      "duration": 41,
+      "duration": 44,
       "from": "+61400000000",
       "to": "+61400000037",
       "direction": "outgoing",
@@ -979,7 +979,7 @@
     {
       "id": "FAKE-CALL-038",
       "source": "nooks_sep",
-      "duration": 64,
+      "duration": 63,
       "from": "+61400000000",
       "to": "+61400000038",
       "direction": "outgoing",
