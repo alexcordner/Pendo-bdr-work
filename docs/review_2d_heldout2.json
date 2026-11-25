@@ -1,0 +1,1935 @@
+{
+ "note": "FAKE data; packets are REAL src/callsheet.build_packet output (docs/review_2d_heldout2_packets.json). Labels written BEFORE the lint was run. intended_code = code(s) a good lint should raise (| = any). Names in codes that do not exist are ideal codes.",
+ "label_line": "DRAFT STYLE: not yet calibrated to Alex",
+ "cases": [
+  {
+   "id": "H-G01",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on the Series C. Who looks after product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G02",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird raised A$22 million last week. Who owns product day to day?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good_relative_9d_last_week",
+   "intended_code": null
+  },
+  {
+   "id": "H-G03",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. A$22 million is a big round. Who looks after digital there?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G04",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Southgate Capital led the Series C, right? Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good_right_tag",
+   "intended_code": null
+  },
+  {
+   "id": "H-G05",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird has about 780 people. Who looks after digital there?\nFACT 1: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Perth, Western Australia (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G06",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark appointed Callum Reyes as Head of Product two weeks ago. Who handles digital alongside product?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "pass",
+   "category": "good_age14_two_weeks",
+   "intended_code": null
+  },
+  {
+   "id": "H-G07",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark has a new Head of Product. Who looks after the digital side?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G08",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched the buy now pay later app five days ago. How is the first week going?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good_age5_five_days",
+   "intended_code": null
+  },
+  {
+   "id": "H-G09",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka's new app for small retailers launched this week. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G10",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka is about 95 people with a new app out. Who owns product?\nFACT 1: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Sydney, New South Wales (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G11",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Congrats on the launch. Is the app roadmap yours or someone else's?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G12",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Currawong hired Priya Nair as Chief Experience Officer three days ago. Who owns the CX roadmap now?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "pass",
+   "category": "good_age3",
+   "intended_code": null
+  },
+  {
+   "id": "H-G13",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Currawong has a new Chief Experience Officer. Who looks after CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G14",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. A new Chief Experience Officer at Currawong. What does that mean for CX?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G15",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat raised US$4 million in a seed round this week. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "pass",
+   "category": "good_age2",
+   "intended_code": null
+  },
+  {
+   "id": "H-G16",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat is hiring a Head of Customer Experience. Who will they work with on product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G17",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. A seed round and a CX hire in the past week. Who looks after product now?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "pass",
+   "category": "good_two_events",
+   "intended_code": null
+  },
+  {
+   "id": "H-G18",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Cold call, I'll be upfront. Who looks after digital products at Saltbush?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_ambiguous_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G19",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Saltbush Health has about 1200 employees. Who handles digital there?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_ambiguous_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G20",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Cold call, no news hook. Who looks after customer experience at Bilby?\nFACT 1: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Sydney, New South Wales (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_intent_only",
+   "intended_code": null
+  },
+  {
+   "id": "H-G21",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Bilby Insurance is in Sydney with about 700 staff. Who owns CX tooling?\nFACT 1: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Sydney, New South Wales (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_intent_only",
+   "intended_code": null
+  },
+  {
+   "id": "H-G22",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia agreed to acquire Heron Wealth. Who owns the platform side of that?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G23",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia's Heron Wealth deal is a month old. Who looks after the digital side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "pass",
+   "category": "good_age30_month",
+   "intended_code": null
+  },
+  {
+   "id": "H-G24",
+   "kind": "opener",
+   "packet": "gumnut",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Olivia, Alex from Pendo. Cold call. Who looks after digital at Gumnut Retail?\nFACT 1: About 450 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Melbourne, Victoria (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_stale_signal",
+   "intended_code": null
+  },
+  {
+   "id": "H-G25",
+   "kind": "opener",
+   "packet": "gumnut",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Olivia, Alex from Pendo. Gumnut has about 450 staff in Melbourne. Who owns the online side?\nFACT 1: About 450 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Melbourne, Victoria (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_stale_signal",
+   "intended_code": null
+  },
+  {
+   "id": "H-G26",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa announced a partnership with Southern Rail. Who owns the tech side of it?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G27",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Auckland travel company with a Southern Rail partnership. Who looks after IT there?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "H-G28",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. The Southern Rail partnership is three weeks old. Who owns the digital side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "pass",
+   "category": "good_age20_three_weeks",
+   "intended_code": null
+  },
+  {
+   "id": "H-G29",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Cold call, no news hook. Lorikeet builds education software. Who owns product?\nFACT 1: Industry: Education software (source: Salesforce account record)\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G30",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Brisbane education software, about 60 people. Who looks after product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G31",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. I'll be straight, this is a cold call. Do you have a minute?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G32",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi there, Alex from Pendo. Cold call to Kookaburra in Hobart. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_no_name_one_fact",
+   "intended_code": null
+  },
+  {
+   "id": "H-G33",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi there, Alex from Pendo. I'll be upfront, this is a cold call. Who owns product at Kookaburra?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_no_name_one_fact",
+   "intended_code": null
+  },
+  {
+   "id": "H-G34",
+   "kind": "opener",
+   "packet": "tuatara",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Sione, Alex from Pendo. Cold call, I'll be upfront. Who looks after engineering and product at Tuatara?\nFACT 1: none verified\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_zero_facts",
+   "intended_code": null
+  },
+  {
+   "id": "H-G35",
+   "kind": "opener",
+   "packet": "tuatara",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Sione, Alex from Pendo. This is a cold call. Is product something you look after?\nFACT 1: none verified\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_zero_facts",
+   "intended_code": null
+  },
+  {
+   "id": "H-G36",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Numbat named a Head of Digital Operations recently. Who looks after digital there?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "pass",
+   "category": "good_ambiguous_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G37",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Numbat named Hugo Ferris as Head of Digital Operations. Who handles digital there?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "pass",
+   "category": "good_ambiguous_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G38",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Who looks after product there?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Could you point me to whoever looks after product?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G39",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Who looks after product there?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: May I speak to whoever handles digital there?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G40",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Who looks after product there?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who would I ask about product, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G41",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Who looks after product there?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Is there someone who owns the app roadmap?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G42",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Who looks after product there?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the best person for product there?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G43",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who looks after product there?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Could you tell me who leads digital?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G44",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Who looks after product there?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who looks after the product team, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G45",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Who looks after product there?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Is the head of product around?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G46",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Who looks after product there?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who runs customer experience there?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G47",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Who looks after product there?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who should I speak to about the website?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G48",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Who looks after product there?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Could I get the name of the product lead?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G49",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who looks after product there?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who looks after IT there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "pass",
+   "category": "good_gatekeeper",
+   "intended_code": null
+  },
+  {
+   "id": "H-G50",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Series C",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nI'm curious who looks after product there.\nWho is the right person to speak to?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G51",
+   "kind": "email",
+   "packet": "ironbark",
+   "subject": "tried you re Ironbark",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Declan,\nJust tried you. Ironbark Freight appointed Callum Reyes as Head of Product.\nI'd like to find who looks after digital alongside product.\nWho should I speak to about it?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G52",
+   "kind": "email",
+   "packet": "quokka",
+   "subject": "tried you re Quokka app",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Mei,\nJust tried you. Quokka Pay launched a buy now pay later app for small retailers.\nThe first weeks after a launch are busy.\nWho looks after the app?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G53",
+   "kind": "email",
+   "packet": "currawong",
+   "subject": "tried you re Currawong",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jack,\nJust tried you. Currawong Bank hired Priya Nair as Chief Experience Officer.\nI'm curious who owns CX tooling now.\nWho is the right person to talk to?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G54",
+   "kind": "email",
+   "packet": "wombat",
+   "subject": "tried you re seed round",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Zara,\nJust tried you. Wombat Media raised US$4 million in a seed round.\nYou are also hiring a Head of Customer Experience.\nWho should I talk to about product?\nAlex",
+   "expect": "pass",
+   "category": "good_email_fact_word_hiring",
+   "intended_code": null
+  },
+  {
+   "id": "H-G55",
+   "kind": "email",
+   "packet": "banksia",
+   "subject": "tried you re Heron Wealth",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Tom,\nJust tried you. Banksia Mutual agreed to acquire Heron Wealth.\nI would like to find who looks after the platform side.\nWho is the right person to speak to?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G56",
+   "kind": "email",
+   "packet": "pohutukawa",
+   "subject": "tried you re Southern Rail",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Aroha,\nJust tried you. Pohutukawa Travel announced a partnership with Southern Rail.\nI'd like to find who owns the tech side.\nWho should I speak to?\nAlex",
+   "expect": "pass",
+   "category": "good_email",
+   "intended_code": null
+  },
+  {
+   "id": "H-G57",
+   "kind": "email",
+   "packet": "lorikeet",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Niamh,\nJust tried you. I have no news hook, Lorikeet Learning just looks like a fit.\nI'm calling product teams at education software companies in Brisbane.\nIs product something you look after?\nAlex",
+   "expect": "pass",
+   "category": "good_email_no_trigger",
+   "intended_code": null
+  },
+  {
+   "id": "H-G58",
+   "kind": "email",
+   "packet": "kookaburra",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi there,\nJust tried you. I have no news hook for Kookaburra Logistics.\nI'm trying to find who looks after product in Hobart.\nWho is the right person to talk to?\nAlex",
+   "expect": "pass",
+   "category": "good_email_no_name",
+   "intended_code": null
+  },
+  {
+   "id": "H-G59",
+   "kind": "email",
+   "packet": "tuatara",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Sione,\nJust tried you. I have no news hook for Tuatara Systems.\nI'm trying to find who looks after product and engineering.\nIs that you?\nAlex",
+   "expect": "pass",
+   "category": "good_email_zero_facts",
+   "intended_code": null
+  },
+  {
+   "id": "H-G60",
+   "kind": "email",
+   "packet": "saltbush",
+   "subject": "tried you re Saltbush",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Rahul,\nJust tried you. I have no news hook for Saltbush Health.\nI'm trying to find who handles digital products there.\nWho is the right person to speak to?\nAlex",
+   "expect": "pass",
+   "category": "good_email_ambiguous_stale",
+   "intended_code": null
+  },
+  {
+   "id": "H-G61",
+   "kind": "email",
+   "packet": "bilby",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ethan,\nJust tried you. I have no news hook for Bilby Insurance.\nI'm trying to find who owns customer experience tooling.\nWho should I speak to?\nAlex",
+   "expect": "pass",
+   "category": "good_email_intent_only",
+   "intended_code": null
+  },
+  {
+   "id": "H-G62",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on the Series C. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16, 2026-11-16)",
+   "expect": "pass",
+   "category": "good_trigger_line_cites_label_only",
+   "intended_code": null
+  },
+  {
+   "id": "H-B001",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on the Series B. Who looks after product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "wrong_round_letter",
+   "intended_code": "TRIGGER_MISMATCH|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B002",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on raising A$25 million. Who looks after product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "wrong_amount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B003",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird raised A$22 million in a Series C led by Southgate Ventures. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "investor_name_changed",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B004",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird raised US$22 million. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "currency_changed",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B005",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird raised A$22 million last month. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "relative_time_wrong_9d_vs_last_month",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B006",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird raised A$22 million two days ago. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "age_number_word_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B007",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird has grown to 800 staff. Who looks after digital?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "plausible_employee_count",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B008",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird, the Perth renewable energy company, raised a Series C. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "invented_adjective_industry",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B009",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on your promotion to Chief Product Officer. Who owns the roadmap?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "career_claim_promotion",
+   "intended_code": "UNSUPPORTED_CLAIM|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B010",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. I saw your LinkedIn post about the round. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "linkedin_post_claim",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B011",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Wattlebird is listed on the ASX, right? Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "invented_fact_listing",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B012",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Unlike Gainsight we focus on product teams. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "competitor_named",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B013",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: Salesforce account record)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "fact_wrong_source_label",
+   "intended_code": "FACT_SOURCE_MISMATCH"
+  },
+  {
+   "id": "H-B014",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: Wattlebird Energy operates twelve wind farms across Western Australia (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "fact_invented_wholesale",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "H-B015",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-15)",
+   "expect": "fail",
+   "category": "trigger_line_wrong_date",
+   "intended_code": "TRIGGER_DATE_INVENTED|TRIGGER_DATE_MISSING"
+  },
+  {
+   "id": "H-B016",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count), 2026-11-01)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "fact_invented_date_for_undated_fact",
+   "intended_code": "FACT_DATE_INVENTED"
+  },
+  {
+   "id": "H-B017",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: LinkedIn company page)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "fact_source_made_up",
+   "intended_code": "FACT_SOURCE_UNKNOWN"
+  },
+  {
+   "id": "H-B018",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "fact_source_truncated",
+   "intended_code": "FACT_SOURCE_UNKNOWN|FACT_SOURCE_MISMATCH"
+  },
+  {
+   "id": "H-B019",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Congrats on the funding. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "funding_for_exec_move_packet",
+   "intended_code": "TRIGGER_MISMATCH|INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B020",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark's new CPO is settling in. Who handles digital alongside product?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "wrong_title_cpo_abbrev",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B021",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Callum Reyes joined from Atlassian as Head of Product. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "invented_career_named",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B022",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark appointed Callum Reyes as Head of Product last week. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "relative_time_wrong_14d_last_week",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B023",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Callum Reyes starts his new role next week. Who handles digital alongside him?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "gender_guess_and_invented_start",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B024",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark is like Banksia in a way. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "mixing_up_two_accounts",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B025",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark appointed Callum Reyes as Chief Product Officer. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "wrong_title_in_trigger",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B026",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Chief Product Officer (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "fact_title_changed_in_fact",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "H-B027",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Ironbark in Adelaide is hiring product people. Who handles digital?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "invented_hiring",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B028",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched its app in Melbourne. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "wrong_city",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B029",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched a buy now pay later app for big retailers. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "word_swap_small_to_big",
+   "intended_code": "UNSUPPORTED_CLAIM|FACT_UNSUPPORTED"
+  },
+  {
+   "id": "H-B030",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka's app already has 50,000 downloads. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "invented_metric",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B031",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched the app on 14 November. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "wrong_date",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B032",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched its app last month. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "relative_time_wrong_5d",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED"
+  },
+  {
+   "id": "H-B033",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka launched a new web portal for retailers. Who looks after it?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "app_vs_portal",
+   "intended_code": "UNSUPPORTED_CLAIM|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B034",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. I noticed Quokka is also hiring product designers. Who looks after product?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "invented_hiring",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B035",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Quokka just raised funding, congrats. Who looks after product?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "funding_for_launch_packet",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B036",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Congrats on becoming Chief Experience Officer. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "hired_person_confused_with_contact",
+   "intended_code": "UNSUPPORTED_CLAIM|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B037",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Priya Nair joined Currawong from a major bank. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "invented_career",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B038",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Currawong hired Priya Nair as Chief Digital Officer. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "wrong_title",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B039",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Currawong hired two executives this week. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "invented_count",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B040",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. Currawong is one of Australia's biggest banks. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "invented_boast",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B041",
+   "kind": "opener",
+   "packet": "currawong",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jack, Alex from Pendo. I saw your post about CX on LinkedIn. Who owns CX tooling?\nFACT 1: Currawong Bank hired Priya Nair as Chief Experience Officer (source: ZoomInfo scoop 2026-11-22)\nFACT 2: About 1800 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Currawong Bank hired Priya Nair as Chief Experience Officer (source: zoominfo_scoop:FAKE-H-100, 2026-11-22)",
+   "expect": "fail",
+   "category": "linkedin_post_claim",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B042",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat raised US$40 million. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "amount_10x",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B043",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Congrats on the Series A. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "wrong_round",
+   "intended_code": "TRIGGER_MISMATCH|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B044",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat raised A$4 million in a seed round. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "currency_changed",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B045",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat, the Melbourne media startup, raised a seed round. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "wrong_city",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B046",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat is hiring a Head of Product. Who will they work with?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "wrong_role_hired_contacts_own_title",
+   "intended_code": "TRIGGER_MISMATCH|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B047",
+   "kind": "opener",
+   "packet": "wombat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Zara, Alex from Pendo. Wombat is hiring three CX people. Who owns product?\nFACT 1: Wombat Media raised US$4 million in a seed round (source: ZoomInfo scoop 2026-11-23)\nFACT 2: Wombat Media is hiring a Head of Customer Experience (source: ZoomInfo scoop 2026-11-19)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wombat Media raised US$4 million in a seed round (source: zoominfo_scoop:FAKE-H-130, 2026-11-23)",
+   "expect": "fail",
+   "category": "invented_count",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B048",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Saltbush Health is hiring a Product Manager. Who looks after digital?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "stale_trigger_used_as_news",
+   "intended_code": "INVENTED_TRIGGER|ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B049",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. As Product Manager you probably own the roadmap. Who looks after digital?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "role_assumed_title",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B050",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Your team must be juggling a lot. Who looks after digital?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "role_assumed_your_team",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B051",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Saltbush's patient app must keep you busy. Who looks after it?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_product_and_role",
+   "intended_code": "ROLE_ASSUMED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B052",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Saltbush Health has 1,300 staff. Who looks after digital?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "employee_count_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B053",
+   "kind": "opener",
+   "packet": "saltbush",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Rahul, Alex from Pendo. Cold call, I'll be upfront. Who looks after digital?\nFACT 1: About 1200 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Canberra, Australian Capital Territory (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Saltbush Health is hiring a Product Manager and a UX Researcher (source: zoominfo_scoop:FAKE-H-40, 2026-10-16)",
+   "expect": "fail",
+   "category": "trigger_line_restates_stale_signal",
+   "intended_code": "TRIGGER_LINE_CLAIMED"
+  },
+  {
+   "id": "H-B054",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Saw Bilby is researching CX tools. Who owns that?\nFACT 1: Intent signal (interest, not a dated event): Bilby Insurance is researching customer experience tools (source: ZoomInfo intent date unknown (unverified connector shape))\nFACT 2: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "reaction_to_intent",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B055",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Congrats on the CX project. Who owns it?\nFACT 1: Intent signal (interest, not a dated event): Bilby Insurance is researching customer experience tools (source: ZoomInfo intent date unknown (unverified connector shape))\nFACT 2: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "congrats_on_intent",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B056",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Cold call. Who owns CX tooling?\nFACT 1: Intent signal (interest, not a dated event): Bilby Insurance is researching customer experience tools (source: ZoomInfo intent date unknown (unverified connector shape))\nFACT 2: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Bilby Insurance is researching customer experience tools (source: zoominfo_intent:FAKE-I-12, 2026-11-20)",
+   "expect": "fail",
+   "category": "trigger_line_uses_intent",
+   "intended_code": "TRIGGER_LINE_CLAIMED"
+  },
+  {
+   "id": "H-B057",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. I hear Bilby is shopping for CX tools. Who owns that?\nFACT 1: Intent signal (interest, not a dated event): Bilby Insurance is researching customer experience tools (source: ZoomInfo intent date unknown (unverified connector shape))\nFACT 2: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "heard_claim_on_intent",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B058",
+   "kind": "opener",
+   "packet": "bilby",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ethan, Alex from Pendo. Who owns CX tooling?\nFACT 1: Bilby Insurance is evaluating Qualtrics (source: ZoomInfo intent date unknown (unverified connector shape))\nFACT 2: About 700 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "competitor_in_fact",
+   "intended_code": "FACT_UNSUPPORTED|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B059",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia completed the acquisition of Heron Wealth. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "agreed_vs_completed",
+   "intended_code": "UNSUPPORTED_CLAIM|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B060",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia acquired Heron Wealth. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "tense_agreed_to_acquire_vs_acquired",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B061",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia's merger with Heron Wealth is big news. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "merger_vs_acquisition",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B062",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia agreed to acquire Heron Wealth for A$300 million. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "invented_price",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B063",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Banksia agreed to acquire Heron Wealth last week. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "relative_time_wrong_30d",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED"
+  },
+  {
+   "id": "H-B064",
+   "kind": "opener",
+   "packet": "banksia",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tom, Alex from Pendo. Congrats on the CTO role. Who owns the platform side?\nFACT 1: Banksia Mutual agreed to acquire Heron Wealth (source: ZoomInfo scoop 2026-10-26)\nFACT 2: About 560 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Banksia Mutual agreed to acquire Heron Wealth (source: zoominfo_scoop:FAKE-H-60, 2026-10-26)",
+   "expect": "fail",
+   "category": "career_claim",
+   "intended_code": "UNSUPPORTED_CLAIM|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B065",
+   "kind": "opener",
+   "packet": "gumnut",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Olivia, Alex from Pendo. Gumnut is migrating its ecommerce platform. Who owns the online side?\nFACT 1: About 450 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Melbourne, Victoria (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "stale_trigger_used_as_news",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B066",
+   "kind": "opener",
+   "packet": "gumnut",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Olivia, Alex from Pendo. Gumnut Retail launched a new ecommerce site. Who owns the online side?\nFACT 1: About 450 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Melbourne, Victoria (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_launch",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B067",
+   "kind": "opener",
+   "packet": "gumnut",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Olivia, Alex from Pendo. Saw the platform migration, congrats. Who owns the online side?\nFACT 1: About 450 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Melbourne, Victoria (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "saw_congrats_on_stale",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B068",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa announced a partnership with Northern Rail. Who owns the tech side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "fail",
+   "category": "partner_name_changed",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B069",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa announced a merger with Southern Rail. Who owns the tech side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "fail",
+   "category": "event_changed_to_merger",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B070",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa, based in Wellington, announced a partnership. Who owns the tech side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "fail",
+   "category": "wrong_city",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B071",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa announced a partnership with Southern Rail yesterday. Who owns the tech side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "fail",
+   "category": "relative_time_wrong_20d",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED"
+  },
+  {
+   "id": "H-B072",
+   "kind": "opener",
+   "packet": "pohutukawa",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Aroha, Alex from Pendo. Pohutukawa has 300 staff. Who owns the tech side?\nFACT 1: Pohutukawa Travel announced a partnership with Southern Rail (source: ZoomInfo scoop 2026-11-05)\nFACT 2: About 210 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Pohutukawa Travel announced a partnership with Southern Rail (source: zoominfo_scoop:FAKE-H-50, 2026-11-05)",
+   "expect": "fail",
+   "category": "employee_count_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B073",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Lorikeet just raised a round. Who owns product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_raise",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B074",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Lorikeet has 90 employees. Who owns product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "employee_count_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B075",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Lorikeet is based in Sydney. Who owns product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "wrong_city",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B076",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Lorikeet serves 200 schools. Who owns product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_metric",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B077",
+   "kind": "opener",
+   "packet": "lorikeet",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Niamh, Alex from Pendo. Congrats to the Lorikeet team. Who owns product?\nFACT 1: About 60 employees (source: Salesforce account record (ZoomInfo employee count))\nFACT 2: Based in Brisbane, Queensland (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "congrats_no_trigger",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B078",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jordan, Alex from Pendo. Cold call to Kookaburra. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "guessed_first_name",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B079",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mr Smith, Alex from Pendo. Cold call to Kookaburra. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "guessed_honorific_surname",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B080",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi there, Alex from Pendo. Kookaburra is hiring. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_hiring",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B081",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi there, Alex from Pendo. Cold call to Kookaburra. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: Kookaburra Logistics is a freight company (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "padded_fact2_invented",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "H-B082",
+   "kind": "opener",
+   "packet": "kookaburra",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi there, Alex from Pendo. Cold call to Kookaburra. Who looks after product?\nFACT 1: Based in Hobart, Tasmania (source: Salesforce account record)\nFACT 2: Kookaburra Logistics is based in Hobart (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "padded_fact2_duplicate",
+   "intended_code": "FACT_DUPLICATE"
+  },
+  {
+   "id": "H-B083",
+   "kind": "opener",
+   "packet": "tuatara",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Sione, Alex from Pendo. Cold call. Who looks after product?\nFACT 1: Tuatara Systems has about 100 employees (source: Salesforce account record)\nFACT 2: none verified\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_fact_zero_facts",
+   "intended_code": "FACT_UNSUPPORTED|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B084",
+   "kind": "opener",
+   "packet": "tuatara",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Sione, Alex from Pendo. Cold call. Who looks after product?\nFACT 1: none verified\nFACT 2: Tuatara Systems is based in Wellington (source: Salesforce account record)\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_place_zero_facts",
+   "intended_code": "FACT_UNSUPPORTED|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B085",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. As Product Manager you must be excited about the hire. Who handles digital?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "fail",
+   "category": "role_assumed_title",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B086",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Your team must be thrilled about the hire. Who handles digital?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "fail",
+   "category": "role_assumed_your_team",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B087",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Hugo Ferris previously led digital at a major miner. Who handles digital?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "fail",
+   "category": "invented_career",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B088",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Numbat named Hugo Ferris as Chief Digital Officer. Who handles digital?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "fail",
+   "category": "wrong_title",
+   "intended_code": "UNSUPPORTED_CLAIM|PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B089",
+   "kind": "opener",
+   "packet": "numbat",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Lisa, Alex from Pendo. Numbat named a new CDO. Who handles digital?\nFACT 1: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: ZoomInfo scoop 2026-11-14)\nFACT 2: About 300 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Numbat Mining Tech named Hugo Ferris as Head of Digital Operations (source: zoominfo_scoop:FAKE-H-140, 2026-11-14)",
+   "expect": "fail",
+   "category": "abbrev_for_title_not_in_packet",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B090",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Hope you're having a fantastic Wednesday. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "politeness_filler",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "H-B091",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Just checking in on product at Wattlebird. Who owns it?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "filler_checking_in",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "H-B092",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Do you have 15 minutes this week to chat about how Pendo can help?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "cta_stuffing_number_pitch",
+   "intended_code": "NUMBER_UNSUPPORTED|OPENER_MULTIPLE_QUESTIONS"
+  },
+  {
+   "id": "H-B093",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Would love to get twenty minutes on your calendar. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "cta_stuffing_calendar",
+   "intended_code": "NUMBER_UNSUPPORTED|OPENER_MULTIPLE_QUESTIONS|EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "H-B094",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product? And can I send over a one-pager?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "two_asks_send",
+   "intended_code": "OPENER_MULTIPLE_QUESTIONS|EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "H-B095",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Pendo is the leading digital adoption platform. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "sales_speak_leading",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B096",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. We help product teams ship better software. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "we_help_claim",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B097",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Our platform gives you full visibility into user behaviour. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "feature_pitch_visibility",
+   "intended_code": "OPENER_PENDO_FEATURE|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B098",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Our analytics show exactly where users drop off. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "feature_pitch_analytics",
+   "intended_code": "OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "H-B099",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Revolutionary in-app guidance for Wattlebird. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "hype_plus_feature",
+   "intended_code": "BANNED_PHRASE|OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "H-B100",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo!! Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "exclamation",
+   "intended_code": "EXCLAMATION"
+  },
+  {
+   "id": "H-B101",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo 👋. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "emoji",
+   "intended_code": "EMOJI"
+  },
+  {
+   "id": "H-B102",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. See pendo.io/au for more. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "link",
+   "intended_code": "LINK"
+  },
+  {
+   "id": "H-B103",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Ring me on 0400 000 000. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "phone",
+   "intended_code": "PHONE_NUMBER"
+  },
+  {
+   "id": "H-B104",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Congrats on the Series C round and the new funding and the fact that Wattlebird has grown so quickly this year. Who owns product at the company now?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "over_length",
+   "intended_code": "OPENER_TOO_LONG"
+  },
+  {
+   "id": "H-B105",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Do you have a quick call this week? Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "quick_call",
+   "intended_code": "BANNED_PHRASE|OPENER_MULTIPLE_QUESTIONS"
+  },
+  {
+   "id": "H-B106",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Larkspur just appointed a new Chief Digital Officer. Is now a bad time for a short question?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "copied_example_wording_other_account",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "H-B107",
+   "kind": "opener",
+   "packet": "quokka",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Mei, Alex from Pendo. Saw the new Tidewater app launched this month. Curious how the first weeks are going?\nFACT 1: Quokka Pay launched a buy now pay later app for small retailers (source: ZoomInfo scoop 2026-11-20)\nFACT 2: About 95 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Quokka Pay launched a buy now pay later app for small retailers (source: zoominfo_scoop:FAKE-H-30, 2026-11-20)",
+   "expect": "fail",
+   "category": "copied_example_wording_other_account",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B108",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Could I speak to whoever looks after your product analytics?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_pitch_analytics",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "H-B109",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Hi, it's Alex from Pendo, we help product teams. Who is the head of product?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_pitch_we_help_long",
+   "intended_code": "GATEKEEPER_PITCH|GATEKEEPER_TOO_LONG"
+  },
+  {
+   "id": "H-B110",
+   "kind": "opener",
+   "packet": "ironbark",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Declan, Alex from Pendo. Who owns product?\nFACT 1: Ironbark Freight appointed Callum Reyes as Head of Product (source: ZoomInfo scoop 2026-11-11)\nFACT 2: About 340 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who looks after digital now that Callum Reyes is Head of Product?\nTRIGGER: Ironbark Freight appointed Callum Reyes as Head of Product (source: zoominfo_scoop:FAKE-H-20, 2026-11-11)",
+   "expect": "fail",
+   "category": "gk_mentions_trigger",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "H-B111",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Imogen asked me to call back this afternoon.\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_invented_relationship",
+   "intended_code": "GATEKEEPER_NO_ROLE|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B112",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Hi there, could you please let me know who the best person would be for me to speak to about product today?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_too_long",
+   "intended_code": "GATEKEEPER_TOO_LONG"
+  },
+  {
+   "id": "H-B113",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Is Imogen available, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_name_only",
+   "intended_code": "GATEKEEPER_NO_ROLE"
+  },
+  {
+   "id": "H-B114",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is your head of product? I'd like to send them a free report.\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "gk_free_report_pitch",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "H-B115",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "OPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "label_missing",
+   "intended_code": "DRAFT_STYLE_LABEL_MISSING"
+  },
+  {
+   "id": "H-B116",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\n**OPENER:** Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "markdown_bold",
+   "intended_code": "SHAPE_MISSING"
+  },
+  {
+   "id": "H-B117",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "```text\nDRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)\n```",
+   "expect": "fail",
+   "category": "code_fence",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "H-B118",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: \"Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\"\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "quotes_around_opener",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "H-B119",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)\nI kept it short as the calls are brief.",
+   "expect": "fail",
+   "category": "commentary_after",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "H-B120",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "Sure, here is the block for Wattlebird:\nDRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: zoominfo_scoop:FAKE-H-10, 2026-11-16)",
+   "expect": "fail",
+   "category": "preamble",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "H-B121",
+   "kind": "opener",
+   "packet": "wattle",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Imogen, Alex from Pendo. Who owns product at Wattlebird?\nFACT 1: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: ZoomInfo scoop 2026-11-16)\nFACT 2: About 780 employees (source: Salesforce account record (ZoomInfo employee count))\nGATEKEEPER: Who is the right person for digital there, please?\nTRIGGER: Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital (source: LinkedIn, 2026-11-16)",
+   "expect": "fail",
+   "category": "trigger_source_invented_linkedin",
+   "intended_code": "TRIGGER_SOURCE_MISMATCH"
+  },
+  {
+   "id": "H-B122",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Series B",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Congrats on the Series B.\nI'm curious who looks after product.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_wrong_round",
+   "intended_code": "TRIGGER_MISMATCH|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B123",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you and left you a voicemail.\nWattlebird Energy raised A$22 million in a Series C round.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_voicemail_claim",
+   "intended_code": "HISTORY_CLAIM"
+  },
+  {
+   "id": "H-B124",
+   "kind": "email",
+   "packet": "ironbark",
+   "subject": "tried you re Ironbark",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Declan,\nJust tried you. We spoke last week about Ironbark.\nI'd like to find who looks after digital.\nWho should I speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_we_spoke",
+   "intended_code": "HISTORY_CLAIM"
+  },
+  {
+   "id": "H-B125",
+   "kind": "email",
+   "packet": "quokka",
+   "subject": "tried you re Quokka",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Mei,\nJust tried you. Following up on my last email about the launch.\nQuokka Pay launched a buy now pay later app for small retailers.\nWho looks after the app?\nAlex",
+   "expect": "fail",
+   "category": "email_following_up_no_prior_email",
+   "intended_code": "HISTORY_CLAIM"
+  },
+  {
+   "id": "H-B126",
+   "kind": "email",
+   "packet": "currawong",
+   "subject": "tried you re Currawong",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jack,\nJust tried you. Currawong Bank hired Priya Nair as Chief Experience Officer.\nI've sent you a calendar invite for Friday.\nWho owns CX tooling?\nAlex",
+   "expect": "fail",
+   "category": "email_send_language",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "H-B127",
+   "kind": "email",
+   "packet": "wombat",
+   "subject": "tried you re seed round",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Zara,\nJust tried you. Wombat Media raised US$4 million in a seed round.\nI'd like to find who looks after product.\nWho should I speak to? Can we talk Friday?\nAlex",
+   "expect": "fail",
+   "category": "email_two_asks",
+   "intended_code": "EMAIL_MULTIPLE_ASKS"
+  },
+  {
+   "id": "H-B128",
+   "kind": "email",
+   "packet": "banksia",
+   "subject": "Re: Heron Wealth",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Tom,\nJust tried you. Banksia Mutual agreed to acquire Heron Wealth.\nI'd like to find who looks after the platform side.\nWho should I speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_fake_thread_subject",
+   "intended_code": "SUBJECT_FAKE_THREAD"
+  },
+  {
+   "id": "H-B129",
+   "kind": "email",
+   "packet": "pohutukawa",
+   "subject": "tried you re Southern Rail",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Aroha,\nJust tried you.\nPohutukawa Travel announced a partnership with Southern Rail.\nI'd like to find who owns the tech side.\nTeams then look at usage.\nWho should I speak to about it?\nIs that you?\nAlex",
+   "expect": "fail",
+   "category": "email_too_many_lines",
+   "intended_code": "EMAIL_LINE_COUNT"
+  },
+  {
+   "id": "H-B130",
+   "kind": "email",
+   "packet": "lorikeet",
+   "subject": "quick question",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Niamh,\nJust tried you. I have no news hook, Lorikeet Learning just looks like a fit.\nA quick question about product.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_quick",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "H-B131",
+   "kind": "email",
+   "packet": "numbat",
+   "subject": "tried you re Numbat",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Lisa,\nJust tried you. Numbat Mining Tech named Hugo Ferris as Head of Digital Operations.\nYour team will be busy with the new hire.\nWho looks after digital?\nAlex",
+   "expect": "fail",
+   "category": "email_role_assumed",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "H-B132",
+   "kind": "email",
+   "packet": "kookaburra",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jordan,\nJust tried you. I have no news hook for Kookaburra.\nI'm trying to find who looks after product.\nWho is the right person to talk to?\nAlex",
+   "expect": "fail",
+   "category": "email_guessed_name",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B133",
+   "kind": "email",
+   "packet": "lorikeet",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Niamh,\nJust tried you. I saw Lorikeet is growing fast.\nThat often means a busier product team.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_invented_trigger",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B134",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Teams like yours cut onboarding time by 30 percent with Pendo.\nWattlebird Energy raised A$22 million in a Series C round.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_stat_claim",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B135",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nI've attached a one-pager on how Pendo helps.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_attachment",
+   "intended_code": "BANNED_PHRASE|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B136",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nReply to imogen@wattlebird.example.com if easier.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_address_leak",
+   "intended_code": "EMAIL_ADDRESS"
+  },
+  {
+   "id": "H-B137",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. I hope this finds you well.\nWattlebird Energy raised A$22 million in a Series C round.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_filler",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "H-B138",
+   "kind": "email",
+   "packet": "saltbush",
+   "subject": "tried you re Saltbush",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Rahul,\nJust tried you. Saltbush Health has about 1300 staff.\nI'm trying to find who handles digital.\nWho should I speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_employee_count_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "H-B139",
+   "kind": "email",
+   "packet": "numbat",
+   "subject": "tried you re Numbat",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Lisa,\nJust tried you. Numbat has an office in Melbourne.\nI'm trying to find who handles digital.\nWho should I speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_wrong_city",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "H-B140",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nPendo helps teams see where users struggle.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_pendo_claim",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B141",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nGainsight users often switch to something simpler.\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_competitor",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "H-B142",
+   "kind": "email",
+   "packet": "bilby",
+   "subject": "tried you re Bilby",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ethan,\nJust tried you. I noticed Bilby Insurance is researching customer experience tools.\nI'd like to find who owns it.\nWho should I speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_intent_as_news",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "H-B143",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\n- Raised A$22 million\n- Led by Southgate Capital\nWho looks after product?\nAlex",
+   "expect": "fail",
+   "category": "email_bullets",
+   "intended_code": "EMAIL_BULLETS"
+  },
+  {
+   "id": "H-B144",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nI'd like to find who looks after product.\nWho is the right person to speak to?\nCheers, Alex",
+   "expect": "fail",
+   "category": "email_bad_signoff",
+   "intended_code": "EMAIL_SIGNOFF"
+  },
+  {
+   "id": "H-B145",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nI'd like to find who looks after product, and this note is a little longer than it needs to be because I am trying to explain in far too much detail why I called today and what I was hoping to learn about how product decisions get made at Wattlebird this year.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_too_long",
+   "intended_code": "EMAIL_TOO_LONG"
+  },
+  {
+   "id": "H-B146",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "Hi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nI'd like to find who looks after product.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_label_missing",
+   "intended_code": "DRAFT_STYLE_LABEL_MISSING"
+  },
+  {
+   "id": "H-B147",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round last month.\nI'd like to find who looks after product.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_relative_time_wrong",
+   "intended_code": "RELATIVE_TIME_UNVERIFIED"
+  },
+  {
+   "id": "H-B148",
+   "kind": "email",
+   "packet": "wattle",
+   "subject": "tried you re Wattlebird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Imogen,\nJust tried you. Wattlebird Energy raised A$22 million in a Series C round.\nCallum Reyes might be a good contact.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "email_other_account_name",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  }
+ ]
+}
