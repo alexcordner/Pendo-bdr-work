@@ -46,6 +46,7 @@ KIND_BASE_WEIGHT: dict[SignalKind, float] = {
 LAUNCH_NON_DIGITAL_WEIGHT = 0.40
 LAUNCH_FINANCIAL_WEIGHT = 0.20      # property / fund / financial product launch (0.25 x 0.8)
 FUNDING_DEBT_WEIGHT = 0.25          # debt facility, loan, bond, credit line: not a growth round
+MA_TARGET_MINORITY_WEIGHT = 0.35    # target of a minority stake purchase: a holder, not a leadership/platform change
 MA_RUMOUR_FACTOR = 0.5              # 'reportedly in talks to acquire': x0.5 of the acquirer weight
 MA_MINORITY_OR_UNRELATED_WEIGHT = 0.25
 MA_UNCLEAR_WEIGHT = 0.25
@@ -61,9 +62,18 @@ KIND_HALF_LIFE_DAYS: dict[SignalKind, float] = {
     SignalKind.NEW_HIRE: 45.0,
 }
 
-#: Several signals on one account: the best counts in full, every other one counts at this fraction.
-#: combined = 1 - (1 - best) * prod(1 - COMBINE_DAMPING * other). Always >= best and <= 1.0.
+#: Several signals on one account (combined_strength): the strongest signal of each KIND counts in full for the best
+#: one and at COMBINE_DAMPING for the best of every other kind. Extra signals of a kind that already counted add at most
+#: SAME_KIND_EXTRA_EACH each (SAME_KIND_EXTRA_TOTAL together), and only the MAX_COMBINED_SIGNALS strongest signals
+#: take part at all, so nine launch scoops for one company cannot push an account towards 1.0.
+#: combined = 1 - (1 - best) * prod(1 - contribution). Always >= best and <= 1.0.
 COMBINE_DAMPING = 0.5
+SAME_KIND_EXTRA_EACH = 0.15
+SAME_KIND_EXTRA_TOTAL = 0.30
+MAX_COMBINED_SIGNALS = 3
+#: Two scoops of one company about the same product count once when this close in time.
+NEAR_DUPLICATE_DAYS = 14
+NEAR_DUPLICATE_CHARS = 60
 
 #: Longest a scoop of each kind stays useful (days). People moves are a long buying window, so 90; partnerships,
 #: hiring notes and intent fade faster. ``config.signals.max_age_days`` is only the default for a kind missing here
@@ -395,6 +405,7 @@ PARTNERSHIP_NOTE = "partnership without product, digital or customer words: chec
 DEBT_NOTE = "debt facility, not an equity round"
 FINANCIAL_LAUNCH_NOTE = "financial or property product launch, not a digital product"
 RUMOUR_NOTE = "reported talks, not a confirmed deal"
+MA_TARGET_MINORITY_NOTE = "minority stake purchase: weak trigger"
 SAME_DEAL_PREFIX = "same deal as "
 
 
@@ -444,6 +455,14 @@ _DIGITAL_PRODUCT = re.compile(
     r"(?<!\w)(?:apps?|platforms?|software|digital|mobile|portal|online|website|web|saas|ai|artificial\s+intelligence|"
     r"cloud|api|apis|customer\s+experience|cx|ux|e-?commerce|banking\s+app|internet\s+banking|self-service|"
     r"dashboard|chatbot|login|subscription\s+service|solutions?|technology)(?!\w)", _FLAGS)
+# Hardware / lab / equipment words. When one is present the launch is NOT digital unless the text names a software
+# product itself (_SOFTWARE_NOUN); weak words such as platform, user interface, AI, cloud, mobile, digital do not rescue it.
+_HARDWARE_PRODUCT = re.compile(
+    r"(?<!\w)(?:robotics?|robots?|instruments?|consumables?|sampling|samplers?|emitters?|cameras?|sensors?|devices?|"
+    r"hardware|laborator(?:y|ies)|chromatograph\w*|equipment|powders?|reagents?|assays?|spectromet\w+|analy[sz]ers?|"
+    r"wearables?|drones?|batter(?:y|ies)|microscop\w+|centrifuges?|pipettes?)(?!\w)", _FLAGS)
+_SOFTWARE_NOUN = re.compile(
+    r"(?<!\w)(?:software|apps?|saas|portal|website|apis?|e-?commerce|banking\s+app|chatbot|web\s+app\w*)(?!\w)", _FLAGS)
 _CAMEL_AI = re.compile(r"[a-z]AI(?!\w)")            # product names such as 'SignalAI' (case-sensitive on purpose)
 # Financial or property products are not digital products: fund, REIT, trust, portfolio, ETF, property, mortgage...
 # A bank / insurer / super fund launching an APP or platform still matches _DIGITAL_PRODUCT first and counts as digital.
@@ -498,6 +517,12 @@ def _mentions(text: str, name: str) -> bool:
     return bool(name) and bool(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text, _FLAGS))
 
 
+# "agreement for X to acquire", "deal for X to buy", "allows X to acquire": X is the buyer, not the company named earlier.
+_THIRD_PARTY_SUBJECT = re.compile(
+    r"(?<!\w)(?:agreement|deal|offer|proposal|bid|approval|(?:allow|allows|allowed|allowing|enable|enables|enabling|permit|permits))"
+    r"\s+(?:for\s+)?(?P<subject>(?:(?!\bto\b)[^.;]){1,100}?)\s*$", _FLAGS)
+
+
 def ma_role(description: str, company_name: str) -> str:
     """'target', 'acquirer' or 'unclear': the scoop company's role in an M&A description. Deterministic text rules.
     Passive wording ('to be acquired by', 'acquired by', 'merger with', 'sold to') makes the company the target unless
@@ -515,9 +540,28 @@ def ma_role(description: str, company_name: str) -> str:
     before, after = text[:m.start()], text[m.end():]
     if m is pas:
         return "acquirer" if _mentions(after, name) and not _mentions(before, name) else "target"
+    third = _THIRD_PARTY_SUBJECT.search(before)
+    if third:
+        # 'NEXTDC has entered into an agreement for Goodman and Digital Realty to acquire a 9.9% stake in the company':
+        # the buyers are named between 'for' / 'allow' / 'enable' and 'to acquire'; the company named BEFORE that is the target
+        if _mentions(third.group("subject"), name):
+            return "acquirer"
+        return "target" if _mentions(before[:third.start()], name) or _mentions(after, name) else "unclear"
     if _mentions(before, name):
         return "acquirer"
     return "target" if _mentions(after, name) else "unclear"
+
+
+def _is_minority_stake(description: str) -> bool:
+    """True for a minority-stake purchase: a percentage under 50, 'minority', or a 'stake' with no majority wording."""
+    text = description or ""
+    pct = _PERCENT.search(text)
+    pct_val = float(pct.group(1)) if pct else None
+    if pct_val is not None and pct_val < 50 and _STAKE.search(text):
+        return True
+    if re.search(r"(?<!\w)minority(?!\w)", text, _FLAGS):
+        return True
+    return bool(_STAKE.search(text)) and not _MAJORITY.search(text) and pct_val is None
 
 
 def _acquirer_variant(description: str) -> tuple[float, str]:
@@ -542,6 +586,8 @@ def classify_ma(description: str, company_name: str) -> tuple[str, float, str]:
     acquisition 0.50, acquirer of a minority stake or unrelated business 0.25, unclear 0.25."""
     role = ma_role(description, company_name)
     if role == "target":
+        if _is_minority_stake(description):
+            return role, MA_TARGET_MINORITY_WEIGHT, MA_TARGET_MINORITY_NOTE
         return role, KIND_BASE_WEIGHT[SignalKind.MA], MA_TARGET_NOTE
     if role == "acquirer":
         w, note = _acquirer_variant(description)
@@ -714,6 +760,9 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
         return _J(True)
 
     if kind is SignalKind.PRODUCT_LAUNCH:
+        if _HARDWARE_PRODUCT.search(desc) and not _SOFTWARE_NOUN.search(desc):
+            # robotics / instruments / cameras / consumables: 'platform', 'user interface', 'AI' do not make it software
+            return _J(True, LAUNCH_NOTE, factor=LAUNCH_NON_DIGITAL_WEIGHT / KIND_BASE_WEIGHT[kind], notes=(LAUNCH_NOTE,))
         if _DIGITAL_PRODUCT.search(desc) or _CAMEL_AI.search(desc):
             return _J(True)
         if _FINANCIAL_PRODUCT.search(desc):
@@ -723,7 +772,7 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
 
     if kind is SignalKind.MA:
         role, weight, note = classify_ma(desc, scoop.company_name)
-        notes = [] if role == "target" or weight >= KIND_BASE_WEIGHT[kind] else [note]
+        notes = [] if weight >= KIND_BASE_WEIGHT[kind] else [note]
         if role == "acquirer" and _RUMOUR.search(desc):
             weight *= MA_RUMOUR_FACTOR
             note += "; " + RUMOUR_NOTE
@@ -856,7 +905,7 @@ AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
 #: Every warning note that can follow the evidence text, one ' (note)' per note. signal_notes() reads them back.
 NOTE_PREFIXES = ("role ambiguous", "physical or unclear product launch", "acquirer of a minority stake",
                  "M&A direction unclear", "partnership without product", "debt facility", "financial or property",
-                 "reported talks", SAME_DEAL_PREFIX.strip())
+                 "reported talks", "minority stake purchase", SAME_DEAL_PREFIX.strip())
 
 
 def _suffix(notes) -> str:
@@ -968,21 +1017,74 @@ def dedupe_deals(signals: list[Signal]) -> list[Signal]:
     return kept
 
 
+_LAUNCH_VERB = (r"(?i:launch(?:ed|es|ing)?(?:\s+of)?|unveil(?:ed|s|ing)?|introduc(?:ed|es|ing)|releas(?:ed|es|ing)|"
+                r"debut(?:ed|s)?|rolls?\s+out|rolled\s+out|announc(?:ed|es)(?:\s+the\s+launch\s+of)?)")
+_PRODUCT_NAME = re.compile(
+    rf"(?<!\w){_LAUNCH_VERB}\s+(?:(?i:the|its|a|an|new|latest|next-generation)\s+)*"
+    r"(?P<name>[A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,3})")
+
+
+def _product_name(text: str) -> str | None:
+    """The capitalised product name after a launch verb ('Catapult launches PerformanceHub 2'), lower-cased, else None."""
+    m = _PRODUCT_NAME.search(text or "")
+    return m.group("name").lower() if m else None
+
+
+def _normalised_start(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()[:NEAR_DUPLICATE_CHARS]
+
+
+def _near_duplicate(a: Signal, b: Signal) -> bool:
+    """Same kind and either the same first NEAR_DUPLICATE_CHARS normalised characters of the evidence, or the same
+    product name within NEAR_DUPLICATE_DAYS days (one launch announced in several scoops)."""
+    if a.kind is not b.kind:
+        return False
+    ta, tb = _plain_evidence(a), _plain_evidence(b)
+    if _normalised_start(ta) == _normalised_start(tb):
+        return True
+    na, nb = _product_name(ta), _product_name(tb)
+    if na and na == nb:
+        if a.source_date is None or b.source_date is None:
+            return True
+        return abs((a.source_date - b.source_date).days) <= NEAR_DUPLICATE_DAYS
+    return False
+
+
+def dedupe_signals(signals: list[Signal]) -> list[Signal]:
+    """Within one account, scoops that are near-identical (see _near_duplicate) count once: the strongest is kept."""
+    kept: list[Signal] = []
+    for sig in sorted(signals, key=_signal_sort_key):
+        if not any(_near_duplicate(k, sig) for k in kept):
+            kept.append(sig)
+    return kept
+
+
 def combined_strength(signals: list[Signal]) -> float:
     """Diminishing returns over all signals of one account, in 0.0-1.0.
-    The best counts fully, each other counts at COMBINE_DAMPING: 1 - (1-best) * prod(1 - d*other).
-    When the account has any real (non-intent) signal, the best is chosen among those only, so intent can only
-    count as a damped 'other'."""
-    real = dedupe_deals(_real_signals(signals))
-    dated = sorted((x.strength for x in real if x.kind is not SignalKind.INTENT), reverse=True)
-    intent = sorted((x.strength for x in real if x.kind is SignalKind.INTENT), reverse=True)
-    strengths = dated + intent if dated else intent
-    if not strengths:
+
+    1. Same-deal M&A scoops and near-identical scoops (same first 60 characters, or the same product name within 14
+       days) count once (dedupe_deals, dedupe_signals).
+    2. Only the MAX_COMBINED_SIGNALS (3) strongest signals take part; the rest add nothing.
+    3. The strongest counts in full. The best signal of each OTHER kind counts at COMBINE_DAMPING (0.5). Further signals
+       of a kind that already counted add at most SAME_KIND_EXTRA_EACH (0.15) each, SAME_KIND_EXTRA_TOTAL (0.30) in total.
+    combined = 1 - (1 - best) * prod(1 - contribution). While the account has any real (non-intent) signal the best is
+    chosen among those, so intent can only be a damped extra."""
+    real = dedupe_signals(dedupe_deals(_real_signals(signals)))
+    dated = sorted((x for x in real if x.kind is not SignalKind.INTENT), key=_signal_sort_key)
+    intent = sorted((x for x in real if x.kind is SignalKind.INTENT), key=_signal_sort_key)
+    ordered = (dated + intent if dated else intent)[:MAX_COMBINED_SIGNALS]
+    if not ordered:
         return 0.0
-    rest = 1.0
-    for x in strengths[1:]:
-        rest *= 1.0 - COMBINE_DAMPING * x
-    return round(min(1.0, 1.0 - (1.0 - strengths[0]) * rest), 4)
+    rest, seen_kinds, extras = 1.0, {ordered[0].kind}, 0.0
+    for sig in ordered[1:]:
+        if sig.kind in seen_kinds:
+            c = min(sig.strength, SAME_KIND_EXTRA_EACH, SAME_KIND_EXTRA_TOTAL - extras)
+            extras += c
+        else:
+            seen_kinds.add(sig.kind)
+            c = COMBINE_DAMPING * sig.strength
+        rest *= 1.0 - c
+    return round(min(1.0, 1.0 - (1.0 - ordered[0].strength) * rest), 4)
 
 
 # ---------------------------------------------------------------- 3. no trigger
