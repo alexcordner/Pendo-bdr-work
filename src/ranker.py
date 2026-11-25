@@ -23,6 +23,9 @@ SCORING TABLE (points; weights come from ``config.signals.weights``; total clamp
 RESULT BUCKETS
   ranked           callable accounts only (a persona-matching, phoned, non-blocked prospect exists),
                    best first, daily cap applied to this list only, each with a window + local_call_time.
+  spilled          callable accounts held for a later working day because their timezone's first
+                   usable day was full (machine-readable; also reason 'Spilled to ...'). NOT tasks, NOT
+                   in ranked, NOT counted against the cap, NOT sheet history.
   needs_prospect   scored accounts with NO callable prospect (codes: no_prospects_on_account,
                    no_persona_match, persona_match_no_phone). Uncapped, best first, NO window and NO
                    local_call_time. NOTHING IN THIS BUCKET MAY EVER BECOME A NOOKS TASK: it is a
@@ -41,11 +44,15 @@ CONTRACTS
   last_sheet_ids   set of ids (sf / zoominfo / nooks). A HARD skip ('on last sheet'): never the same
                    account twice in a row.
 
-SCHEDULING: per timezone, all call windows of the first working day that still have time ahead of
-``now`` form one timeline (a window already under way starts at ``now``). Callable accounts, best
-first, are spread evenly over that timeline with at least MIN_SLOT_MINUTES per account; anything that
-does not fit spills to the next working day's windows. A window with under MIN_SLOT_MINUTES left is
-not used.
+SCHEDULING: per timezone, the FIRST USABLE DAY is the first working day with at least one window
+that still has MIN_SLOT_MINUTES left after ``earliest`` (= now rounded up to a whole minute + 1 minute
+of lead, so the first task is never due before the run could finish). Its date is the account's call
+date (used for cooldown and for deciding what 'spilled' means). Callable accounts, best first, take
+slots on that day (spread evenly, >= MIN_SLOT_MINUTES apart) until it is full; the rest are SPILLED
+(held, later local_call_time, no cap slot used) and the next-ranked account that fits takes the place.
+SHEET BUILDER CONTRACT: write tasks ONLY for ``ranked`` (all on the first usable day of their own
+timezone; zones may differ). ``spilled`` and ``needs_prospect`` never become tasks and are never
+recorded in sheet history / last_sheet_ids.
 """
 from __future__ import annotations
 
@@ -64,6 +71,7 @@ SIZE_UNKNOWN_FACTOR = 0.3          # neutral value for unknown headcount
 EXTRA_SIGNAL_BONUS = 0.10          # added to combined strength per additional real signal
 FLAGGED_GROUP_PENALTY = -3.0       # non-ANZ billing / ANZ HQ accounts
 MIN_SLOT_MINUTES = 3               # minimum wall-clock gap between two calls in one timezone
+LEAD_MINUTES = 1                   # first slot = now rounded up to a whole minute + this lead
 
 _KIND_LABELS = {
     SignalKind.FUNDING: "Funding", SignalKind.EXEC_MOVE: "Executive move", SignalKind.NEW_HIRE: "New hire",
@@ -79,6 +87,10 @@ class RankResult:
     # Scored accounts with no callable prospect; uncapped, best first, no window/time. NEVER make
     # Nooks tasks from these. Code per account (account_key -> code) is in needs_prospect_codes.
     needs_prospect: list[RankedAccount] = field(default_factory=list)
+    # Callable accounts HELD for a later working day because their timezone's first usable day was
+    # full. They carry their intended later window/local_call_time (for the run log) but are NOT in
+    # ranked, do not use cap slots, and must never become tasks or be recorded as sheet history.
+    spilled: list[RankedAccount] = field(default_factory=list)
     needs_prospect_codes: dict[str, str] = field(default_factory=dict)
     skipped: list[RankedAccount] = field(default_factory=list)      # each has skipped_reason
     by_window: dict[str, list[RankedAccount]] = field(default_factory=dict)  # window name -> best first
@@ -108,7 +120,7 @@ def is_blocked(prospect: Prospect) -> bool:
 ALIASES = [
     {"cto", "chief technology officer", "chief technical officer"},
     {"cio", "chief information officer"},
-    {"cpo", "chief product officer"},
+    {"cpo", "chief product officer", "chief product technology officer"},
     {"vp product", "vice president product"},
     {"head customer experience", "head cx"},
     {"head customer success", "director customer success", "customer success director"},
@@ -117,6 +129,8 @@ ALIASES = [
     {"head digital", "digital director", "director digital"},
 ]
 _DROP_WORDS = {"of", "the", "and"}
+# Stale titles: 'Former Head of Product', 'Ex-CTO', 'Past VP Product', 'Interim former ...' never match.
+_STALE = re.compile(r"^\s*(?:(?:interim|acting)\s+)?(?:former|past|ex)(?:[-\s]|$)", re.IGNORECASE)
 
 
 def _norm(text: str) -> list[str]:
@@ -158,7 +172,7 @@ def _persona_rank(title: str | None, config: Config) -> tuple[int, int, int] | N
     Matching is on whole tokens (see _norm / _phrase_in / ALIASES): 'CTO' does not match 'Director',
     'Director of Product-Led Growth' does not match 'Director of Product'.
     """
-    if not title:
+    if not title or _STALE.match(title):
         return None
     tokens = _norm(title)
     best = None   # (-words, level, idx)
@@ -358,6 +372,12 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
     if now.tzinfo is None:
         raise ValueError("now must be timezone-aware")
     cooldowns = _clean_cooldown(cooldown_until)
+    timelines: dict[str, list] = {}          # tz -> usable days (first usable day first)
+
+    def days_for(tz: str) -> list:
+        if tz not in timelines:
+            timelines[tz] = _timeline(config, tz, now)
+        return timelines[tz]
 
     # Index prospects by every account id they carry.
     by_acct: dict[str, list[Prospect]] = {}
@@ -392,11 +412,12 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
         if _on_last_sheet(a, last_sheet_ids):
             skipped.append(_skip(a, "on last sheet", sigs))
             continue
-        # 4. call date = account-local date of the first open window (never the UTC date).
-        windows = next_working_windows(config, a.timezone, now)
-        call_date = windows[0].start.date() if windows else now.astimezone(ZoneInfo(a.timezone)).date()
+        # 4. call date = account-local date of the FIRST USABLE day (a window with under
+        #    MIN_SLOT_MINUTES left does not count). Never the UTC date.
+        days = days_for(a.timezone)
+        call_date = days[0][0][1].date() if days else now.astimezone(ZoneInfo(a.timezone)).date()
         chosen = pick_prospects(mine, config)
-        if chosen and not windows:
+        if chosen and not days:
             skipped.append(_skip(a, "no call window in the next 14 days", sigs))
             continue
         cool = _in_cooldown(a, cooldowns, call_date)
@@ -421,21 +442,39 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
 
     callable_.sort(key=sort_key)
     needs.sort(key=sort_key)
-    cap = config.limits.daily_call_cap          # cap counts CALLABLE accounts only
-    kept, cut = callable_[:cap], callable_[cap:]
-    for i, (ra, _, _, _) in enumerate(cut, start=cap + 1):
-        ra.skipped_reason = f"below daily cap (rank {i}, cap {cap})"
+
+    # Select, best first. An account takes a cap slot only if its timezone's first usable day still
+    # has room; otherwise it is SPILLED (held) and the next-ranked account that fits replaces it.
+    cap = config.limits.daily_call_cap
+    day_room = {tz: _day_capacity(days[0]) for tz, days in timelines.items() if days}
+    kept, held, cut = [], [], []
+    for item in callable_:
+        tz = item[0].account.timezone
+        if len(kept) >= cap:
+            cut.append(item)
+        elif day_room[tz] > 0:
+            day_room[tz] -= 1
+            kept.append(item)
+        else:
+            held.append(item)
+    for n, (ra, _, _, _) in enumerate(cut, start=cap + 1):
+        ra.skipped_reason = f"below daily cap (rank {n}, cap {cap})"
         skipped.append(ra)
 
-    unscheduled = _assign_times(kept, config, now)
-    for ra in unscheduled:
-        ra.window, ra.local_call_time = None, None
+    _place(kept, timelines, first_day_only=True)
+    unplaced = _place(held, timelines, first_day_only=False)
+    unplaced_ids = {id(t) for t in unplaced}
+    spilled = [t for t in held if id(t) not in unplaced_ids]
+    for ra, _, _, _ in spilled:
+        ra.reasons.append(f"Spilled to {ra.local_call_time:%a %d %b} (first day's call windows full): held, no task tonight")
+    for ra, _, _, _ in unplaced:
         ra.skipped_reason = "no call capacity in the next 14 days"
         skipped.append(ra)
 
     result = RankResult()
-    result.ranked = [t[0] for t in kept if t[0].skipped_reason is None]
-    result.prospects = {account_key(t[0].account): t[2] for t in kept if t[0].skipped_reason is None}
+    result.ranked = [t[0] for t in kept]
+    result.prospects = {account_key(t[0].account): t[2] for t in kept}
+    result.spilled = [t[0] for t in spilled]
     result.needs_prospect = [t[0] for t in needs]
     result.needs_prospect_codes = {account_key(t[0].account): t[3] for t in needs}
     result.by_window = {w.name: [] for w in config.call_windows}
@@ -445,66 +484,77 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
     return result
 
 
-def _timeline(config: Config, tz: str, now: datetime) -> list[list[tuple[str, datetime, datetime]]]:
-    """Per working day (first open day first), usable segments (name, start, end) in ``tz``.
+def _earliest(now: datetime) -> datetime:
+    """First dialable moment: now rounded UP to a whole minute, plus LEAD_MINUTES."""
+    base = now.replace(second=0, microsecond=0)
+    if base < now:
+        base += timedelta(minutes=1)
+    return base + timedelta(minutes=LEAD_MINUTES)
 
-    The first day's windows start no earlier than ``now``. Segments shorter than MIN_SLOT_MINUTES are
-    dropped. Looks up to 15 working days ahead (same horizon as next_working_windows)."""
+
+def _timeline(config: Config, tz: str, now: datetime) -> list[list[tuple[str, datetime, datetime]]]:
+    """Usable working days in ``tz`` (first usable day first), each a list of segments
+    (window name, start, end) as local aware datetimes.
+
+    A segment starts no earlier than _earliest(now) and is dropped when under MIN_SLOT_MINUTES long;
+    a day with no usable segment is dropped entirely. Looks up to 15 working days ahead."""
+    earliest = _earliest(now)
     days, cursor = [], now
     for _ in range(15):
         ws = next_working_windows(config, tz, cursor)
         if not ws:
             break
-        segs = [(w.name, max(w.start, now.astimezone(w.start.tzinfo)), w.end) for w in ws]
-        days.append([x for x in segs if (x[2] - x[1]) >= timedelta(minutes=MIN_SLOT_MINUTES)])
+        segs = [(w.name, max(w.start, earliest.astimezone(w.start.tzinfo)), w.end) for w in ws]
+        usable = [x for x in segs if (x[2] - x[1]) >= timedelta(minutes=MIN_SLOT_MINUTES)]
+        if usable:
+            days.append(usable)
         cursor = ws[-1].end
     return days
 
 
-def _assign_times(kept: list, config: Config, now: datetime) -> list[RankedAccount]:
-    """Set window + local_call_time. Returns accounts that found no slot (practically never).
+def _day_capacity(segs) -> int:
+    """How many accounts one day can hold at MIN_SLOT_MINUTES each."""
+    return sum(int((end - start) // timedelta(minutes=MIN_SLOT_MINUTES)) for _, start, end in segs)
 
-    Per timezone, accounts (already best first) fill the timeline day by day. A day takes at most
-    sum(floor(segment minutes / MIN_SLOT_MINUTES)) accounts; when it takes fewer than that they are
-    spread evenly over the whole day's usable time (gap = total seconds // n, so >= 3 min), best
-    account earliest. Excess spills to the next working day. Confirmed and guessed timezones are
-    treated the same: the earlier 'call later when guessed' rule was dropped (it did not protect Perth
-    and made two groups share minutes)."""
+
+def _place(items: list, timelines: dict, first_day_only: bool) -> list:
+    """Set window + local_call_time on items (best first). Returns items that found no slot.
+
+    Per timezone the items fill usable days in order (only the first when ``first_day_only``). A day
+    holding fewer items than its capacity spreads them evenly over its whole usable time
+    (gap = total seconds // n, so >= MIN_SLOT_MINUTES), best item earliest; a full day is packed at
+    MIN_SLOT_MINUTES and the excess goes to the next day. Guessed and confirmed timezones share one
+    timeline (the earlier 'guessed calls later' rule was dropped: it did not protect Perth)."""
     by_tz: dict[str, list] = {}
-    for item in kept:
+    for item in items:
         by_tz.setdefault(item[0].account.timezone, []).append(item)
-    unscheduled = []
-    min_slot = timedelta(minutes=MIN_SLOT_MINUTES)
+    unplaced = []
     for tz, members in sorted(by_tz.items()):
         remaining = members
-        for segs in _timeline(config, tz, now):
+        days = timelines[tz][:1] if first_day_only else timelines[tz][1:]
+        for segs in days:
             if not remaining:
                 break
-            cap = sum(int((end - start) // min_slot) for _, start, end in segs)
-            if cap == 0:
-                continue
-            take, remaining = remaining[:cap], remaining[cap:]
+            take, remaining = remaining[:_day_capacity(segs)], remaining[_day_capacity(segs):]
             total = sum(int((end - start).total_seconds()) for _, start, end in segs)
             gap = total // len(take)
-            for i, (ra, _, _, call_date) in enumerate(take):
+            for i, item in enumerate(take):
                 off = i * gap
                 for name, start, end in segs:
                     dur = int((end - start).total_seconds())
                     if off < dur:
-                        ra.window, ra.local_call_time = name, start + timedelta(seconds=off)
+                        item[0].window, item[0].local_call_time = name, start + timedelta(seconds=off)
                         break
                     off -= dur
-                if ra.local_call_time.date() > call_date:
-                    ra.reasons.append(f"Spilled to {ra.local_call_time:%a %d %b} (call windows full)")
-        unscheduled.extend(t[0] for t in remaining)
-    return unscheduled
+        unplaced.extend(remaining)
+    return unplaced
 
 
 # --- run log ----------------------------------------------------------------------------------
 def summarise(result: RankResult) -> str:
     """Plain-text summary for the run log: counts, windows, skip reasons, top accounts."""
     lines = [f"Ranked {len(result.ranked)} accounts; skipped {len(result.skipped)}; "
-             f"needs prospect {len(result.needs_prospect)}."]
+             f"needs prospect {len(result.needs_prospect)}; spilled {len(result.spilled)}."]
     for name, items in result.by_window.items():
         lines.append(f"  window {name}: {len(items)} accounts")
     reasons: dict[str, int] = {}

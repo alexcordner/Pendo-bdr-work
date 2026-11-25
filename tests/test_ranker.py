@@ -427,7 +427,7 @@ def test_different_timezones_same_instant(config):
     akl = times["FAKE-N"]
     assert akl.tzinfo.key == "Pacific/Auckland" and akl.date() == date(2026, 11, 26)
     assert akl >= NOW      # clamped to now (09:00 NZDT), not the 08:45 start
-    assert akl == datetime(2026, 11, 26, 9, 0, tzinfo=ZoneInfo("Pacific/Auckland"))
+    assert akl == datetime(2026, 11, 26, 9, 1, tzinfo=ZoneInfo("Pacific/Auckland"))   # now 09:00:00 + 1 min lead
 
 
 def test_perth_afternoon_while_sydney_next_morning(config):
@@ -475,18 +475,23 @@ def test_spread_distinct_times_min_slot_and_inside_windows(config):
 
 
 def test_late_in_window_spills_to_next_day_not_squeezed(config):
-    # Thu 16:00 Sydney: 30 min left in the afternoon => 10 slots; the other 30 spill to Friday.
+    # Thu 16:00 Sydney: first slot 16:01, 29 min left => 9 slots tonight; the other 31 are HELD for Friday.
     now = datetime(2026, 11, 26, 5, 0, tzinfo=timezone.utc)
     accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(40)]
     r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
-    thu = [x for x in r.ranked if x.local_call_time.date() == date(2026, 11, 26)]
-    fri = [x for x in r.ranked if x.local_call_time.date() == date(2026, 11, 27)]
-    assert len(thu) == 10 and len(fri) == 30 and len(r.ranked) == 40
-    assert all(x.local_call_time >= datetime(2026, 11, 26, 16, 0, tzinfo=SYD) for x in thu)
-    ts = sorted(x.local_call_time for x in thu)
+    assert len(r.ranked) == 9 and len(r.spilled) == 31 and not r.skipped
+    assert all(x.local_call_time.date() == date(2026, 11, 26) and x.local_call_time >= datetime(2026, 11, 26, 16, 1, tzinfo=SYD)
+               for x in r.ranked)
+    ts = sorted(x.local_call_time for x in r.ranked)
     assert all(b - a >= timedelta(minutes=3) for a, b in zip(ts, ts[1:]))
-    assert any("Spilled to" in rr for rr in fri[0].reasons)
-    assert [x.account.name for x in r.ranked][:10] == [x.account.name for x in sorted(thu, key=lambda x: x.local_call_time)]
+    assert all(x.local_call_time.date() == date(2026, 11, 27) for x in r.spilled)
+    assert any("Spilled to Fri" in rr for rr in r.spilled[0].reasons)
+    # held accounts are not tasks: not in ranked, not in prospects, no cap slot used
+    ids = {x.account.sf_account_id for x in r.ranked}
+    assert not ids & {x.account.sf_account_id for x in r.spilled}
+    assert set(r.prospects) == ids
+    # best accounts take tonight's slots
+    assert max(x.account.name for x in r.ranked) < min(x.account.name for x in r.spilled)
 
 
 def test_window_with_under_min_slot_left_unused(config):
@@ -500,7 +505,7 @@ def test_now_inside_window_everyone_after_now(config):
     accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(5)]
     r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
     assert all(x.local_call_time >= now for x in r.ranked)
-    assert r.ranked[0].local_call_time == now.astimezone(SYD)
+    assert r.ranked[0].local_call_time == datetime(2026, 11, 26, 9, 31, tzinfo=SYD)   # now 09:30:00 + 1 min
 
 
 def test_guessed_timezone_treated_like_confirmed(config):
@@ -639,14 +644,14 @@ def test_summarise_contents(config):
     accts = [acct("A1"), acct("A2", tz=None)]
     r = run(accts, {}, [pros("A1")], cfg=config)
     text = summarise(r)
-    assert "Ranked 1 accounts; skipped 1; needs prospect 0." in text
+    assert "Ranked 1 accounts; skipped 1; needs prospect 0; spilled 0." in text
     assert "skipped - no timezone: 1" in text
     assert "no real trigger (ranked on fit only): 1" in text
     assert "Acct A1" in text and "Thu 08:45" in text
 
 
 def test_summarise_empty(config):
-    assert summarise(run([], cfg=config)).startswith("Ranked 0 accounts; skipped 0; needs prospect 0.")
+    assert summarise(run([], cfg=config)).startswith("Ranked 0 accounts; skipped 0; needs prospect 0; spilled 0.")
 
 
 def test_scenario_fixture_end_to_end(config):
@@ -784,9 +789,116 @@ def test_summarise_lists_needs_prospect_codes(config):
     assert "no_prospects_on_account: 1" in text
 
 
-def test_timeline_friday_late_spills_into_monday(config):
-    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)     # Fri 16:20 Sydney: 10 min left, 3 slots
+def test_friday_late_holds_overflow_for_monday(config):
+    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)     # Fri 16:20 Sydney: earliest 16:21, 9 min = 3 slots
     accts = [acct(f"A{i}", name=f"N{i}") for i in range(5)]
     r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
-    days = sorted({x.local_call_time.date() for x in r.ranked})
-    assert days == [date(2026, 11, 27), date(2026, 11, 30)]
+    assert len(r.ranked) == 3 and len(r.spilled) == 2
+    assert {x.local_call_time.date() for x in r.ranked} == {date(2026, 11, 27)}
+    assert {x.local_call_time.date() for x in r.spilled} == {date(2026, 11, 30)}
+
+
+# ------------------------------------------------------------ N1 first usable day
+def test_N1_thu_1628_nobody_is_spilled(config):
+    now = datetime(2026, 11, 26, 5, 28, tzinfo=timezone.utc)     # Thu 16:28 Sydney, 2 min left: unusable
+    accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(40)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
+    assert len(r.ranked) == 40 and r.spilled == []
+    assert all(x.local_call_time.date() == date(2026, 11, 27) for x in r.ranked)
+    assert not any("Spilled" in rr for x in r.ranked for rr in x.reasons)
+
+
+def test_N1_wed_1629_cooldown_thu_not_penalised(config):
+    now = datetime(2026, 11, 25, 5, 29, tzinfo=timezone.utc)     # Wed 16:29 Sydney, 1 min left: unusable
+    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0]
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 26)}, cfg=config, now=now).ranked[0]
+    assert r.local_call_time.date() == date(2026, 11, 26) and r.score == plain.score
+    r2 = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 27)}, cfg=config, now=now).ranked[0]
+    assert r2.score == plain.score - 30
+
+
+def test_N1_different_zones_may_have_different_first_days(config):
+    now = datetime(2026, 11, 26, 5, 28, tzinfo=timezone.utc)     # Thu 16:28 Sydney, 13:28 Perth (afternoon open)
+    r = run([acct("S"), acct("P", tz="Australia/Perth")], {}, [pros("S"), pros("P")], cfg=config, now=now)
+    d = {x.account.sf_account_id: x.local_call_time.date() for x in r.ranked}
+    assert d == {"FAKE-S": date(2026, 11, 27), "FAKE-P": date(2026, 11, 26)} and r.spilled == []
+
+
+# ------------------------------------------------------------ N2 spilled / cap
+def _cfg_cap(raw_config, cap):
+    from src.config import parse_config
+    raw_config["limits"]["daily_call_cap"] = cap
+    return parse_config(raw_config)
+
+
+def test_N2_held_account_does_not_eat_cap_slot(raw_config):
+    cfg = _cfg_cap(raw_config, 4)
+    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)     # Fri 16:20 Sydney (3 slots), 13:20 Perth (plenty)
+    syd = [acct(f"S{i}", name=f"A{i}") for i in range(4)]
+    per = [acct(f"P{i}", name=f"B{i}", employees=30, tz="Australia/Perth") for i in range(2)]
+    ps = [pros(a.sf_account_id[5:]) for a in syd + per]
+    r = run(syd + per, {}, ps, cfg=cfg, now=now)
+    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-S0", "FAKE-S1", "FAKE-S2", "FAKE-P0"]
+    assert [x.account.sf_account_id for x in r.spilled] == ["FAKE-S3"]
+    assert [x.skipped_reason for x in r.skipped] == ["below daily cap (rank 5, cap 4)"]
+
+
+def test_N2_spilled_shape(config):
+    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)
+    accts = [acct(f"A{i}", name=f"N{i}") for i in range(5)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
+    for x in r.spilled:
+        assert x.window in ("morning", "afternoon") and x.local_call_time is not None and x.skipped_reason is None
+        assert x not in r.by_window["morning"] + r.by_window["afternoon"]
+    assert "spilled 2" in summarise(r)
+
+
+def test_N2_spill_deterministic_under_shuffle(config):
+    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)
+    accts = [acct(f"A{i}", name=f"N{i}") for i in range(8)]
+    ps = [pros(a.sf_account_id[5:]) for a in accts]
+    snap = lambda r: ([x.account.sf_account_id for x in r.ranked], [(x.account.sf_account_id, x.local_call_time) for x in r.spilled])
+    base = snap(run(accts, {}, ps, cfg=config, now=now))
+    rnd = random.Random(5)
+    for _ in range(4):
+        a2 = accts[:]
+        rnd.shuffle(a2)
+        assert snap(run(a2, {}, ps, cfg=config, now=now)) == base
+
+
+# ------------------------------------------------------------ N3 lead time
+def test_N3_lead_rounds_up_to_whole_minute_plus_one(config):
+    now = datetime(2026, 11, 25, 22, 30, 20, tzinfo=timezone.utc)     # Thu 09:30:20 Sydney
+    r = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0]
+    assert r.local_call_time == datetime(2026, 11, 26, 9, 32, tzinfo=SYD)
+
+
+def test_N3_exact_minute_gets_one_minute_lead(config):
+    now = datetime(2026, 11, 25, 22, 30, 0, tzinfo=timezone.utc)
+    assert run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].local_call_time == \
+        datetime(2026, 11, 26, 9, 31, tzinfo=SYD)
+
+
+def test_N3_before_window_no_lead_effect(config):
+    assert run([acct()], {}, [pros()], cfg=config).ranked[0].local_call_time == datetime(2026, 11, 26, 8, 45, tzinfo=SYD)
+
+
+# ------------------------------------------------------------ N5 stale titles / CPO alias
+@pytest.mark.parametrize("title", ["Former Head of Product", "Ex-Head of Product", "Ex CTO", "Past VP Product",
+                                   "Interim Former Head of Product", "Acting Former CTO", "former cto",
+                                   "  Former Chief Product Officer"])
+def test_N5_stale_titles_do_not_match(config, title):
+    from src.ranker import _persona_rank
+    assert _persona_rank(title, config) is None
+
+
+@pytest.mark.parametrize("title", ["Interim Head of Product", "Acting CTO", "Executive Director of Product",
+                                   "Chief Product & Technology Officer", "Chief Product and Technology Officer"])
+def test_N5_current_titles_still_match(config, title):
+    from src.ranker import _persona_rank
+    assert _persona_rank(title, config) is not None
+
+
+def test_N5_product_owner_and_engineering_manager_still_unmatched(config):
+    from src.ranker import _persona_rank
+    assert _persona_rank("Product Owner", config) is None and _persona_rank("Engineering Manager", config) is None
