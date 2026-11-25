@@ -406,6 +406,7 @@ DEBT_NOTE = "debt facility, not an equity round"
 FINANCIAL_LAUNCH_NOTE = "financial or property product launch, not a digital product"
 RUMOUR_NOTE = "reported talks, not a confirmed deal"
 MA_TARGET_MINORITY_NOTE = "minority stake purchase: weak trigger"
+VACATED_NOTE = "role vacated: new leader likely"
 SAME_DEAL_PREFIX = "same deal as "
 
 
@@ -719,17 +720,18 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
             detail = f"{where} '{rm.role}'" + ("" if new_rm.role else ", new leader likely")
             if start:
                 detail += f", incoming leader starts {start.date().isoformat()}"
-            return _J(True, detail, rm.ambiguous, event_date=start)
+            return _J(True, detail, rm.ambiguous, event_date=start, notes=() if new_rm.role else (VACATED_NOTE,))
         rm = role_match(desc)
         if not rm.role:
             return _J(False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description")
         start = incoming_start_date(desc, scoop.published_date)
         detail = f"role '{rm.role}'"
-        if role_vacated(desc):
+        vacated = role_vacated(desc)
+        if vacated:
             detail += " vacated, new leader likely"
         if start:
             detail += f", incoming leader starts {start.date().isoformat()}"
-        return _J(True, detail, rm.ambiguous, event_date=start)
+        return _J(True, detail, rm.ambiguous, event_date=start, notes=(VACATED_NOTE,) if vacated else ())
 
     if kind is SignalKind.HIRING_PLAN:
         # Generic hiring (nurses, drivers, legal, 'more open roles in Medical & Health') is dropped unless the
@@ -772,7 +774,8 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
 
     if kind is SignalKind.MA:
         role, weight, note = classify_ma(desc, scoop.company_name)
-        notes = [] if weight >= KIND_BASE_WEIGHT[kind] else [note]
+        # reduced weights and the 'being acquired' target both travel on the signal (the sheet shows why it is a trigger)
+        notes = [note] if (weight < KIND_BASE_WEIGHT[kind] or role == "target") else []
         if role == "acquirer" and _RUMOUR.search(desc):
             weight *= MA_RUMOUR_FACTOR
             note += "; " + RUMOUR_NOTE
@@ -905,7 +908,7 @@ AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
 #: Every warning note that can follow the evidence text, one ' (note)' per note. signal_notes() reads them back.
 NOTE_PREFIXES = ("role ambiguous", "physical or unclear product launch", "acquirer of a minority stake",
                  "M&A direction unclear", "partnership without product", "debt facility", "financial or property",
-                 "reported talks", "minority stake purchase", SAME_DEAL_PREFIX.strip())
+                 "reported talks", "minority stake purchase", "being acquired", "role vacated", SAME_DEAL_PREFIX.strip())
 
 
 def _suffix(notes) -> str:

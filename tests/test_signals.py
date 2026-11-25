@@ -1565,7 +1565,7 @@ def test_ma_role(desc, name, role):
 
 def test_ma_target_weight_and_reason(config, accounts):
     v = one(config, "Mergers & Acquisitions (M&A)", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
-    assert v.keep and v.factor == 1.0 and v.notes == ()
+    assert v.keep and v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)
     assert v.reason == "Kept: Mergers & Acquisitions (M&A), being acquired: leadership/platform change likely, 5 days ago"
     assert sig_for(config, v, accounts).strength == 0.4239          # 0.5 * 0.5 ** (5/21)
 
@@ -2038,7 +2038,7 @@ def test_rumour_words(config, word):
 
 def test_rumoured_target_keeps_target_weight(config):
     v = one(config, "Mergers & Acquisitions (M&A)", "SG Fleet is reportedly in talks to acquire FleetPartners.", name="FleetPartners Group")
-    assert v.factor == 1.0 and v.notes == ()           # documented: the rumour discount applies to the acquirer only
+    assert v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)   # documented: the rumour discount applies to the acquirer only
 
 
 # ------------------------------------------------------------ (f) FleetPartners / SG Fleet and Goodman / NEXTDC pairs
@@ -2327,3 +2327,63 @@ def test_powder_launch_is_hardware(config):
 def test_extras_total_cap_is_the_sum_of_two_extras_at_the_default_settings():
     # SAME_KIND_EXTRA_TOTAL (0.30) equals 2 x SAME_KIND_EXTRA_EACH with MAX_COMBINED_SIGNALS = 3, so it is a guard only
     assert S.SAME_KIND_EXTRA_TOTAL == (S.MAX_COMBINED_SIGNALS - 1) * S.SAME_KIND_EXTRA_EACH
+
+
+# ------------------------------------------------------------ notes carried onto Signal: being acquired, role vacated
+def test_being_acquired_note_reaches_the_signal(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
+    sig = sig_for(config, v, accounts)
+    assert sig.evidence == "Pickles Auctions to be acquired by EQT. (being acquired: leadership/platform change likely)"
+    assert S.signal_notes(sig) == [S.MA_TARGET_NOTE] and sig.strength == 0.4239
+
+
+def test_reclassified_funding_target_carries_the_note(config, accounts):
+    v = one(config, "Funding", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
+    assert S.signal_notes(sig_for(config, v, accounts)) == [S.MA_TARGET_NOTE]
+
+
+def test_full_acquirer_has_no_being_acquired_note(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Gamma Group acquires Tiny Co.", name="Gamma Group")
+    assert S.signal_notes(sig_for(config, v, accounts)) == []
+
+
+def test_target_note_stacks_with_same_deal_note(config):
+    d = "Delta Systems to be acquired by Gamma Group."
+    va, vb = deal_pair(config, d, d, a_name="Gamma Group", b_name="Delta Systems")
+    by_zi = {"ZA": Account("SF-A", "Gamma"), "ZB": Account("SF-B", "Delta")}
+    sigs = {s.sf_account_id: s for s in S.scoops_to_signals([va, vb], by_zi, config, TODAY).signals}
+    assert S.signal_notes(sigs["SF-B"]) == [S.MA_TARGET_NOTE, "same deal as Gamma Group"]
+    assert S.signal_notes(sigs["SF-A"]) == ["same deal as Delta Systems"]
+
+
+@pytest.mark.parametrize("desc", [
+    "The CTO of Example Co has left to join another organisation.",
+    "Example Co's Interim Chief Digital Officer is leaving.",
+])
+def test_role_vacated_note_reaches_the_signal(config, accounts, desc):
+    v = one(config, "Executive Move", desc)
+    assert v.notes == (S.VACATED_NOTE,)
+    sig = sig_for(config, v, accounts)
+    assert sig.evidence == desc + " (role vacated: new leader likely)" and S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+def test_vacated_via_promotion_carries_the_note(config, accounts):
+    v = one(config, "Executive Move", "Example Co's Jane moves from Chief Technology Officer to CEO.")
+    assert S.signal_notes(sig_for(config, v, accounts)) == [S.VACATED_NOTE]
+
+
+def test_incoming_leader_has_no_vacated_note(config, accounts):
+    for d in ("Example Co appointed a new Chief Digital Officer.",
+              "Example Co's Sam moved from Head of Marketing to Chief Digital Officer."):
+        assert S.signal_notes(sig_for(config, one(config, "Executive Move", d), accounts)) == []
+
+
+def test_vacated_and_ambiguous_notes_stack_in_order(config, accounts):
+    v = one(config, "Executive Move", "Example Co's Head of Product, Footwear has left to join a rival.")
+    assert v.ambiguous and S.signal_notes(sig_for(config, v, accounts)) == [S.AMBIGUOUS_NOTE, S.VACATED_NOTE]
+
+
+def test_long_text_with_two_notes_fits(config, accounts):
+    d = "Example Co's Interim Chief Digital Officer is leaving. " + "More text. " * 60
+    sig = sig_for(config, one(config, "Executive Move", d), accounts)
+    assert len(sig.evidence) <= S.EVIDENCE_MAX_CHARS and S.signal_notes(sig) == [S.VACATED_NOTE]
