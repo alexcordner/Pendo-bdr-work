@@ -1,0 +1,134 @@
+{
+ "_note": "SYNTHETIC inputs for tests/test_state.py. Plain-dict forms of Prospect / CallRecord / SentEmail. Ids FAKE-*, phones +61400000xxx, emails example.com.",
+ "prospects": [
+  {
+   "nooks_id": "FAKE-P1",
+   "sf_account_id": "FAKE-ACC-1",
+   "nooks_account_id": "FAKE-NA-1",
+   "name": "Pat One",
+   "email": "pat.one@example.com",
+   "phone_e164": "+61400000011"
+  },
+  {
+   "nooks_id": "FAKE-P2",
+   "sf_account_id": "FAKE-ACC-2",
+   "nooks_account_id": "FAKE-NA-2",
+   "name": "Sam Two",
+   "email": "sam.two@example.com",
+   "phone_e164": "+61400000012"
+  },
+  {
+   "nooks_id": "FAKE-P3",
+   "sf_account_id": null,
+   "nooks_account_id": "FAKE-NA-3",
+   "name": "Nooks Only",
+   "email": null,
+   "phone_e164": "+61400000013"
+  },
+  {
+   "nooks_id": "FAKE-P4",
+   "sf_account_id": "FAKE-ACC-4",
+   "nooks_account_id": "FAKE-NA-4",
+   "name": "Shared Phone A",
+   "email": "a@example.com",
+   "phone_e164": "+61400000099"
+  },
+  {
+   "nooks_id": "FAKE-P5",
+   "sf_account_id": "FAKE-ACC-5",
+   "nooks_account_id": "FAKE-NA-5",
+   "name": "Shared Phone B",
+   "email": "b@example.com",
+   "phone_e164": "+61400000099"
+  },
+  {
+   "nooks_id": "FAKE-P6",
+   "sf_account_id": "FAKE-ACC-6",
+   "nooks_account_id": "FAKE-NA-6",
+   "name": "Opted Out",
+   "email": "opt.out@example.com",
+   "phone_e164": "+61400000016",
+   "opted_out_email": true
+  },
+  {
+   "nooks_id": null,
+   "sf_account_id": "FAKE-ACC-7",
+   "nooks_account_id": null,
+   "name": "No Id",
+   "email": "no.id@example.com",
+   "phone_e164": "+61400000017"
+  }
+ ],
+ "calls": [
+  {
+   "nooks_id": "FAKE-C1",
+   "prospect_id": "FAKE-P1",
+   "disposition_name": "No Answer",
+   "duration_s": 19,
+   "started_at": "2026-11-10T01:00:00Z",
+   "to_e164": "+61400000011"
+  },
+  {
+   "nooks_id": "FAKE-C2",
+   "prospect_id": "FAKE-P2",
+   "disposition_name": "No Answer",
+   "duration_s": 21,
+   "started_at": "2026-11-10T02:00:00Z",
+   "to_e164": "+61400000012"
+  },
+  {
+   "nooks_id": "FAKE-C3",
+   "prospect_id": "FAKE-P1",
+   "disposition_name": "Left Voicemail",
+   "duration_s": 90,
+   "started_at": "2026-11-11T01:00:00Z",
+   "to_e164": "+61400000011"
+  },
+  {
+   "nooks_id": "FAKE-C4",
+   "prospect_id": "FAKE-P2",
+   "disposition_name": "Meeting Booked",
+   "duration_s": 180,
+   "started_at": "2026-11-12T01:00:00Z",
+   "to_e164": "+61400000012"
+  },
+  {
+   "nooks_id": "FAKE-C5",
+   "prospect_id": null,
+   "disposition_name": "No Answer",
+   "duration_s": 5,
+   "started_at": "2026-11-12T03:00:00Z",
+   "to_e164": "+61400000013"
+  },
+  {
+   "nooks_id": "FAKE-C6",
+   "prospect_id": null,
+   "disposition_name": "No Answer",
+   "duration_s": 5,
+   "started_at": "2026-11-12T03:30:00Z",
+   "to_e164": "+61400000555"
+  },
+  {
+   "nooks_id": "FAKE-C7",
+   "prospect_id": "FAKE-P6",
+   "disposition_name": "Do Not Call",
+   "duration_s": 30,
+   "started_at": "2026-10-01T01:00:00Z",
+   "to_e164": "+61400000016"
+  }
+ ],
+ "sent": [
+  {
+   "message_id": "FAKE-M1",
+   "thread_id": "FAKE-T1",
+   "recipient": "patone@example.com",
+   "sent_at": "2026-11-20T01:00:00Z"
+  },
+  {
+   "message_id": "FAKE-M2",
+   "thread_id": "FAKE-T2",
+   "recipient": "samtwo@example.com",
+   "sent_at": null
+  }
+ ]
+}
