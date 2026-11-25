@@ -238,12 +238,14 @@ def test_c_notes_are_in_why_chosen_flags_and_packet_but_not_in_the_quotable_text
     assert note in cs.render_packet_text(ln.packet)
 
 
-def test_c_target_direction_is_not_recoverable_from_signal_alone(built):
-    """KNOWN LIMITATION (reported to the coordinator): 'being acquired' is on the verdict reason only, not on the
-    Signal, so the sheet shows a bare M&A scoop for the target of a full acquisition."""
+def test_c_target_direction_is_carried_on_the_signal_and_reaches_the_sheet(built):
+    """The 'being acquired' note travels on Signal.evidence (signals.signal_notes), so the packet notes, the
+    'Flag:' line in why_chosen and the sheet flags all show it for the target of a full acquisition."""
+    note = "being acquired: leadership/platform change likely"
     ln = line(built, "Eqtbound Bank Pty Ltd")
-    assert ln.packet.signals[0].notes == ()
-    assert not any("being acquired" in x for x in ln.why_chosen)
+    assert ln.packet.signals[0].notes == (note,)
+    assert f"Flag: {note}" in ln.why_chosen and note in ln.flags
+    assert note not in ln.packet.to_dict()["signals"][0]["evidence"]          # kept out of the quotable text
 
 
 # ---------------------------------------------------------------- (iv) personal email
