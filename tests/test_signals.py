@@ -2999,3 +2999,73 @@ def test_launch_alone_rescues_and_customer_word_platform_rescues(config):
     assert one(config, "Partnership", "Acme signs a capacity deal to launch a new service.", name="Acme Holdings").keep
     assert one(config, "Partnership", "Acme signs a compute deal for a customer loyalty platform.", name="Acme Holdings").keep
     assert not one(config, "Partnership", "Acme signs a compute deal for a loyalty.", name="Acme Holdings").keep
+
+
+# ============================================================ fix-triggers5 review: onboarding / experience words rescue
+@pytest.mark.parametrize("desc", [
+    "Acme and Bigco partner to bring a new digital onboarding experience, hosted on cloud capacity.",
+    "Acme partners with Bigco on onboarding hosted on cloud capacity.",
+    "Acme will bring digital onboarding to customers on new hosting.",
+    "Acme and Bigco build a digital employee experience hosted in the cloud with capacity.",
+    "Acme partners with Bigco on a patient experience hosted on GPU compute.",
+    "Acme partners with Bigco on member experience with colocation capacity.",
+    "Acme partners with Bigco for user experience research on hosting.",
+    "Acme partners with Bigco on in-app guidance hosted on cloud capacity.",
+    "Acme partners with Bigco on customer experience hosted on cloud capacity.",
+    "Acme partners with Bigco on student experience hosted on cloud capacity.",
+])
+def test_onboarding_and_experience_wording_keeps_an_infrastructure_worded_partnership(config, desc):
+    v = one(config, "Partnership", desc, name="Acme Holdings")
+    assert v.keep and v.factor == 1.0 and v.notes == ()
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme signs $4bn ARR contracts for AI compute.", "Acme signs a 200MW power purchase agreement.",
+    "Acme signs a 45MW deal with customers.", "Acme signs a 200MW data centre contract with customers.",
+    "Acme signs GPU compute hosting for customers.", "Acme signs a colocation contract.", "Acme wins an offtake deal.",
+    ACME_ARR, "Acme signs a hyperscaler capacity deal for AI cloud services.",
+    "Acme signs a take-or-pay hosting contract with customers for cloud services.",
+])
+def test_existing_infrastructure_drop_cases_are_still_dropped(config, desc):
+    assert not one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+@pytest.mark.parametrize("d", ["45MW", "a 200 MW campus", "50 megawatts of power", "the 45MW deal", "1.5 MW"])
+def test_megawatt_units_match_with_or_without_a_space(d):
+    assert S._INFRASTRUCTURE_DEAL.search(d)
+
+
+def test_mw_inside_other_words_does_not_match():
+    assert not S._INFRASTRUCTURE_DEAL.search("a hallmw or a Smwx")
+    assert not S._INFRASTRUCTURE_DEAL.search("the mwanza office")
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme to launch a 200MW data centre campus.", "Acme partners with Bigco to launch a 45MW facility.",
+    "Acme signs a deal to launch new GPU compute capacity.", "Acme signs hosting to launch a data centre.",
+    "Acme and Bigco launch colocation space with ARR contracts.",
+])
+def test_launching_infrastructure_does_not_rescue(config, desc):
+    assert not one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme signs a capacity deal to launch a new service.", "Acme partners with Bigco to launch a new mobile banking app.",
+    "Acme and Bigco launch a customer app hosted on cloud capacity.", "Acme launches onboarding software on GPU compute.",
+    "Acme signs capacity to launch an online store.",
+])
+def test_launch_of_a_non_infrastructure_thing_still_rescues(config, desc):
+    assert one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+def test_launch_infrastructure_lookahead_stops_at_the_sentence_end():
+    assert S._PRODUCT_RESCUE.search("Acme will launch a new service. Separately it signed capacity deals.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new data centre.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a very large new GPU hall.")            # 4 words before 'GPU': blocked
+    assert S._PRODUCT_RESCUE.search("Acme will launch a very large brand new GPU hall.")        # 5 words: known limit, still rescues
+
+
+def test_launch_lookahead_object_words_campus_and_facility_and_sentence_bound():
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new campus.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new facility.")
+    assert S._PRODUCT_RESCUE.search("Acme will launch it. GPU deals followed.")          # the '.' ends the launched phrase

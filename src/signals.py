@@ -484,13 +484,19 @@ _RUMOUR = re.compile(r"(?<!\w)(?:reportedly|in\s+talks|rumou?r\w*|understood\s+t
 # are infrastructure supply deals, not partnerships a Pendo buyer would care about: dropped unless the text also has
 # product / digital / customer wording (_PARTNERSHIP_WORDS).
 _INFRASTRUCTURE_DEAL = re.compile(
-    r"(?<!\w)(?:compute|gpus?|data[\s-]?cent(?:re|er)s?|capacity|megawatts?|mw|arr|annual\s+recurring\s+revenue|"
-    r"colocation|co-location|hyperscal\w*|power\s+purchase|offtake|take-or-pay|contracted\s+revenue|hosting)(?!\w)", _FLAGS)
+    r"(?<!\w)(?:compute|gpus?|data[\s-]?cent(?:re|er)s?|capacity|arr|annual\s+recurring\s+revenue|"
+    r"colocation|co-location|hyperscal\w*|power\s+purchase|offtake|take-or-pay|contracted\s+revenue|hosting)(?!\w)"
+    r"|(?:(?<=\d)|(?<!\w))(?:megawatts?|mw)(?!\w)", _FLAGS)         # '45MW' counts: the digit may touch the unit
 # Real product words that rescue an infrastructure-worded partnership: an app, mobile, portal, website, software, a launch,
 # or a platform that is itself a product for end-users ('customer support platform', 'digital banking', 'online store').
 # NOT rescuing: 'customers', 'cloud', 'AI cloud services', 'digital', 'platform' on its own, 'products'.
 _PRODUCT_RESCUE = re.compile(
-    r"(?<!\w)(?:apps?|applications?|webapps?|mobile|portals?|websites?|software|saas|chatbots?|e-?commerce|launch(?:ed|es|ing)?|"
+    r"(?<!\w)(?:apps?|applications?|webapps?|mobile|portals?|websites?|software|saas|chatbots?|e-?commerce|"
+    # 'launch' rescues unless the thing launched is infrastructure ('launch a 200MW data centre campus')
+    r"launch(?:ed|es|ing)?(?!\s+(?:\w+[\s-]+){0,4}?(?:data[\s-]?cent(?:re|er)s?|campus|capacity|compute|gpus?|megawatts?|mw|"
+    r"power|hosting|colocation|facility|plant)(?!\w))|"
+    # onboarding and experience wording is core product language
+    r"onboarding|in-app|user\s+experience|(?:digital|employee|customer|user|member|patient|learner|student)\s+experience|"
     r"ux|cx|customer\s+experience|digital\s+(?:banking|experience|product|channel)s?|online\s+(?:store|shop|banking)|"
     r"(?:customer[\s-]+\w+|support|experience|analytics|banking|payments?|commerce|learning|engagement|onboarding|"
     r"self-service|digital)\s+platforms?)(?!\w)", _FLAGS)
