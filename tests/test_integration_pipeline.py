@@ -1587,9 +1587,11 @@ def test_m_prospect_to_account_join_paths(world, tmp_path):
 
 def test_m_ranker_uses_the_single_signals_combination_formula():
     """review_1g L (fixed in 1f-fixes): ranker.trigger_strength points come from signals.combined_strength."""
-    s = [Signal("x", SignalKind.FUNDING, 0.5, "a", None, "e"), Signal("x", SignalKind.FUNDING, 0.4, "b", None, "e")]
+    # different kinds and distinct evidence: same-kind extras and near-identical scoops are capped / merged (signals.py)
+    s = [Signal("x", SignalKind.FUNDING, 0.5, "a", None, "Funding scoop a"),
+         Signal("x", SignalKind.MA, 0.4, "b", None, "M&A scoop b")]
     assert sig_mod.combined_strength(s) == 0.6
-    s3 = s + [Signal("x", SignalKind.FUNDING, 0.2, "c", None, "e")]
+    s3 = s + [Signal("x", SignalKind.PRODUCT_LAUNCH, 0.2, "c", None, "Launch scoop c")]
     assert sig_mod.combined_strength(s3) == 0.64
     cfg = load_config()
     acct = Account("FAKE-X", "X", employees=500, timezone="Australia/Sydney")

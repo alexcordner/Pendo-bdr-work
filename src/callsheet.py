@@ -563,6 +563,10 @@ NOTE_BANNED_PHRASES: dict[str, tuple[str, ...]] = {
     "reported talks": ("has acquired", "have acquired", "acquired", "completed the acquisition", "congrats on acquiring",
                        "congratulations on acquiring", "congrats on the acquisition", "congratulations on the acquisition"),
     "acquirer of a minority stake": ("acquired", "takeover", "acquisition of the company", "full acquisition"),
+    "minority stake purchase": ("takeover", "being acquired", "acquisition of the company", "full acquisition",
+                                "acquired by", "buyout"),
+    "role vacated": ("has appointed", "appointed a new", "successor", "replacement", "has hired", "new head",
+                     "new chief", "congrats on the new role", "congratulations on the new role", "welcome the new"),
 }
 
 

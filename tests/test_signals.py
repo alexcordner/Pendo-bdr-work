@@ -450,7 +450,7 @@ def test_determinism_independent_of_input_order(sig_scoops, accounts, config):
 
 # ------------------------------------------------------------ best_signal / combined_strength
 def _sig(kind, strength, day=20, src="s"):
-    return Signal("A", kind, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), "e", "Z")
+    return Signal("A", kind, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), f"scoop text {src} {kind.value}", "Z")
 
 
 def test_best_signal_picks_strongest():
@@ -479,9 +479,11 @@ def test_combined_empty_is_zero():
 
 
 def test_combined_literal_numbers():
-    f = lambda *xs: S.combined_strength([_sig(SignalKind.FUNDING, x, src=f"s{i}") for i, x in enumerate(xs)])
-    assert S.COMBINE_DAMPING == 0.5
-    assert f(0.5, 0.4) == 0.6                # 1 - 0.5 * (1 - 0.5*0.4)
+    kinds = [SignalKind.FUNDING, SignalKind.MA, SignalKind.PRODUCT_LAUNCH, SignalKind.NEW_HIRE]
+    f = lambda *xs: S.combined_strength([_sig(kinds[i], x, src=f"s{i}") for i, x in enumerate(xs)])
+    assert S.COMBINE_DAMPING == 0.5 and S.SAME_KIND_EXTRA_EACH == 0.15 and S.SAME_KIND_EXTRA_TOTAL == 0.30
+    assert S.MAX_COMBINED_SIGNALS == 4
+    assert f(0.5, 0.4) == 0.6                # different kinds: 1 - 0.5 * (1 - 0.5*0.4)
     assert f(0.4, 0.5) == 0.6
     assert f(0.5, 0.4, 0.2) == 0.64          # 1 - 0.5 * 0.8 * 0.9
     assert f(0.5, 0.5) == 0.625
@@ -497,16 +499,13 @@ def test_combined_at_least_best_and_capped():
     assert 0.9 <= c <= 1.0
 
 
-def test_combined_diminishing_returns():
-    base = [_sig(SignalKind.FUNDING, 0.5)]
-    gains, cur = [], S.combined_strength(base)
-    for i in range(5):
-        base = base + [_sig(SignalKind.FUNDING, 0.5, src=f"s{i}")]
-        nxt = S.combined_strength(base)
-        gains.append(nxt - cur)
-        cur = nxt
-    assert all(g > 0 for g in gains) and gains == sorted(gains, reverse=True)
-    assert cur < 1.0
+def test_combined_adding_signals_never_lowers_and_stops_after_four():
+    kinds = [SignalKind.FUNDING, SignalKind.MA, SignalKind.PRODUCT_LAUNCH, SignalKind.NEW_HIRE, SignalKind.HIRING_PLAN]
+    sigs, vals = [], []
+    for i, k in enumerate(kinds):
+        sigs.append(_sig(k, 0.5 - i * 0.05, src=f"s{i}"))
+        vals.append(S.combined_strength(sigs))
+    assert vals[0] < vals[1] < vals[2] < vals[3] and vals[3] == vals[4] and vals[4] < 1.0
 
 
 def test_combined_max_strength_stays_one():
@@ -1067,7 +1066,7 @@ def test_marketing_roles_still_dropped_without_the_old_prefilter():
 
 # ------------------------------------------------------------ (b) intent vs real signals
 def _isig(strength, src="zoominfo_intent:Z:digital experience", day=20):
-    return Signal("A", SignalKind.INTENT, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), "e", "Z")
+    return Signal("A", SignalKind.INTENT, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), f"interest text {src}", "Z")
 
 
 def test_intent_never_best_when_a_real_signal_exists():
@@ -1087,7 +1086,7 @@ def test_intent_counts_only_as_damped_other_in_combined():
     assert S.combined_strength([_sig(SignalKind.FUNDING, 0.16), _isig(0.3)]) == 0.286
     assert S.combined_strength([_isig(0.3)]) == 0.3
     # two intents, no real: best intent 0.3, the other damped
-    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.37
+    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.405     # same kind: extra capped at 0.15
 
 
 def test_intent_cannot_lift_combined_above_real_plus_damped_intent():
@@ -1566,7 +1565,7 @@ def test_ma_role(desc, name, role):
 
 def test_ma_target_weight_and_reason(config, accounts):
     v = one(config, "Mergers & Acquisitions (M&A)", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
-    assert v.keep and v.factor == 1.0 and v.notes == ()
+    assert v.keep and v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)
     assert v.reason == "Kept: Mergers & Acquisitions (M&A), being acquired: leadership/platform change likely, 5 days ago"
     assert sig_for(config, v, accounts).strength == 0.4239          # 0.5 * 0.5 ** (5/21)
 
@@ -1668,7 +1667,7 @@ def test_same_deal_both_kept_with_reason(config):
     assert va.keep and vb.keep
     assert va.same_deal_as == ("NEXTDC Ltd",) and vb.same_deal_as == ("Goodman Group",)
     assert va.reason.endswith("; same deal as NEXTDC Ltd") and vb.reason.endswith("; same deal as Goodman Group")
-    assert (va.factor, vb.factor) == (0.5, 1.0)                     # buyer minority 0.25, target 0.50
+    assert (va.factor, vb.factor) == (0.5, 0.7)                     # buyer minority 0.25, target minority 0.35
     assert "same deal as NEXTDC Ltd" in va.notes
 
 
@@ -1696,7 +1695,7 @@ def test_same_deal_note_reaches_evidence_and_helper(config, accounts):
     sigs = S.scoops_to_signals([va, vb], by_zi, config, TODAY).signals
     notes = {s.sf_account_id: S.signal_notes(s) for s in sigs}
     assert notes["SF-A"] == [S.MA_MINORITY_NOTE, "same deal as NEXTDC Ltd"]
-    assert notes["SF-B"] == ["same deal as Goodman Group"]
+    assert notes["SF-B"] == [S.MA_TARGET_MINORITY_NOTE, "same deal as Goodman Group"]
 
 
 def test_combined_strength_counts_one_deal_once_within_an_account():
@@ -1849,7 +1848,7 @@ def test_dry_run_examples_through_the_radar(config):
     out = {e.account.name: e for e in S.trigger_radar(scoops, accts, config, TODAY, top_n=None)}
     assert out["Pickles Auctions"].signal.kind is SignalKind.MA                      # was scored as Funding
     assert out["Pickles Auctions"].signal.strength == 0.4529                         # 0.5 * 0.5 ** (3/21)
-    assert out["NEXTDC Ltd"].signal.strength == 0.4529                               # the target
+    assert out["NEXTDC Ltd"].signal.strength == 0.317                                # the target of a 9.9% stake: 0.4529 * 0.7
     assert out["Goodman Group"].signal.strength == 0.2265                            # the minority buyer (0.4529 * 0.5)
     assert out["Acme Labs"].signal.strength == 0.3623                                # 0.8 * 0.5 ** (3/21) * 0.5
     assert out["Beta Corp"].signal.strength == 0.1811                                # round(0.3 * 0.5 ** (3/21), 4) * 2/3
@@ -2039,7 +2038,7 @@ def test_rumour_words(config, word):
 
 def test_rumoured_target_keeps_target_weight(config):
     v = one(config, "Mergers & Acquisitions (M&A)", "SG Fleet is reportedly in talks to acquire FleetPartners.", name="FleetPartners Group")
-    assert v.factor == 1.0 and v.notes == ()           # documented: the rumour discount applies to the acquirer only
+    assert v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)   # documented: the rumour discount applies to the acquirer only
 
 
 # ------------------------------------------------------------ (f) FleetPartners / SG Fleet and Goodman / NEXTDC pairs
@@ -2077,3 +2076,476 @@ def test_signal_notes_for_debt_fund_and_rumour(config, accounts):
 
 def test_solution_and_technology_count_as_digital(config):
     assert one(config, "Product Launch", "Example Co launched a new solution for universities.").factor == 1.0
+
+
+# ============================================================ fix-triggers2: stacking, minority target, hardware launches
+def L(strength, src, text, day=20, kind=SignalKind.PRODUCT_LAUNCH):
+    return Signal("A", kind, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), text, "Z")
+
+
+# ------------------------------------------------------------ (1) stacking
+CATAPULT = [  # nine launch scoops for one fake company, strengths like the dry run (0.59, 0.59, 0.30, 0.27 ...)
+    L(0.59, "c1", "Catapult launched Vision Cameras for elite teams."),
+    L(0.59, "c2", "Catapult launched Vision Cameras for elite teams."),            # same scoop, repeated
+    L(0.30, "c3", "Catapult unveils GPS Pods for field sport."),
+    L(0.27, "c4", "Catapult introduces Heart Sensors for athletes."),
+    L(0.25, "c5", "Catapult releases Edge Tracker for coaches."),
+    L(0.22, "c6", "Catapult announced the launch of Clip Trainer."),
+    L(0.20, "c7", "Catapult debuted Pro Sleeves for training."),
+    L(0.18, "c8", "Catapult rolls out Lite Vest for juniors."),
+    L(0.15, "c9", "Catapult launched Motion Band for rehab."),
+]
+
+
+def test_nine_launches_do_not_stack_towards_one():
+    c = S.combined_strength(CATAPULT)
+    # repeated scoop counts once; best 0.59, then two same-kind extras at 0.15 each: 1 - 0.41 * 0.85 * 0.85 = 0.7038
+    assert c == 0.7038
+    assert 0.59 < c < 0.75
+
+
+def test_nine_launches_old_formula_would_have_been_near_one():
+    old = 1.0
+    for x in sorted((s.strength for s in CATAPULT), reverse=True)[1:]:
+        old *= 1 - 0.5 * x
+    assert round(1 - 0.41 * old, 2) == 0.87                # what the previous formula gave for these nine
+    assert S.combined_strength(CATAPULT) < 0.75
+
+
+def test_same_kind_extras_capped_each_and_in_total():
+    sigs = [L(0.6, f"s{i}", f"Company launched Product{i} Alpha{i}.") for i in range(3)]
+    sigs = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
+            L(0.1, "c", "Gamma Co launched Gamma Hub.")]
+    # extras: min(0.5, 0.15) = 0.15, then min(0.1, 0.15, 0.30 - 0.15) = 0.1
+    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.9, 4)
+
+
+def test_only_the_strongest_counted_entries_count():
+    base = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
+            L(0.45, "c", "Gamma Co launched Gamma Hub.")]
+    more = base + [L(0.4, "d", "Delta Co launched Delta Hub."), L(0.35, "e", "Echo Co launched Echo Hub.")]
+    assert S.combined_strength(more) == S.combined_strength(base) == round(1 - 0.4 * 0.85 * 0.85, 4)
+
+
+def test_mixed_kinds_keep_the_damped_contribution():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.8, src="e"), _sig(SignalKind.PRODUCT_LAUNCH, 0.6, src="l"),
+            _sig(SignalKind.FUNDING, 0.4, src="f")]
+    assert S.combined_strength(sigs) == round(1 - 0.2 * (1 - 0.3) * (1 - 0.2), 4)          # 0.888
+
+
+def test_mixed_kind_case_with_same_kind_repeats():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.8, src="e"), L(0.6, "l1", "Alpha Co launched Alpha Hub."),
+            L(0.5, "l2", "Beta Co launched Beta Hub."), _sig(SignalKind.FUNDING, 0.4, src="f")]
+    # leads: exec 0.8, launch 0.6 (x0.5), funding 0.4 (x0.5); extra: launch #2 at 0.15 -> all four count
+    assert S.combined_strength(sigs) == round(1 - 0.2 * (1 - 0.3) * (1 - 0.2) * (1 - 0.15), 4)         # 0.9048
+
+
+def test_one_signal_per_kind_is_unchanged_by_the_new_rule():
+    sigs = [_sig(SignalKind.FUNDING, 0.5, src="a"), _sig(SignalKind.MA, 0.4, src="b")]
+    assert S.combined_strength(sigs) == 0.6
+
+
+def test_combined_always_at_least_best_and_at_most_one():
+    for n in range(1, 8):
+        sigs = [L(0.9 - i * 0.05, f"s{i}", f"Co{i} launched Thing{i} Pro.") for i in range(n)]
+        c = S.combined_strength(sigs)
+        assert 0.9 <= c <= 1.0
+
+
+# near-identical scoops
+def test_same_first_60_characters_count_once():
+    a = L(0.5, "a", "Catapult launched the Vision camera for elite teams across Europe today.")
+    b = L(0.4, "b", "Catapult launched the Vision camera for elite teams across Europe, said the firm in a statement.")
+    assert S._normalised_start(a.evidence) == S._normalised_start(b.evidence)
+    assert S.dedupe_signals([a, b]) == [a]
+    assert S.combined_strength([a, b]) == 0.5
+
+
+def test_normalisation_ignores_case_punctuation_and_spacing():
+    a = L(0.5, "a", "Catapult launched the Vision camera for elite teams across Europe today.")
+    b = L(0.4, "b", "CATAPULT   launched the Vision camera, for elite teams across Europe today!!")
+    assert S.dedupe_signals([a, b]) == [a]
+
+
+def test_same_product_name_within_14_days_counts_once():
+    a = L(0.5, "a", "Catapult launched VisionPro for elite teams.", day=20)
+    b = L(0.4, "b", "Catapult unveils VisionPro at a trade show.", day=6)            # 14 days earlier
+    assert S._product_name(a.evidence) == S._product_name(b.evidence) == "visionpro"
+    assert S.dedupe_signals([a, b]) == [a]
+
+
+def test_same_product_name_more_than_14_days_apart_counts_twice():
+    a = L(0.5, "a", "Catapult launched VisionPro for elite teams.", day=20)
+    b = L(0.4, "b", "Catapult unveils VisionPro at a trade show.", day=5)             # 15 days earlier
+    assert len(S.dedupe_signals([a, b])) == 2
+
+
+def test_different_products_are_not_duplicates():
+    a = L(0.5, "a", "Catapult launched VisionPro for elite teams.")
+    b = L(0.4, "b", "Catapult launched ClipTrainer for coaches.")
+    assert len(S.dedupe_signals([a, b])) == 2
+
+
+def test_duplicates_must_be_the_same_kind():
+    a = L(0.5, "a", "Catapult launched VisionPro for elite teams.")
+    b = Signal("A", SignalKind.FUNDING, 0.4, "b", a.source_date, a.evidence, "Z")
+    assert len(S.dedupe_signals([a, b])) == 2
+
+
+def test_product_name_extraction():
+    assert S._product_name("Catapult launches the new PerformanceHub 2 today.") == "performancehub"
+    assert S._product_name("Catapult has secured funding.") is None
+    assert S._product_name("Acme announced the launch of Lexi Access, a new solution.") == "lexi access"
+
+
+def test_dedupe_strips_notes_before_comparing():
+    t = "Catapult launched VisionPro cameras for elite teams across the world today."
+    a = L(0.5, "a", t + " (" + S.LAUNCH_NOTE + ")")
+    b = L(0.4, "b", t)
+    assert len(S.dedupe_signals([a, b])) == 1
+
+
+# ------------------------------------------------------------ (2) M&A direction: NEXTDC wording, 9.9% minority target
+NEXTDC_TEXT = ("NEXTDC has entered into an agreement for Goodman and Digital Realty to acquire a 9.9% stake in the company.")
+
+
+@pytest.mark.parametrize("name,role", [("NEXTDC Ltd", "target"), ("Goodman Group", "acquirer"),
+                                       ("Digital Realty Trust", "acquirer")])
+def test_agreement_for_x_to_acquire_stake_in_the_company(name, role):
+    assert S.ma_role(NEXTDC_TEXT, name) == role
+
+
+def test_nextdc_scoop_is_a_weak_target_not_an_acquirer(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", NEXTDC_TEXT, name="NEXTDC Ltd")
+    assert v.keep and v.factor == pytest.approx(0.7) and v.notes == (S.MA_TARGET_MINORITY_NOTE,)
+    assert v.reason == "Kept: Mergers & Acquisitions (M&A), minority stake purchase: weak trigger, 5 days ago"
+    sig = sig_for(config, v, accounts)
+    assert sig.strength == 0.2967 and S.signal_notes(sig) == [S.MA_TARGET_MINORITY_NOTE]       # round(0.4239 * 0.7, 4)
+    assert "acquirer" not in v.reason
+
+
+def test_goodman_side_of_the_same_wording_is_the_minority_acquirer(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", NEXTDC_TEXT, name="Goodman Group")
+    assert v.factor == 0.5 and v.notes == (S.MA_MINORITY_NOTE,)
+
+
+@pytest.mark.parametrize("name,role,weight", [
+    ("Gamma Group", "acquirer", 0.25), ("Delta Systems", "target", 0.35)])
+def test_x_has_agreed_to_acquire_a_stake_in_y(name, role, weight):
+    d = "Gamma Group has agreed to acquire a 9.9% stake in Delta Systems."
+    r, w, _ = S.classify_ma(d, name)
+    assert (r, w) == (role, weight)
+
+
+def test_majority_or_full_acquisition_target_keeps_half_weight():
+    assert S.classify_ma("Gamma Group has agreed to acquire a 60% stake in Delta Systems.", "Delta Systems")[:2] == ("target", 0.5)
+    assert S.classify_ma("Gamma Group has agreed to acquire a majority stake in Delta Systems.", "Delta Systems")[:2] == ("target", 0.5)
+    assert S.classify_ma("Delta Systems to be acquired by Gamma Group.", "Delta Systems")[:2] == ("target", 0.5)
+    assert S.classify_ma("Delta Systems agreed to be acquired by Gamma Group in a full takeover.", "Delta Systems")[:2] == ("target", 0.5)
+
+
+@pytest.mark.parametrize("d", [
+    "Gamma Group agreed to buy a minority interest in Delta Systems.",
+    "Gamma Group took a 15% stake in Delta Systems.",
+    "Gamma Group takes a stake in Delta Systems.",
+])
+def test_minority_stake_in_the_company_is_a_weak_target(d):
+    assert S.classify_ma(d, "Delta Systems")[1] == 0.35
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Delta Systems has signed a deal for Gamma Group to acquire Delta Systems.", "Gamma Group", "acquirer"),
+    ("The board allows Gamma Group to acquire a stake in Delta Systems.", "Delta Systems", "target"),
+    ("Delta Systems received an offer for Gamma Group to buy it.", "Delta Systems", "target"),
+])
+def test_other_third_party_constructions(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_nextdc_goodman_pair_is_still_the_same_deal(config):
+    va, vb = deal_pair(config, NEXTDC_TEXT, NEXTDC_TEXT, a_name="Goodman Group", b_name="NEXTDC Ltd")
+    assert va.same_deal_as == ("NEXTDC Ltd",) and vb.same_deal_as == ("Goodman Group",)
+    assert (va.factor, vb.factor) == (0.5, pytest.approx(0.7))
+
+
+# ------------------------------------------------------------ (3) hardware launches beat platform / interface words
+@pytest.mark.parametrize("desc", [
+    "Example Co launched a scaled-up robotics platform with a new user interface.",
+    "Example Co launched a new chromatography instrument with a cloud platform.",
+    "Example Co launched high-resolution cameras with AI-powered analytics.",
+    "Example Co launched emitters for digital sampling.",
+    "Example Co launched a sensor platform for mobile fleets.",
+    "Example Co launched a reagent kit for a laboratory assay platform.",
+    "Example Co launched a new device with a digital display.",
+    "Example Co launched powder handling equipment with a colour display.",
+    "Example Co launched hardware for the cloud.",
+])
+def test_hardware_launch_is_non_digital_even_with_platform_or_interface_words(config, desc):
+    v = one(config, "Product Launch", desc)
+    assert v.factor == 0.5 and v.notes == (S.LAUNCH_NOTE,)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co launched a robotics platform with companion software.",
+    "Example Co launched a camera with a new mobile app.",
+    "Example Co launched a sensor with an analytics portal.",
+    "Example Co launched a device management API.",
+])
+def test_hardware_with_an_explicit_software_product_stays_digital(config, desc):
+    assert one(config, "Product Launch", desc).factor == 1.0
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co launched an AI-powered platform for banks.", "Example Co launched a fintech cloud platform.",
+    "Example Co launched a new user interface for its app.", "Example Co launched a software platform.",
+])
+def test_software_launches_without_hardware_words_stay_digital(config, desc):
+    assert one(config, "Product Launch", desc).factor == 1.0
+
+
+def test_hardware_words_are_whole_words(config):
+    assert one(config, "Product Launch", "Example Co launched a mobile banking app for devotees.").factor == 1.0
+    assert S._HARDWARE_PRODUCT.search("lab devices") and not S._HARDWARE_PRODUCT.search("Acme Labs and a cameraman")
+    assert not S._HARDWARE_PRODUCT.search("equipmentless")
+
+
+def test_financial_launch_still_checked_after_the_hardware_rule(config):
+    assert one(config, "Product Launch", "Example Co launches a new property trust.").factor == 0.25
+
+
+def test_same_product_name_with_a_missing_date_counts_once():
+    a = Signal("A", SignalKind.PRODUCT_LAUNCH, 0.5, "a", None, "Catapult launched VisionPro for elite teams.", "Z")
+    b = Signal("A", SignalKind.PRODUCT_LAUNCH, 0.4, "b", datetime(2026, 11, 20, tzinfo=timezone.utc),
+               "Catapult unveils VisionPro at a trade show.", "Z")
+    assert S.dedupe_signals([a, b]) == [a]
+
+
+def test_powder_launch_is_hardware(config):
+    assert one(config, "Product Launch", "Example Co launched a metal powder with a digital ordering platform.").factor == 0.5
+
+
+def test_same_kind_extras_stop_at_the_total_cap():
+    sigs = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
+            L(0.45, "c", "Gamma Co launched Gamma Hub."), L(0.4, "d", "Delta Co launched Delta Hub.")]
+    # extras 0.15 + 0.15, then the third extra is capped to 0 by the 0.30 total
+    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.85, 4)
+
+
+# ------------------------------------------------------------ notes carried onto Signal: being acquired, role vacated
+def test_being_acquired_note_reaches_the_signal(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
+    sig = sig_for(config, v, accounts)
+    assert sig.evidence == "Pickles Auctions to be acquired by EQT. (being acquired: leadership/platform change likely)"
+    assert S.signal_notes(sig) == [S.MA_TARGET_NOTE] and sig.strength == 0.4239
+
+
+def test_reclassified_funding_target_carries_the_note(config, accounts):
+    v = one(config, "Funding", "Pickles Auctions to be acquired by EQT.", name="Pickles Auctions")
+    assert S.signal_notes(sig_for(config, v, accounts)) == [S.MA_TARGET_NOTE]
+
+
+def test_full_acquirer_has_no_being_acquired_note(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Gamma Group acquires Tiny Co.", name="Gamma Group")
+    assert S.signal_notes(sig_for(config, v, accounts)) == []
+
+
+def test_target_note_stacks_with_same_deal_note(config):
+    d = "Delta Systems to be acquired by Gamma Group."
+    va, vb = deal_pair(config, d, d, a_name="Gamma Group", b_name="Delta Systems")
+    by_zi = {"ZA": Account("SF-A", "Gamma"), "ZB": Account("SF-B", "Delta")}
+    sigs = {s.sf_account_id: s for s in S.scoops_to_signals([va, vb], by_zi, config, TODAY).signals}
+    assert S.signal_notes(sigs["SF-B"]) == [S.MA_TARGET_NOTE, "same deal as Gamma Group"]
+    assert S.signal_notes(sigs["SF-A"]) == ["same deal as Delta Systems"]
+
+
+@pytest.mark.parametrize("desc", [
+    "The CTO of Example Co has left to join another organisation.",
+    "Example Co's Interim Chief Digital Officer is leaving.",
+])
+def test_role_vacated_note_reaches_the_signal(config, accounts, desc):
+    v = one(config, "Executive Move", desc)
+    assert v.notes == (S.VACATED_NOTE,)
+    sig = sig_for(config, v, accounts)
+    assert sig.evidence == desc + " (role vacated: new leader likely)" and S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+def test_vacated_via_promotion_carries_the_note(config, accounts):
+    v = one(config, "Executive Move", "Example Co's Jane moves from Chief Technology Officer to CEO.")
+    assert S.signal_notes(sig_for(config, v, accounts)) == [S.VACATED_NOTE]
+
+
+def test_incoming_leader_has_no_vacated_note(config, accounts):
+    for d in ("Example Co appointed a new Chief Digital Officer.",
+              "Example Co's Sam moved from Head of Marketing to Chief Digital Officer."):
+        assert S.signal_notes(sig_for(config, one(config, "Executive Move", d), accounts)) == []
+
+
+def test_vacated_and_ambiguous_notes_stack_in_order(config, accounts):
+    v = one(config, "Executive Move", "Example Co's Head of Product, Footwear has left to join a rival.")
+    assert v.ambiguous and S.signal_notes(sig_for(config, v, accounts)) == [S.AMBIGUOUS_NOTE, S.VACATED_NOTE]
+
+
+def test_long_text_with_two_notes_fits(config, accounts):
+    d = "Example Co's Interim Chief Digital Officer is leaving. " + "More text. " * 60
+    sig = sig_for(config, one(config, "Executive Move", d), accounts)
+    assert len(sig.evidence) <= S.EVIDENCE_MAX_CHARS and S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+# ============================================================ review fixes on 600687a
+# ------------------------------------------------------------ (1) 'with' / 'from' are not third-party buyers
+@pytest.mark.parametrize("d", [
+    "Acme signs agreement with Bigco to acquire Zeta.",
+    "Acme gets approval from the ACCC to acquire Zeta.",
+    "Acme, supported by an agreement with Bigco to acquire Zeta, expands.",
+    "Acme reached a deal with Bigco to acquire Zeta.",
+    "Acme won an offer from Bigco to acquire Zeta.",
+])
+def test_with_or_from_counterparty_does_not_make_the_company_the_target(d):
+    assert S.ma_role(d, "Acme Holdings") == "acquirer"
+
+
+def test_acme_with_bigco_is_a_full_acquirer(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme signs agreement with Bigco to acquire Zeta.", name="Acme Holdings")
+    assert v.factor == 1.0 and v.notes == ()
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme has entered into an agreement for Bigco to acquire a 9.9% stake in the company.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco and Cargo to acquire a stake in the company.", "Bigco Ltd", "acquirer"),
+    ("Acme has entered into an agreement for Bigco and Cargo to acquire a stake in the company.", "Cargo Pty", "acquirer"),
+    ("Acme made a deal for Bigco to buy it.", "Acme Holdings", "target"),
+    ("The board allows Bigco to acquire a stake in Acme.", "Acme Holdings", "target"),
+    ("The regulator permits Bigco to acquire Zeta.", "Bigco Ltd", "acquirer"),
+])
+def test_for_and_allow_constructions_still_work(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_nextdc_goodman_digital_realty_wording_unchanged():
+    assert S.ma_role(NEXTDC_TEXT, "NEXTDC Ltd") == "target"
+    assert S.ma_role(NEXTDC_TEXT, "Goodman Group") == "acquirer"
+    assert S.ma_role(NEXTDC_TEXT, "Digital Realty Trust") == "acquirer"
+
+
+# ------------------------------------------------------------ (2) kind diversity before the cap
+def test_new_hire_is_not_dropped_by_three_stronger_funding_scoops():
+    sigs = [_sig(SignalKind.FUNDING, 0.50, src="f1"), _sig(SignalKind.FUNDING, 0.49, src="f2"),
+            _sig(SignalKind.FUNDING, 0.48, src="f3"), _sig(SignalKind.NEW_HIRE, 0.45, src="h")]
+    with_hire = S.combined_strength(sigs)
+    without = S.combined_strength(sigs[:3])
+    assert with_hire == 0.72 and without == 0.6388 and with_hire > without      # 1 - 0.5 * 0.775 * 0.85 * 0.85
+
+
+def test_best_of_each_kind_is_picked_before_the_cap():
+    sigs = [_sig(SignalKind.FUNDING, 0.5, src="f"), _sig(SignalKind.NEW_HIRE, 0.4, src="h"),
+            _sig(SignalKind.MA, 0.3, src="m"), _sig(SignalKind.PRODUCT_LAUNCH, 0.2, src="l"),
+            _sig(SignalKind.HIRING_PLAN, 0.1, src="p")]
+    # leads damped: 0.2, 0.15, 0.1, 0.05; the cap keeps the best plus the three strongest others
+    assert S.combined_strength(sigs) == round(1 - 0.5 * 0.8 * 0.85 * 0.9, 4)
+
+
+def test_one_signal_per_kind_scores_are_unchanged():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.8, src="e"), _sig(SignalKind.FUNDING, 0.6, src="f")]
+    assert S.combined_strength(sigs) == round(1 - 0.2 * 0.7, 4)
+
+
+def test_catapult_nine_launches_unchanged_by_the_new_order():
+    assert S.combined_strength(CATAPULT) == 0.7038
+
+
+def test_intent_is_never_best_even_with_the_new_order():
+    real, intent = _sig(SignalKind.FUNDING, 0.16, src="f"), _isig(0.3)
+    assert S.combined_strength([real, intent]) == 0.286                 # 1 - 0.84 * (1 - 0.15)
+
+
+def test_new_kind_ranks_among_extras_by_contribution():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.9, src="e"), _sig(SignalKind.FUNDING, 0.1, src="f1"),
+            _sig(SignalKind.FUNDING, 0.1, src="f2"), _sig(SignalKind.FUNDING, 0.1, src="f3")]
+    # funding lead counts 0.05; extras 0.1 + 0.1; best + three others = all four entries
+    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.9 * 0.9, 4)
+
+
+# ------------------------------------------------------------ (3) place words are not product names
+@pytest.mark.parametrize("text", [
+    "Gamma launches New Zealand expansion of lending app.", "Gamma launched New Zealand credit card.",
+    "Gamma launched Australian range of cards.", "Gamma launches Sydney pilot.",
+    "Gamma unveils the Asia Pacific expansion.",
+])
+def test_place_and_generic_words_are_not_product_names(text):
+    assert S._product_name(text) is None
+
+
+def test_new_zealand_launches_do_not_dedupe_by_name():
+    a = L(0.5, "a", "Gamma launches New Zealand expansion of lending app.")
+    b = L(0.4, "b", "Gamma launched New Zealand credit card.")
+    assert len(S.dedupe_signals([a, b])) == 2
+
+
+def test_place_words_are_stripped_from_a_real_name():
+    assert S._product_name("Gamma launched Australian VisionPro today.") == "visionpro"
+    assert S._product_name("Gamma launched VisionPro Australia.") == "visionpro"
+
+
+def test_lowercase_product_names_are_a_known_limit():
+    assert S._product_name("Catapult launches the pro tracker for coaches.") is None
+    a = L(0.5, "a", "Catapult launches the pro tracker for coaches in Europe this week for everyone.", day=20)
+    b = L(0.4, "b", "Catapult introduced the pro tracker, a coaching tool for clubs worldwide.", day=20)
+    assert len(S.dedupe_signals([a, b])) == 2                           # different first 60 characters, no capital name
+
+
+# ------------------------------------------------------------ (5) application / webapp / online store are software
+@pytest.mark.parametrize("desc", [
+    "Example Co launches an application for battery monitoring.",
+    "Example Co launched a webapp for sensor fleets.",
+    "Example Co launched Powder Coat Pro online store.",
+    "Example Co launched an online shop for laboratory reagents.",
+    "Example Co launched applications for device management.",
+])
+def test_application_webapp_and_online_store_keep_hardware_words_digital(config, desc):
+    assert one(config, "Product Launch", desc).factor == 1.0
+
+
+def test_hardware_without_a_software_noun_is_still_physical(config):
+    assert one(config, "Product Launch", "Example Co launched a battery for sensor fleets.").factor == 0.5
+
+
+def test_allow_base_form_and_enable_permit_variants():
+    assert S.ma_role("Acme is willing to allow Bigco to acquire a stake in Acme.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will permit Bigco to acquire Zeta.", "Bigco Ltd") == "acquirer"
+
+
+# ============================================================ exact note strings (final review item 6)
+def test_parenthetical_that_looks_like_a_note_prefix_is_plain_text():
+    for tail in ("(being acquired by Bigco)", "(role vacated at the old firm)", "(minority stake purchase by Fund)",
+                 "(debt facility of $5m)", "(reported talks with unions)", "(physical or unclear)", "(role ambiguous)"):
+        sig = Signal("A", SignalKind.EXEC_MOVE, 0.5, "s", None, f"Acme appoints new CDO {tail}", "Z")
+        assert S.signal_notes(sig) == [] and not S.is_ambiguous(sig)
+
+
+def test_real_note_after_a_lookalike_parenthetical_strips_only_the_real_note():
+    ev = "Acme appoints new CDO (being acquired by Bigco) (" + S.VACATED_NOTE + ")"
+    sig = Signal("A", SignalKind.EXEC_MOVE, 0.5, "s", None, ev, "Z")
+    assert S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+def test_every_known_note_is_read_back_exactly():
+    for note in sorted(S.KNOWN_NOTES):
+        sig = Signal("A", SignalKind.MA, 0.5, "s", None, f"Plain scoop text. ({note})", "Z")
+        assert S.signal_notes(sig) == [note]
+
+
+def test_truncated_or_extended_note_text_is_not_a_note():
+    for bad in (S.MA_TARGET_NOTE[:-1], S.MA_TARGET_NOTE + " today", S.VACATED_NOTE.upper(), "role vacated"):
+        sig = Signal("A", SignalKind.MA, 0.5, "s", None, f"Plain scoop text. ({bad})", "Z")
+        assert S.signal_notes(sig) == []
+
+
+def test_same_deal_note_still_matches_with_names_only():
+    ok = Signal("A", SignalKind.MA, 0.5, "s", None, "Text. (same deal as Bigco, Cargo)", "Z")
+    no = Signal("A", SignalKind.MA, 0.5, "s", None, "Text. (same deal as )", "Z")
+    assert S.signal_notes(ok) == ["same deal as Bigco, Cargo"] and S.signal_notes(no) == []
+
+
+def test_note_prefixes_constant_is_gone():
+    assert not hasattr(S, "NOTE_PREFIXES")
