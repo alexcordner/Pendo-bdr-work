@@ -613,10 +613,11 @@ def test_radar_equal_strength_newer_first(config):
     assert [e.account.name for e in S.trigger_radar(scoops, accts, config, TODAY)] == ["Zebra", "Aardvark"]
 
 
-def test_radar_same_zoominfo_id_first_account_wins(config):
+def test_radar_accounts_sharing_a_zoominfo_id_each_get_an_entry(config):
     accts = [Account("SF-1", "First", zoominfo_id="Z"), Account("SF-2", "Second", zoominfo_id="Z")]
     out = S.trigger_radar([make_scoop(cid="Z")], accts, config, TODAY)
-    assert [e.account.name for e in out] == ["First"]
+    assert [e.account.name for e in out] == ["First", "Second"]
+    assert out[0].signal.source == out[1].signal.source and out[0].combined_strength == out[1].combined_strength
 
 
 def test_radar_combines_multiple_scoops_per_account(config):
@@ -1239,3 +1240,238 @@ def test_heldout_files_have_expected_shape():
     for name, n in (("signals_heldout1.json", 128), ("signals_heldout2.json", 28)):
         rows = load_fixture(name)["rows"]
         assert len(rows) == n and all({"id", "types", "topics", "description", "expect", "age_days"} <= set(r) for r in rows)
+
+
+# ============================================================ round 4 (fixes branch)
+# ------------------------------------------------------------ L2: accounts sharing a ZoomInfo id
+def test_scoops_to_signals_accepts_a_list_of_accounts_per_id(config):
+    a1, a2 = Account("SF-1", "One", zoominfo_id="Z"), Account("SF-2", "Two", zoominfo_id="Z")
+    v = S.filter_scoops([make_scoop(cid="Z")], config, TODAY)
+    out = S.scoops_to_signals(v, {"Z": [a1, a2]}, config, TODAY)
+    assert [x.sf_account_id for x in out.signals] == ["SF-1", "SF-2"] and out.unmatched == []
+    one, two = out.signals
+    assert (one.kind, one.strength, one.source, one.source_date, one.evidence, one.zoominfo_id) == \
+           (two.kind, two.strength, two.source, two.source_date, two.evidence, two.zoominfo_id)
+
+
+def test_single_account_value_still_works_and_empty_list_is_unmatched(config):
+    v = S.filter_scoops([make_scoop(cid="Z")], config, TODAY)
+    assert len(S.scoops_to_signals(v, {"Z": Account("SF-1", "One")}, config, TODAY).signals) == 1
+    out = S.scoops_to_signals(v, {"Z": []}, config, TODAY)
+    assert out.signals == [] and len(out.unmatched) == 1
+
+
+def test_list_value_order_does_not_change_output_order(config):
+    a1, a2 = Account("SF-1", "One"), Account("SF-2", "Two")
+    v = S.filter_scoops([make_scoop(cid="Z")], config, TODAY)
+    x = S.scoops_to_signals(v, {"Z": [a1, a2]}, config, TODAY).signals
+    y = S.scoops_to_signals(v, {"Z": [a2, a1]}, config, TODAY).signals
+    assert x == y
+
+
+def test_intent_signal_attached_to_every_account_sharing_the_id(config):
+    accts = [Account("SF-1", "One", zoominfo_id="Z"), Account("SF-2", "Two", zoominfo_id="Z")]
+    row = {"company_id": "Z", "topic": "Digital Experience", "signal_score": 100, "audience_strength": "A",
+           "recorded_date": "2026-11-25"}
+    out = S.intent_to_signals([row], accts, config, TODAY)
+    assert sorted(x.sf_account_id for x in out) == ["SF-1", "SF-2"]
+
+
+# ------------------------------------------------------------ ambiguity carried in the evidence
+def test_ambiguous_evidence_suffix_and_helper(config, accounts):
+    by_zi = {a.zoominfo_id: a for a in accounts if a.zoominfo_id}
+    v = judge(config, desc="Example Co named a Head of Product, Footwear.", types=("Executive Move",), topics=(), days=5)
+    sig = S.scoops_to_signals([v], by_zi, config, TODAY).signals[0]
+    assert sig.evidence == "Example Co named a Head of Product, Footwear. (role ambiguous: check it is a digital product role)"
+    assert S.is_ambiguous(sig)
+    clear = judge(config, desc="Example Co named a Head of Product.", types=("Executive Move",), topics=(), days=5)
+    csig = S.scoops_to_signals([clear], by_zi, config, TODAY).signals[0]
+    assert csig.evidence == "Example Co named a Head of Product." and not S.is_ambiguous(csig)
+
+
+def test_ambiguous_suffix_survives_long_descriptions(config, accounts):
+    by_zi = {a.zoominfo_id: a for a in accounts if a.zoominfo_id}
+    desc = "Example Co named a Head of Product, Footwear. " + "More text. " * 60
+    v = judge(config, desc=desc, types=("Executive Move",), topics=(), days=5)
+    sig = S.scoops_to_signals([v], by_zi, config, TODAY).signals[0]
+    assert len(sig.evidence) == S.EVIDENCE_MAX_CHARS and S.is_ambiguous(sig)
+
+
+def test_is_ambiguous_false_for_intent_and_none():
+    assert not S.is_ambiguous(_isig(0.2)) and not S.is_ambiguous(S.no_trigger_signal(Account("A", "n")))
+
+
+# ------------------------------------------------------------ (1) investor-note rule, more verbs
+def fund(config, desc, name="Example Co"):
+    return S.filter_scoops([make_scoop(desc=desc, name=name)], config, TODAY)[0]
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Capital participated in a $15 million round for Other Co.",
+    "Example Ventures led a seed investment in Other Co.",
+    "Example Super has taken a stake in Other Co's infrastructure arm.",
+    "Example Fund co-led a Series A in Other Co.",
+    "Example Co took a stake in Other Co.",
+    "Example Partners backed Other Co.",
+    "Example Co is backed by Fund Z.",
+])
+def test_investor_verbs_dropped(config, desc):
+    assert not fund(config, desc).keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Fund Y led a $3M round in Example Co.",
+    "Fund Y took a stake in Example Co.",
+    "Example Co raised $5 million, backed by Fund Z.",
+    "Example Co has raised $5 million and Fund Z participated in the round.",
+    "Example Co closed a Series B round.",
+    "Example Co has received an investment of $3M.",
+])
+def test_investee_and_normal_funding_kept(config, desc):
+    assert fund(config, desc).keep
+
+
+def test_company_raised_then_investor_invested_is_kept(config):
+    assert fund(config, "Gamma Apps raised $8 million; Fund X invested in the round.", name="Gamma Apps Pty Ltd").keep
+
+
+def test_investor_reason_text(config):
+    assert fund(config, "Example Capital participated in a round for Other Co.").reason == \
+        "Dropped: investor note: the company is the one investing, not a company that received funding"
+    assert "no funds received" in fund(config, "Example Co is backed by Fund Z.").reason
+
+
+# ------------------------------------------------------------ (2) former / replaced / board
+@pytest.mark.parametrize("desc", [
+    "Example Bank appoints a Chair of the Risk Committee, a former CIO of a rival lender.",
+    "Example Co has welcomed a Head of Procurement. She replaces the former Head of Digital.",
+    "Example Co appointed a CMO, replacing the Chief Digital Officer.",
+    "Example Co hired a CFO who was previously Chief Product Officer at a retailer.",
+    "Example Co hired a Head of Finance, an ex-CPO of a rival.",
+    "Example Co appointed a COO who succeeds the outgoing Head of Digital.",
+])
+def test_former_or_predecessor_roles_rejected(desc):
+    assert S.relevant_role(desc) is None
+
+
+@pytest.mark.parametrize("desc", [
+    "She succeeds Jane Smith as Chief Digital Officer.",
+    "Pat replaces Jane Smith as Head of Product.",
+    "An ex-CPO of a bank joins as Head of Digital.",
+    "Example Co has welcomed a Head of Digital. She replaces the former Head of Procurement.",
+    "Example Co hired a Head of Product, who previously worked in finance.",
+])
+def test_new_leader_in_a_replacement_sentence_still_counts(desc):
+    assert S.relevant_role(desc)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co has appointed Jordan Fake to its Board; Jordan was previously Chief Product Officer.",
+    "Example Co has appointed a Chair. She is also a director of two technology companies.",
+    "Example Co appointed a non-executive director with a Chief Digital Officer background.",
+    "The Board welcomed a new Chief Digital Officer.",
+])
+def test_board_notes_reject_roles(desc):
+    assert S.relevant_role(desc) is None
+
+
+def test_dashboard_and_onboarding_are_not_board():
+    assert S.relevant_role("Example Co hired a Head of Product to lead dashboard and onboarding work.")
+
+
+# ------------------------------------------------------------ (3) CIO
+@pytest.mark.parametrize("desc", [
+    "Example Super has appointed a CIO, who will oversee its $40 billion investment portfolio.",
+    "Example Co appointed a CIO for its superannuation fund assets.",
+    "Example Co appointed a CIO to manage funds under management.",
+])
+def test_cio_in_investment_sentence_rejected(desc):
+    assert S.relevant_role(desc) is None
+
+
+def test_cio_elsewhere_still_counts_and_other_sentences_do_not_veto():
+    assert S.relevant_role("Example Co appointed a CIO to modernise its apps.") == "CIO"
+    assert S.relevant_role("Example Co appointed a CIO. The company manages an investment portfolio.") == "CIO"
+    assert S.relevant_role("Example Co appointed a Chief Information Officer for its investment arm.")   # spelled out
+
+
+# ------------------------------------------------------------ (4) hiring path
+@pytest.mark.parametrize("desc", [
+    "Example Co is hiring a Product Compliance Officer and a Product Safety Auditor.",
+    "Example Co is hiring a Product Compliance Officer.",
+    "Example Co is hiring product engineers for its app.",
+    "Example Co is hiring a Product Manager, Legal Operations.",
+    "Example Co is hiring a Product Owner for procurement systems.",
+])
+def test_hiring_negative_list_and_bare_product_weak(config, desc):
+    assert not judge(config, desc=desc, types=("Hiring Plans",), topics=()).keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co is hiring a Product Design Lead.", "Example Co is hiring a Senior Product Manager.",
+    "Example Co is hiring a Product Owner for its mobile app.",
+])
+def test_hiring_product_roles_still_kept(config, desc):
+    assert judge(config, desc=desc, types=("Hiring Plans",), topics=()).keep
+
+
+def test_bare_product_is_a_weak_keyword():
+    assert "product" in S.WEAK_KEEP_KEYWORDS
+
+
+# ------------------------------------------------------------ (5) chief X and Y officer, hyphenated free words
+@pytest.mark.parametrize("desc", [
+    "Example Co has appointed a Chief Customer and Digital Officer.",
+    "Example Co has a Chief Experience and Technology Officer.",
+    "Example Co has a Chief Information and Technology Officer.",
+    "Example Co has a Chief Product and Growth Officer.",
+    "Example Co named a Chief Digital and Strategy Officer.",
+])
+def test_chief_x_and_y_officer_general(desc):
+    assert S.relevant_role(desc)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co has appointed a Chief Risk and Compliance Officer.",
+    "Example Co has appointed a Chief Legal and People Officer.",
+    "Example Co has appointed a Chief Financial and Operating Officer.",
+])
+def test_chief_x_and_y_officer_non_buyer_rejected(desc):
+    assert S.relevant_role(desc) is None
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Retail has hired a Head of E-commerce Product.",
+    "Example Co hired a Head of Mobile-first Product.",
+    "Example Co hired a Director of Cross-platform Engineering.",
+])
+def test_hyphenated_free_word(desc):
+    assert S.relevant_role(desc)
+
+
+# ------------------------------------------------------------ heldout3 regression (judge rows excluded)
+def test_heldout3_not_below_reviewer_round3_numbers(config):
+    precision, recall, misses = _heldout_metrics(config, "signals_heldout3.json")
+    # the reviewer measured precision 86.8% / recall 96.7% (after two label corrections) on the old code
+    assert precision > 0.868 and recall >= 0.967, misses
+
+
+def test_heldout3_shape_and_label_corrections():
+    rows = {r["id"]: r for r in load_fixture("signals_heldout3.json")["rows"]}
+    assert len(rows) == 170
+    assert rows["T169"]["expect"] == "drop" and rows["T170"]["expect"] == "drop"
+
+
+def test_round_alone_is_not_money_received(config):
+    # company name differs from the investor's, so only the 'received' word list can save it; 'round' must not
+    v = S.filter_scoops([make_scoop(desc="Fictional Capital participated in a $15 million round for Other Co.",
+                                    name="Gamma Apps Pty Ltd")], config, TODAY)[0]
+    assert not v.keep and "investor note" in v.reason
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co has appointed a Chief Strategy and Growth Officer.",
+    "Example Co has appointed a Chief Operating and Commercial Officer.",
+])
+def test_chief_x_and_y_officer_needs_a_buyer_word(desc):
+    assert S.relevant_role(desc) is None

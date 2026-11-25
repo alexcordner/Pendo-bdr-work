@@ -1,0 +1,2082 @@
+{
+ "_note": "HELD-OUT round 3, invented by the reviewer. Labels (expect) written and committed BEFORE running the filter. judge=true rows are borderline calls reported separately.",
+ "rows": [
+  {
+   "id": "T001",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank has appointed Robin Fake as Chief Digital Officer, effective 1 February.",
+   "expect": "keep",
+   "pattern": "bank CDO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T002",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank has named a new Executive General Manager, Digital Channels.",
+   "expect": "keep",
+   "pattern": "EGM digital",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T003",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank's Head of Mobile Banking, Sam Placeholder, has been promoted to Chief Product Officer.",
+   "expect": "keep",
+   "pattern": "promotion to CPO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T004",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Bank has appointed a new Head of Home Loans Product.",
+   "expect": "drop",
+   "pattern": "financial product lead",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T005",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank has appointed a Chief Credit Officer.",
+   "expect": "drop",
+   "pattern": "credit officer",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T006",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Bank has hired a Head of Digital Fraud and Financial Crime.",
+   "expect": "drop",
+   "pattern": "digital + fraud",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T007",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Bank has hired a Director of Customer Experience Transformation.",
+   "expect": "keep",
+   "pattern": "CX transformation director",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T008",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank has appointed Taylor Fake as Executive Manager, Collections and Recoveries.",
+   "expect": "drop",
+   "pattern": "collections",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T009",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank names Alex Fake as Group Executive, Technology and Operations.",
+   "expect": "keep",
+   "pattern": "group executive technology (no title word)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T010",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Bank appoints a Chair of the Risk Committee, a former CIO of a rival lender.",
+   "expect": "drop",
+   "pattern": "board role, former CIO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T011",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Bank has hired a Head of Branch Network and Business Banking.",
+   "expect": "drop",
+   "pattern": "branch network",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T012",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Super has appointed a Chief Investment Officer.",
+   "expect": "drop",
+   "pattern": "CIO spelled out as investment",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T013",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Super has appointed a CIO, who will oversee its $40 billion investment portfolio.",
+   "expect": "drop",
+   "pattern": "acronym CIO = investment",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T014",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Super has hired a Head of Member Digital Experience.",
+   "expect": "keep",
+   "pattern": "member digital experience",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T015",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Super has hired a Head of Member Services.",
+   "expect": "drop",
+   "pattern": "member services",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T016",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Super names Casey Fake as Chief Member Officer.",
+   "expect": "keep",
+   "pattern": "chief member officer (CX-adjacent)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T017",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example University has appointed a new Chief Digital and Information Officer.",
+   "expect": "keep",
+   "pattern": "university CDIO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T018",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example University has named a Director of Student Experience Technology.",
+   "expect": "keep",
+   "pattern": "student experience technology",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T019",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example University has appointed a Pro Vice-Chancellor, Research.",
+   "expect": "drop",
+   "pattern": "PVC research",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T020",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example University has appointed a Professor of Computer Science.",
+   "expect": "drop",
+   "pattern": "professor",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T021",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example University has hired a Director of Student Services.",
+   "expect": "drop",
+   "pattern": "student services",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T022",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "The university has hired a Head of Digital Learning and Platforms.",
+   "expect": "keep",
+   "pattern": "digital learning",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T023",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example City Council has appointed a Chief Information Officer to lead its digital services program.",
+   "expect": "keep",
+   "pattern": "council CIO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T024",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Council has appointed a Director of Planning and Environment.",
+   "expect": "drop",
+   "pattern": "planning",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T025",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Shire Council has a new Director of Customer Service Centres.",
+   "expect": "keep",
+   "pattern": "council customer service director",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T026",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Council has hired a Technology Services Officer for its libraries.",
+   "expect": "drop",
+   "pattern": "junior tech officer",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T027",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Telco has appointed a Chief Product Officer to lead its consumer app and plans.",
+   "expect": "keep",
+   "pattern": "telco CPO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T028",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Telco has hired a Head of Network Engineering.",
+   "expect": "drop",
+   "pattern": "network engineering",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T029",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Telco has appointed a Chief Technology Officer, who will oversee its 5G rollout and spectrum strategy.",
+   "expect": "keep",
+   "pattern": "telco CTO (network flavour)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T030",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Telco hired a Head of Digital Self-Service.",
+   "expect": "keep",
+   "pattern": "digital self-service",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T031",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Telco has hired a Head of Wholesale Product.",
+   "expect": "drop",
+   "pattern": "wholesale product",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T032",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Grocer has appointed a Category Manager, Fresh Produce.",
+   "expect": "drop",
+   "pattern": "category manager",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T033",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Grocer has hired a Head of Private Label Product Development.",
+   "expect": "drop",
+   "pattern": "private label product development",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T034",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Retail has appointed a Chief Digital Officer to lead its e-commerce and app teams.",
+   "expect": "keep",
+   "pattern": "retail CDO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T035",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Retail has hired a Head of E-commerce Product.",
+   "expect": "keep",
+   "pattern": "e-commerce product",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T036",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Retail has hired a Head of Visual Merchandising.",
+   "expect": "drop",
+   "pattern": "merchandising",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T037",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Retail has hired a Store Manager for its new Hobart site.",
+   "expect": "drop",
+   "pattern": "store manager",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T038",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Retail has appointed a Head of Customer Service for its store network.",
+   "expect": "drop",
+   "pattern": "retail store customer service",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T039",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Retail welcomes a Head of Customer Experience, Digital and Stores.",
+   "expect": "keep",
+   "pattern": "CX digital and stores",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T040",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Mining has appointed a Head of Technology, Mine Automation.",
+   "expect": "drop",
+   "pattern": "OT technology",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T041",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Mining has appointed a General Manager, Operations at its Pilbara site.",
+   "expect": "drop",
+   "pattern": "site GM",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T042",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Resources has hired a Chief Geologist.",
+   "expect": "drop",
+   "pattern": "geologist",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T043",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Resources has appointed a Chief Information Officer to modernise its enterprise systems.",
+   "expect": "keep",
+   "pattern": "mining CIO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T044",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Mining has hired a Head of Product Marketing, Lithium.",
+   "expect": "drop",
+   "pattern": "product marketing lithium",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T045",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Health has appointed a Chief Digital Officer to lead its patient app and online booking.",
+   "expect": "keep",
+   "pattern": "health CDO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T046",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Health has appointed a Chief Nursing Officer.",
+   "expect": "drop",
+   "pattern": "nursing officer",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T047",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Hospital has hired a Director of Clinical Technology Services.",
+   "expect": "drop",
+   "pattern": "clinical technology",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T048",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Health has hired a Head of Digital Health Product.",
+   "expect": "keep",
+   "pattern": "digital health product",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T049",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Health has hired a Director of Allied Health.",
+   "expect": "drop",
+   "pattern": "allied health",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T050",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Medical Group names a Director of Customer Support for its Patient Access Centre.",
+   "expect": "keep",
+   "pattern": "patient access support director",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T051",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Freight has hired a Head of Digital and Technology.",
+   "expect": "keep",
+   "pattern": "freight digital and technology",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T052",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Freight has hired a Head of Supply Chain Engineering.",
+   "expect": "drop",
+   "pattern": "supply chain engineering",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T053",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Logistics has appointed a Head of Customer Service Operations for its depots.",
+   "expect": "drop",
+   "pattern": "depot customer service",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T054",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Logistics has hired a Head of Fleet Technology and Telematics.",
+   "expect": "drop",
+   "pattern": "fleet tech",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T055",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Logistics names a Chief Information Officer.",
+   "expect": "keep",
+   "pattern": "logistics CIO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T056",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Software has hired a VP Engineering from a global rival.",
+   "expect": "keep",
+   "pattern": "VP Engineering",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T057",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example SaaS has named a new Chief Product Officer; she was previously VP Product at a payments firm.",
+   "expect": "keep",
+   "pattern": "CPO + previous VP Product",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T058",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Software welcomes a Head of Customer Success, ANZ.",
+   "expect": "keep",
+   "pattern": "CS head ANZ",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T059",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Software has appointed a Head of Partnerships.",
+   "expect": "drop",
+   "pattern": "partnerships",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T060",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Software has hired a Head of Revenue Operations.",
+   "expect": "drop",
+   "pattern": "revops",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T061",
+   "types": [
+    "Management Move"
+   ],
+   "topics": [],
+   "description": "Example Software promoted its Head of Support to VP Customer Experience.",
+   "expect": "keep",
+   "pattern": "promotion to VP CX",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T062",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Software has appointed a VP Product Marketing.",
+   "expect": "drop",
+   "pattern": "VP product marketing",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T063",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example SaaS has hired a Director of Product Design.",
+   "expect": "keep",
+   "pattern": "director of product design",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T064",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example SaaS has hired a Senior Account Executive for its enterprise team.",
+   "expect": "drop",
+   "pattern": "AE",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T065",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "The Department has appointed a Chief Digital Officer to lead its online services.",
+   "expect": "keep",
+   "pattern": "gov CDO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T066",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Agency has named a Director, Digital Service Delivery.",
+   "expect": "keep",
+   "pattern": "digital service delivery director",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T067",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Agency has appointed a Deputy Secretary, Policy.",
+   "expect": "drop",
+   "pattern": "deputy secretary",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T068",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Agency has hired a Director of Legal Services.",
+   "expect": "drop",
+   "pattern": "legal services",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T069",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Government Digital Service has hired a Head of Product and Design.",
+   "expect": "keep",
+   "pattern": "head of product and design",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T070",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired an Executive Assistant to the Chief Digital Officer.",
+   "expect": "drop",
+   "pattern": "EA to CDO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T071",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Personal Assistant to the Head of Product.",
+   "expect": "drop",
+   "pattern": "PA to head of product",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T072",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief of Staff to the CTO.",
+   "expect": "drop",
+   "pattern": "chief of staff to CTO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T073",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has named an interim Chief Product Officer while it searches for a permanent hire.",
+   "expect": "keep",
+   "pattern": "interim CPO",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T074",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co appointed an Acting Head of Digital.",
+   "expect": "keep",
+   "pattern": "acting head of digital",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T075",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co's former Chief Technology Officer has joined a competitor.",
+   "expect": "drop",
+   "pattern": "former CTO departed",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T076",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a non-executive director with a background in technology and digital.",
+   "expect": "drop",
+   "pattern": "board role",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T077",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed Jordan Fake to its Board; Jordan was previously Chief Product Officer at a large retailer.",
+   "expect": "drop",
+   "pattern": "board, former CPO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T078",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chair. She is also a director of two technology companies.",
+   "expect": "drop",
+   "pattern": "chair, other directorships",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T079",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "The CTO of Example Co has resigned.",
+   "expect": "drop",
+   "pattern": "CTO resigned",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T080",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a CPO and a CXO as part of its leadership reshuffle.",
+   "expect": "keep",
+   "pattern": "CPO and CXO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T081",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a CFO and a COO.",
+   "expect": "drop",
+   "pattern": "CFO and COO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T082",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Chief Executive Officer and a Chief Product Officer.",
+   "expect": "keep",
+   "pattern": "CEO and CPO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T083",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a new CEO with a background in digital transformation.",
+   "expect": "drop",
+   "pattern": "CEO digital background",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T084",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Chief Financial Officer to support its digital growth strategy.",
+   "expect": "drop",
+   "pattern": "CFO + digital",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T085",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co's new Head of Finance will work closely with the product and technology teams.",
+   "expect": "drop",
+   "pattern": "finance head + product",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T086",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Product, who previously worked in finance and legal technology.",
+   "expect": "keep",
+   "pattern": "head of product, finance after",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T087",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Legal, previously at a software company.",
+   "expect": "drop",
+   "pattern": "legal head, software before",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T088",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has welcomed a Head of Digital. She replaces the former Head of Procurement.",
+   "expect": "keep",
+   "pattern": "digital replaces procurement",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T089",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has welcomed a Head of Procurement. She replaces the former Head of Digital.",
+   "expect": "drop",
+   "pattern": "procurement replaces digital",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T090",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Director of Engineering, formerly of a hospital group.",
+   "expect": "keep",
+   "pattern": "engineering director, hospital after 'formerly'",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T091",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Conversion and Experimentation.",
+   "expect": "keep",
+   "pattern": "conversion/experimentation",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T092",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Staff Product Designer.",
+   "expect": "keep",
+   "pattern": "IC product designer",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T093",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Director, Digital Product and Platforms.",
+   "expect": "keep",
+   "pattern": "director digital product and platforms",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T094",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed an Enterprise Agile Coach.",
+   "expect": "drop",
+   "pattern": "agile coach",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T095",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Head of Employee Digital Experience.",
+   "expect": "keep",
+   "pattern": "employee digital experience",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T096",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Head of Intranet and Collaboration.",
+   "expect": "keep",
+   "pattern": "intranet",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T097",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co hires a Chief Technology Officer and co-founder.",
+   "expect": "keep",
+   "pattern": "CTO co-founder",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T098",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Customer Success Marketing.",
+   "expect": "drop",
+   "pattern": "CS marketing",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T099",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Customer Support Analyst.",
+   "expect": "drop",
+   "pattern": "junior analyst",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T100",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Customer Success Manager.",
+   "expect": "drop",
+   "pattern": "CSM individual contributor",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T101",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired an IT Service Desk Analyst.",
+   "expect": "drop",
+   "pattern": "service desk analyst",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T102",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed an IT Director for its three campuses.",
+   "expect": "keep",
+   "pattern": "IT director",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T103",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired an IT Procurement Manager.",
+   "expect": "drop",
+   "pattern": "IT procurement",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T104",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Technology Risk Manager.",
+   "expect": "drop",
+   "pattern": "technology risk",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T105",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Cyber Security.",
+   "expect": "drop",
+   "pattern": "cyber head",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T106",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief Customer and Digital Officer.",
+   "expect": "keep",
+   "pattern": "chief customer and digital officer",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T107",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co plans to hire 40 software engineers and 10 product designers this year.",
+   "expect": "keep",
+   "pattern": "software engineers + designers",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T108",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is recruiting a head of mobile and a team of iOS developers.",
+   "expect": "keep",
+   "pattern": "head of mobile + iOS",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T109",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is expanding its customer experience team in Melbourne.",
+   "expect": "keep",
+   "pattern": "CX team",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T110",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is growing its digital product team with 12 hires.",
+   "expect": "keep",
+   "pattern": "digital product team",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T111",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is recruiting 300 casual retail assistants for the holiday season.",
+   "expect": "drop",
+   "pattern": "retail casuals",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T112",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring 150 aged care workers and registered nurses.",
+   "expect": "drop",
+   "pattern": "aged care",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T113",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co plans to hire 80 customer service staff for its contact centre expansion.",
+   "expect": "drop",
+   "pattern": "volume service staff",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T114",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is recruiting underground miners and fly-in fly-out technicians.",
+   "expect": "drop",
+   "pattern": "miners",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T115",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is seeking tradespeople, plumbers and electricians.",
+   "expect": "drop",
+   "pattern": "trades",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T116",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring lecturers and tutors for the 2027 academic year.",
+   "expect": "drop",
+   "pattern": "academics",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T117",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring bank tellers and branch managers.",
+   "expect": "drop",
+   "pattern": "tellers",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T118",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co plans to recruit 25 compliance analysts and 10 AML investigators.",
+   "expect": "drop",
+   "pattern": "compliance",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T119",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring technology risk and audit specialists.",
+   "expect": "drop",
+   "pattern": "tech risk audit",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T120",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring data engineers and analysts to manage its customer data warehouse.",
+   "expect": "drop",
+   "pattern": "data engineers + 'warehouse'",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T121",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring a Head of Product and a UX Researcher.",
+   "expect": "keep",
+   "pattern": "head of product + UX",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T122",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring a Product Compliance Officer and a Product Safety Auditor.",
+   "expect": "drop",
+   "pattern": "product compliance",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T123",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is recruiting for more open roles in Education and Training.",
+   "expect": "drop",
+   "pattern": "generic education",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T124",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co has more open roles in Government and Public Administration.",
+   "expect": "drop",
+   "pattern": "generic government",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T125",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co has more open roles in Retail and Consumer Goods.",
+   "expect": "drop",
+   "pattern": "generic retail",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T126",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co has more open roles in Software and IT Services.",
+   "expect": "drop",
+   "pattern": "generic software",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T127",
+   "types": [
+    "Open Position"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring mobile app developers and a QA lead for its customer app.",
+   "expect": "keep",
+   "pattern": "mobile app developers + QA lead",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T128",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring a Customer Success team lead and two CSMs.",
+   "expect": "keep",
+   "pattern": "customer success team lead",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T129",
+   "types": [
+    "Open Position"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring a Director of Digital Transformation.",
+   "expect": "keep",
+   "pattern": "open position digital transformation",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T130",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is recruiting engineers for its gas processing plant.",
+   "expect": "drop",
+   "pattern": "plant engineers",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T131",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Customer Experience"
+   ],
+   "description": "Example Co is replacing its customer portal.",
+   "expect": "keep",
+   "pattern": "CX topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T132",
+   "types": [
+    "Pain Point"
+   ],
+   "topics": [
+    "Finance"
+   ],
+   "description": "Example Co is seeking expense management software, according to an internal source in finance.",
+   "expect": "drop",
+   "pattern": "finance topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T133",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Digital Workplace"
+   ],
+   "description": "Example Co is rolling out Microsoft 365 to 4,000 staff.",
+   "expect": "keep",
+   "pattern": "digital workplace topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T134",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Cybersecurity"
+   ],
+   "description": "Example Co is evaluating endpoint security tools.",
+   "expect": "drop",
+   "pattern": "security topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T135",
+   "types": [
+    "Pain Point"
+   ],
+   "topics": [
+    "Product Management"
+   ],
+   "description": "Example Co wants better visibility of feature usage in its app.",
+   "expect": "keep",
+   "pattern": "product management topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T136",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Procurement"
+   ],
+   "description": "Example Co is reviewing procurement software.",
+   "expect": "drop",
+   "pattern": "procurement topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T137",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Supply Chain",
+    "Logistics"
+   ],
+   "description": "Example Co is upgrading its warehouse management system.",
+   "expect": "drop",
+   "pattern": "supply chain topics",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T138",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Customer Experience Management"
+   ],
+   "description": "Example Co is evaluating a customer feedback platform.",
+   "expect": "keep",
+   "pattern": "topic variant 'Customer Experience Management'",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T139",
+   "types": [
+    "Pain Point"
+   ],
+   "topics": [
+    "Customer Success",
+    "Sales"
+   ],
+   "description": "Example Co is struggling with customer churn.",
+   "expect": "keep",
+   "pattern": "customer success topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T140",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Sales",
+    "Marketing"
+   ],
+   "description": "Example Co is looking for sales enablement tools.",
+   "expect": "drop",
+   "pattern": "sales topics",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T141",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Product Development"
+   ],
+   "description": "Example Co is building a new member app.",
+   "expect": "keep",
+   "pattern": "product development topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T142",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Data Analytics"
+   ],
+   "description": "Example Co is evaluating BI dashboards.",
+   "expect": "drop",
+   "pattern": "analytics topic",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T143",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Legal"
+   ],
+   "description": "Example Co is reviewing contract management tools.",
+   "expect": "drop",
+   "pattern": "legal topic",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T144",
+   "types": [
+    "Project"
+   ],
+   "topics": [
+    "Customer Experience",
+    "Cloud Computing"
+   ],
+   "description": "Example Co is migrating its contact centre to the cloud.",
+   "expect": "keep",
+   "pattern": "CX topic with cloud",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T145",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Super has invested $30 million in Other Co.",
+   "expect": "drop",
+   "pattern": "investor subject",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T146",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Other Fund has invested $30 million in Example Co.",
+   "expect": "keep",
+   "pattern": "investee",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T147",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Co has closed a $20 million Series B round.",
+   "expect": "keep",
+   "pattern": "closed Series B",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T148",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Capital participated in a $15 million round for Other Co.",
+   "expect": "drop",
+   "pattern": "investor participated",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T149",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Ventures led a seed investment in Other Co.",
+   "expect": "drop",
+   "pattern": "investor led",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T150",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Co received a $5 million grant from the government.",
+   "expect": "keep",
+   "pattern": "grant",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T151",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Bank provided a $100 million loan facility to Other Co.",
+   "expect": "drop",
+   "pattern": "lender subject",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T152",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Super has taken a stake in Other Co's infrastructure arm.",
+   "expect": "drop",
+   "pattern": "investor stake",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T153",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Co completed its IPO, raising $80 million.",
+   "expect": "keep",
+   "pattern": "IPO raised",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T154",
+   "types": [
+    "Mergers & Acquisitions (M&A)"
+   ],
+   "topics": [],
+   "description": "Example Co has acquired Other Co.",
+   "expect": "keep",
+   "pattern": "acquirer",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T155",
+   "types": [
+    "Mergers & Acquisitions (M&A)"
+   ],
+   "topics": [],
+   "description": "Example Co is being acquired by Other Group.",
+   "expect": "keep",
+   "pattern": "acquired",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T156",
+   "types": [
+    "Mergers & Acquisitions (M&A)"
+   ],
+   "topics": [],
+   "description": "Example REIT has acquired a shopping centre for $200 million.",
+   "expect": "drop",
+   "pattern": "property acquisition, not software",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T157",
+   "types": [
+    "Partnership"
+   ],
+   "topics": [],
+   "description": "Example Co partnered with Other Co to launch a digital banking service.",
+   "expect": "keep",
+   "pattern": "digital partnership",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T158",
+   "types": [
+    "Partnership"
+   ],
+   "topics": [],
+   "description": "Example Co partnered with a charity to sponsor a local sports team.",
+   "expect": "drop",
+   "pattern": "sponsorship",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T159",
+   "types": [
+    "Product Launch"
+   ],
+   "topics": [],
+   "description": "Example Co launched a new mobile app for members.",
+   "expect": "keep",
+   "pattern": "app launch",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T160",
+   "types": [
+    "Product Launch"
+   ],
+   "topics": [],
+   "description": "Example Co launched a new range of frozen meals.",
+   "expect": "drop",
+   "pattern": "food launch",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "T161",
+   "types": [
+    "Funding",
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co raised $10 million. It also hired a Chief Financial Officer.",
+   "expect": "keep",
+   "pattern": "funding wins over failed exec",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T162",
+   "types": [
+    "Executive Move",
+    "Partnership"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Sales and signed a partnership with Other Co.",
+   "expect": "keep",
+   "pattern": "partnership passes, exec fails",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T163",
+   "types": [
+    "New Hire",
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Sales.",
+   "expect": "drop",
+   "pattern": "new hire and exec both fail",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "T164",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief Product Officer.",
+   "expect": "keep",
+   "pattern": "exec 50 days",
+   "judge": false,
+   "age_days": 50
+  },
+  {
+   "id": "T165",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief Product Officer.",
+   "expect": "drop",
+   "pattern": "exec 95 days",
+   "judge": false,
+   "age_days": 95
+  },
+  {
+   "id": "T166",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Co has raised $4 million.",
+   "expect": "drop",
+   "pattern": "funding 50 days",
+   "judge": false,
+   "age_days": 50
+  },
+  {
+   "id": "T167",
+   "types": [
+    "Funding"
+   ],
+   "topics": [],
+   "description": "Example Co has raised $4 million.",
+   "expect": "keep",
+   "pattern": "funding 44 days (strength about 0.16)",
+   "judge": false,
+   "age_days": 44
+  },
+  {
+   "id": "T168",
+   "types": [
+    "Product Launch"
+   ],
+   "topics": [],
+   "description": "Example Co launched a new app.",
+   "expect": "keep",
+   "pattern": "launch 45 days",
+   "judge": false,
+   "age_days": 45
+  },
+  {
+   "id": "T169",
+   "types": [
+    "Partnership"
+   ],
+   "topics": [],
+   "description": "Example Co partnered with Other Co on a digital service.",
+   "expect": "drop",
+   "pattern": "partnership 40 days",
+   "judge": false,
+   "age_days": 40,
+   "note": "label corrected by the reviewer: expired under the per-kind 30-day limit"
+  },
+  {
+   "id": "T170",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring a Head of Product.",
+   "expect": "drop",
+   "pattern": "hiring 44 days",
+   "judge": false,
+   "age_days": 44,
+   "note": "label corrected by the reviewer: expired under the per-kind 30-day limit"
+  }
+ ]
+}
