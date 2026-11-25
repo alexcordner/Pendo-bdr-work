@@ -98,6 +98,25 @@ def normalise_phone(raw: str | None, account_country: str | None = None) -> str 
     return "+" + intl if 8 <= len(intl) <= 15 else None
 
 
+def normalise_sf_id(value: str | None) -> str | None:
+    """Canonical key for a Salesforce record id: the case-sensitive 15-character form.
+
+    Salesforce returns 18-character ids from SOQL; other systems (Nooks crmId, CSV) may carry the
+    15-character form. The first 15 characters are the same id, so compare on those. Do NOT
+    lower-case (the 15-char form is case-sensitive). Anything that is not a 15/18-character
+    alphanumeric id (e.g. synthetic 'FAKE-..' ids) is returned trimmed and otherwise unchanged;
+    empty -> None. Apply at INGESTION so every module (state, accounts, ranker) shares one key.
+    """
+    if value is None or not isinstance(value, str):
+        return None
+    v = value.strip()
+    if not v:
+        return None
+    if len(v) == 18 and v.isalnum():
+        return v[:15]
+    return v
+
+
 def normalise_email_for_match(addr: str | None) -> str | None:
     """Comparison key for an email: lower-case, trimmed, dots removed from the LOCAL part only.
 
@@ -108,6 +127,7 @@ def normalise_email_for_match(addr: str | None) -> str | None:
     if not addr or not isinstance(addr, str) or addr.count("@") != 1:
         return None
     local, domain = addr.strip().lower().split("@")
+    local = local.split("+", 1)[0]        # plus-addressing (a+tag@) is the same mailbox
     local = local.replace(".", "")
     return f"{local}@{domain}" if local and domain else None
 
@@ -154,7 +174,7 @@ def account_from_sf_row(row: dict, config: Config | None = None) -> Account:
     """
     cr = resolve_country(row.get("BillingCountry"), row.get("HQ_Country__c"))
     acct = Account(
-        sf_account_id=row["Id"],
+        sf_account_id=normalise_sf_id(row["Id"]),
         name=row.get("Name") or "",
         website=row.get("Website"),
         country_raw=row.get("BillingCountry"),
@@ -200,7 +220,7 @@ def account_from_nooks(row: dict, sf_account_id: str | None = None) -> Account:
     Domain becomes ``website``; ``numEmployees`` becomes ``employees``.
     """
     acct = Account(
-        sf_account_id=sf_account_id,
+        sf_account_id=normalise_sf_id(sf_account_id),
         name=row.get("name") or "",
         website=row.get("domain"),
         employees=_int_or_none(row.get("numEmployees")),
@@ -245,8 +265,8 @@ def prospect_from_nooks(row: dict, sf_contact: dict | None = None, account_count
     acct = row.get("account") or {}
     return Prospect(
         nooks_id=row["id"],
-        sf_contact_id=row.get("crmId") or c.get("Id"),
-        sf_account_id=c.get("AccountId") or sf_account_id,
+        sf_contact_id=normalise_sf_id(row.get("crmId") or c.get("Id")),
+        sf_account_id=normalise_sf_id(c.get("AccountId") or sf_account_id),
         nooks_account_id=acct.get("id"),
         name=row.get("name") or " ".join(x for x in (row.get("firstName"), row.get("lastName")) if x),
         title=row.get("title") or c.get("Title"),
@@ -263,7 +283,7 @@ def match_account(prospect: Prospect, accounts) -> Account | None:
     """
     if prospect.sf_account_id:
         for a in accounts:
-            if a.sf_account_id == prospect.sf_account_id:
+            if normalise_sf_id(a.sf_account_id) == normalise_sf_id(prospect.sf_account_id):
                 return a
     if prospect.nooks_account_id:
         for a in accounts:
