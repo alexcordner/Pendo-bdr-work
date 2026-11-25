@@ -10,11 +10,19 @@ Conventions every module must follow:
   * Phones are E.164 strings (``+61400000001``) or None.
   * Country is canonical: ``"Australia"``, ``"New Zealand"`` or None (not ANZ / unknown).
   * Missing data is None (or an empty list), never a made-up default.
+  * Mutable: Account, RankedAccount, SheetEntry. Frozen: everything else. To change a frozen
+    object use ``dataclasses.replace(obj, field=value)`` (e.g. 1c sets ``do_not_call`` that way).
+
+Join keys:
+  * Prospect.sf_contact_id == Nooks prospect.crmId; Prospect.sf_account_id == Account.sf_account_id.
+  * Prospect.nooks_account_id == Account.nooks_account_id (the only link for Nooks-only prospects).
+  * Scoop.company_id == Account.zoominfo_id.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 
 
 @dataclass
@@ -50,6 +58,12 @@ class Account:
     days_since_last_activity: int | None = None
     prospecting_priority: str | None = None   # SDR_Prospecting_Priority__c (optional tie-breaker)
     notes: list[str] = field(default_factory=list)   # human-readable audit trail (why dropped, guesses...)
+
+    @property
+    def size_unknown(self) -> bool:
+        """True when headcount is missing. Such accounts are KEPT and flagged (note 'size_unknown'),
+        never silently dropped; the ranker gives them no icp_fit points."""
+        return self.employees is None
 
 
 @dataclass(frozen=True)
@@ -99,17 +113,76 @@ class Scoop:
     link: str | None = None
 
 
+class SignalKind(str, Enum):
+    """Fixed set of trigger kinds (``none`` = no real trigger; say so, never invent one)."""
+
+    FUNDING = "funding"
+    EXEC_MOVE = "exec_move"
+    NEW_HIRE = "new_hire"
+    MA = "ma"
+    PRODUCT_LAUNCH = "product_launch"
+    PARTNERSHIP = "partnership"
+    PROJECT_PAIN = "project_pain"
+    HIRING_PLAN = "hiring_plan"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class TaskRecord:
+    """A Nooks task (listTasks row). Existing tasks are never modified by this project."""
+
+    nooks_id: str
+    action: str                          # 'call', 'manual_email', ...
+    status: str                          # pending / ready / finished / skipped / failed
+    completed: bool
+    due_at: datetime | None
+    prospect_id: str | None
+    sequence_id: str | None              # None for one-off tasks
+    email_id: str | None = None          # set on manual_email tasks
+    owner_id: str | None = None
+
+    @property
+    def is_manual_email(self) -> bool:
+        """Old manual_email backlog tasks: NEVER touch (decision 7)."""
+        return self.action == "manual_email"
+
+    @property
+    def in_sequence(self) -> bool:
+        return self.sequence_id is not None
+
+
+@dataclass(frozen=True)
+class SentEmail:
+    """One (message, recipient) pair from a Gmail sent-mail search (metadata view).
+
+    Gmail strips dots from the local part of returned addresses, so compare with
+    ``recipient_key`` (see loaders.normalise_email_for_match), never with ``recipient``.
+    """
+
+    message_id: str
+    thread_id: str | None
+    recipient: str                       # as returned (dots stripped)
+    recipient_key: str                   # normalised match key
+    sent_at: datetime | None             # None if the search view carries no date (UNVERIFIED which key it uses)
+
+
 @dataclass(frozen=True)
 class Signal:
     """A real, sourced reason to call an account now. Never invented (CLAUDE.md rule 6)."""
 
-    sf_account_id: str | None            # account link (None if only zoominfo_id is known; use zoominfo_id)
-    kind: str                            # e.g. "funding", "exec_move", "product_launch", "partnership", "mna", "hiring"
+    sf_account_id: str | None            # account link; if None, join on zoominfo_id (sf_account_id wins when both set)
+    kind: SignalKind
     strength: float                      # 0.0-1.0; the ranker multiplies by the trigger_strength weight
     source: str                          # e.g. "zoominfo_scoop:FAKE-SCOOP-1"
     source_date: datetime | None         # when the underlying event was published
     evidence: str                        # the text the opener may quote (e.g. scoop description)
     zoominfo_id: str | None = None
+
+    def __post_init__(self):
+        if not isinstance(self.kind, SignalKind):
+            raise ValueError(f"Signal.kind must be a SignalKind, got {self.kind!r}")
+        if not 0.0 <= self.strength <= 1.0:
+            raise ValueError(f"Signal.strength must be within 0.0-1.0, got {self.strength}")
 
 
 @dataclass
@@ -120,7 +193,10 @@ class RankedAccount:
     score: float = 0.0                   # 0-100
     score_breakdown: dict[str, float] = field(default_factory=dict)  # weight name -> points
     window: str | None = None            # call window name from config ("morning" / "afternoon")
-    local_call_time: datetime | None = None   # aware datetime in the prospect's timezone
+    # Suggested dial time: an aware datetime in Account.timezone, falling inside ``window`` on the
+    # next working day (see config.next_working_windows). Default is the window start; the ranker
+    # should push it later inside the window when ``account.timezone_guessed``. None if unscheduled.
+    local_call_time: datetime | None = None
     reasons: list[str] = field(default_factory=list)
     skipped_reason: str | None = None    # set when the account is excluded; score is then irrelevant
     signals: list[Signal] = field(default_factory=list)
