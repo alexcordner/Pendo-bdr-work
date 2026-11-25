@@ -36,8 +36,8 @@ def run(accounts, sigs=None, prospects=(), cool=None, last=None, cfg=None, now=N
     return rank_accounts(accounts, sigs or {}, list(prospects), cool or {}, last or set(), cfg, now)
 
 
-def score_of(cfg, a, sigs=(), prospect=True, cool=False, last=False, now=NOW):
-    return score_account(a, list(sigs), prospect, cool, last, cfg, now)
+def score_of(cfg, a, sigs=(), prospect=True, cool=False, now=NOW):
+    return score_account(a, list(sigs), prospect, cool, cfg, now)
 
 
 # ------------------------------------------------------------ score components in isolation
@@ -106,11 +106,6 @@ def test_cooldown_penalty_applied_and_clamped_at_zero(config):
     assert s == 0 and b["clamp_adjustment"] > 0
 
 
-def test_cooldown_and_last_sheet_penalised_once(config):
-    _, b = score_of(config, acct(), [sig()], cool=True, last=True)
-    assert b["cooldown_penalty"] == -30
-
-
 def test_sdr_boost_points(config):
     _, b = score_of(config, acct(is_sdr_target=True), [])
     assert b["sdr_target_boost"] == 10
@@ -155,21 +150,69 @@ def test_cooldown_active_in_rank(config):
 def test_cooldown_expired_no_penalty(config):
     p = [pros()]
     plain = run([acct()], {}, p, cfg=config).ranked[0].score
-    r = run([acct()], {}, p, cool={"FAKE-A1": date(2026, 11, 25)}, cfg=config).ranked[0]
-    assert r.score == plain      # until == today means callable again
+    r = run([acct()], {}, p, cool={"FAKE-A1": date(2026, 11, 26)}, cfg=config).ranked[0]
+    assert r.score == plain      # until == call date (Thu 26th Sydney) means callable again
 
 
-def test_last_sheet_penalty(config):
-    p = [pros()]
-    plain = run([acct()], {}, p, cfg=config).ranked[0].score
-    r = run([acct()], {}, p, last={"FAKE-A1"}, cfg=config).ranked[0]
-    assert r.score == plain - 30 and "On the last call sheet" in r.reasons
+def test_last_sheet_is_hard_skip(config):
+    r = run([acct("A1"), acct("A2")], {"FAKE-A1": [sig("A1")]}, [pros("A1"), pros("A2")],
+            last={"FAKE-A1"}, cfg=config)
+    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-A2"]
+    assert r.skipped[0].skipped_reason == "on last sheet"
 
 
 def test_last_sheet_matches_zoominfo_id(config):
     a = acct(zoominfo_id="ZI-1")
-    r = run([a], {}, [pros()], last={"ZI-1"}, cfg=config).ranked[0]
-    assert r.score_breakdown["cooldown_penalty"] == -30
+    r = run([a], {}, [pros()], last={"ZI-1"}, cfg=config)
+    assert not r.ranked and r.skipped[0].skipped_reason == "on last sheet"
+
+
+def test_last_sheet_skips_needs_prospect_accounts_too(config):
+    r = run([acct()], {}, [], last={"FAKE-A1"}, cfg=config)
+    assert not r.needs_prospect and r.skipped[0].skipped_reason == "on last sheet"
+
+
+# ---- cooldown uses the account-LOCAL call date (H2)
+def test_cooldown_first_callable_day_is_callable_even_when_utc_date_is_earlier(config):
+    # Run Tue 20:00 AEDT = Tue 09:00 UTC; call date is Wed 2026-12-02 local. cooldown_until == Wed => callable.
+    now = datetime(2026, 12, 1, 9, 0, tzinfo=timezone.utc)
+    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 12, 2)}, cfg=config, now=now).ranked[0]
+    assert r.score == plain and r.local_call_time.date() == date(2026, 12, 2)
+
+
+def test_cooldown_day_after_call_date_still_active(config):
+    now = datetime(2026, 12, 1, 9, 0, tzinfo=timezone.utc)
+    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 12, 3)}, cfg=config, now=now).ranked[0]
+    assert r.score == plain - 30
+
+
+def test_cooldown_utc_date_earlier_than_local(config):
+    # now = Wed 23:00 UTC = Thu 10:00 Sydney (inside morning). Call date is Thu 26th. cooldown Thu => callable.
+    now = datetime(2026, 11, 25, 23, 0, tzinfo=timezone.utc)
+    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 26)}, cfg=config, now=now).ranked[0]
+    assert r.score == plain
+
+
+def test_cooldown_datetime_value_converted_not_typeerror(config):
+    now = datetime(2026, 11, 25, 23, 0, tzinfo=timezone.utc)
+    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": datetime(2026, 11, 30, 5, 0)}, cfg=config, now=now).ranked[0]
+    assert r.score == plain - 30
+
+
+def test_cooldown_bad_type_valueerror(config):
+    with pytest.raises(ValueError, match="cooldown_until"):
+        run([acct()], {}, [pros()], cool={"FAKE-A1": "2026-12-01"}, cfg=config)
+
+
+def test_cooldown_keyed_by_nooks_id(config):
+    a = acct(nooks_account_id="NK-5")
+    plain = run([a], {}, [pros()], cfg=config).ranked[0].score
+    r = run([a], {}, [pros()], cool={"NK-5": date(2026, 12, 20)}, cfg=config).ranked[0]
+    assert r.score == plain - 30
 
 
 # ------------------------------------------------------------ SDR boost is not a filter
@@ -254,16 +297,66 @@ def test_only_prospect_opted_out_skips_account(config):
     assert "blocked" in r.skipped[0].skipped_reason
 
 
-def test_no_prospects_not_skipped_but_no_points(config):
+def test_no_prospects_goes_to_needs_prospect(config):
     r = run([acct()], {}, [], cfg=config)
-    assert len(r.ranked) == 1
-    assert r.ranked[0].score_breakdown["named_prospect_with_phone"] == 0
-    assert "No callable persona with a phone" in r.ranked[0].reasons
+    assert not r.ranked and not r.skipped and len(r.needs_prospect) == 1
+    ra = r.needs_prospect[0]
+    assert r.needs_prospect_codes["FAKE-A1"] == "no_prospects_on_account"
+    assert ra.score_breakdown["named_prospect_with_phone"] == 0
+    assert ra.window is None and ra.local_call_time is None and ra.skipped_reason is None
+    assert ra.reasons[0] == "Needs a prospect: no_prospects_on_account"
 
 
-def test_prospect_without_phone_account_kept_without_points(config):
+def test_persona_match_no_phone_code(config):
     r = run([acct()], {}, [pros(phone=None)], cfg=config)
-    assert r.ranked and r.ranked[0].score_breakdown["named_prospect_with_phone"] == 0
+    assert r.needs_prospect_codes["FAKE-A1"] == "persona_match_no_phone"
+    assert r.needs_prospect[0].local_call_time is None
+
+
+def test_no_persona_match_code(config):
+    r = run([acct()], {}, [pros(title="Accountant")], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "no_persona_match"
+
+
+def test_blocked_plus_unmatched_is_no_persona_match(config):
+    r = run([acct()], {}, [pros(do_not_call=True, name="Bl"), pros(title="Accountant", name="Ac")], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "no_persona_match"
+
+
+def test_blocked_matching_plus_phoneless_matching(config):
+    r = run([acct()], {}, [pros(do_not_call=True, name="Bl"), pros(phone=None, name="Nop")], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "persona_match_no_phone"
+
+
+def test_needs_prospect_never_in_ranked_or_prospects(config):
+    r = run([acct("A1"), acct("A2")], {"FAKE-A1": [sig("A1")]}, [pros("A2")], cfg=config)
+    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-A2"]
+    assert "FAKE-A1" not in r.prospects
+    assert r.needs_prospect[0].account.sf_account_id == "FAKE-A1"
+
+
+def test_H1_45_no_prospect_do_not_displace_10_callable(config):
+    no_p = [acct(f"N{i:02d}", name=f"N{i:02d}") for i in range(45)]
+    ok = [acct(f"C{i:02d}", name=f"C{i:02d}", employees=30) for i in range(10)]
+    sigs = {a.sf_account_id: [sig(a.sf_account_id[5:])] for a in no_p}
+    r = run(no_p + ok, sigs, [pros(a.sf_account_id[5:]) for a in ok], cfg=config)
+    assert len(r.ranked) == 10 and all(x.account.sf_account_id.startswith("FAKE-C") for x in r.ranked)
+    assert len(r.needs_prospect) == 45          # uncapped, even though cap is 40
+    assert r.needs_prospect[0].score >= r.needs_prospect[-1].score
+    assert all(x.local_call_time is None for x in r.needs_prospect)
+
+
+def test_cap_counts_callable_only(config):
+    no_p = [acct(f"N{i:02d}", name=f"N{i:02d}") for i in range(30)]
+    ok = [acct(f"C{i:02d}", name=f"C{i:02d}") for i in range(41)]
+    r = run(no_p + ok, {}, [pros(a.sf_account_id[5:]) for a in ok], cfg=config)
+    assert len(r.ranked) == 40 and len(r.needs_prospect) == 30
+    assert sum(1 for s in r.skipped if s.skipped_reason.startswith("below daily cap")) == 1
+
+
+def test_needs_prospect_still_scored_with_zero_prospect_points(config):
+    r = run([acct()], {"FAKE-A1": [sig()]}, [], cfg=config)
+    assert r.needs_prospect[0].score == 40 + 25 + 15
 
 
 def test_prospect_linked_by_nooks_account_id(config):
@@ -334,7 +427,7 @@ def test_different_timezones_same_instant(config):
     akl = times["FAKE-N"]
     assert akl.tzinfo.key == "Pacific/Auckland" and akl.date() == date(2026, 11, 26)
     assert akl >= NOW      # clamped to now (09:00 NZDT), not the 08:45 start
-    assert len(r.by_window["morning"]) == 3
+    assert akl == datetime(2026, 11, 26, 9, 0, tzinfo=ZoneInfo("Pacific/Auckland"))
 
 
 def test_perth_afternoon_while_sydney_next_morning(config):
@@ -350,30 +443,80 @@ def test_perth_afternoon_while_sydney_next_morning(config):
 
 
 def test_window_grouping_sorted_by_score(config):
-    accts = [acct("A1", employees=30), acct("A2", employees=500), acct("A3", employees=100)]
-    r = run(accts, {}, [pros(x) for x in ("A1", "A2", "A3")], cfg=config)
-    scores = [x.score for x in r.by_window["morning"]]
-    assert scores == sorted(scores, reverse=True) and len(scores) == 3
-    assert r.by_window["afternoon"] == []
+    accts = [acct(f"A{i}", name=f"N{i}", employees=[30, 500, 100][i % 3]) for i in range(9)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config)
+    for name in ("morning", "afternoon"):
+        scores = [x.score for x in r.by_window[name]]
+        assert scores == sorted(scores, reverse=True)
+    assert len(r.by_window["morning"]) + len(r.by_window["afternoon"]) == 9
+    assert all(x.window == "morning" for x in r.by_window["morning"])
 
 
-def test_spread_within_window_distinct_times(config):
+def test_uses_both_windows_of_first_day(config):
+    accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(40)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config)
+    assert r.by_window["morning"] and r.by_window["afternoon"]
+    assert all(x.local_call_time.date() == date(2026, 11, 26) for x in r.ranked)
+
+
+def test_spread_distinct_times_min_slot_and_inside_windows(config):
     accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(40)]
     r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config)
     times = [x.local_call_time for x in r.ranked]
-    assert len(set(times)) == 40
-    start, end = datetime(2026, 11, 26, 8, 45, tzinfo=SYD), datetime(2026, 11, 26, 11, 30, tzinfo=SYD)
-    assert all(start <= t < end for t in times)
     assert times == sorted(times)            # best score gets the earliest slot
+    assert all(b - a >= timedelta(minutes=3) for a, b in zip(times, times[1:]))
+    day = date(2026, 11, 26)
+    m = (datetime(day.year, day.month, day.day, 8, 45, tzinfo=SYD), datetime(2026, 11, 26, 11, 30, tzinfo=SYD))
+    a = (datetime(2026, 11, 26, 13, 30, tzinfo=SYD), datetime(2026, 11, 26, 16, 30, tzinfo=SYD))
+    for x in r.ranked:
+        lo, hi = m if x.window == "morning" else a
+        assert lo <= x.local_call_time < hi
+    assert times[0] == m[0]
 
 
-def test_guessed_timezone_called_later(config):
+def test_late_in_window_spills_to_next_day_not_squeezed(config):
+    # Thu 16:00 Sydney: 30 min left in the afternoon => 10 slots; the other 30 spill to Friday.
+    now = datetime(2026, 11, 26, 5, 0, tzinfo=timezone.utc)
+    accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(40)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
+    thu = [x for x in r.ranked if x.local_call_time.date() == date(2026, 11, 26)]
+    fri = [x for x in r.ranked if x.local_call_time.date() == date(2026, 11, 27)]
+    assert len(thu) == 10 and len(fri) == 30 and len(r.ranked) == 40
+    assert all(x.local_call_time >= datetime(2026, 11, 26, 16, 0, tzinfo=SYD) for x in thu)
+    ts = sorted(x.local_call_time for x in thu)
+    assert all(b - a >= timedelta(minutes=3) for a, b in zip(ts, ts[1:]))
+    assert any("Spilled to" in rr for rr in fri[0].reasons)
+    assert [x.account.name for x in r.ranked][:10] == [x.account.name for x in sorted(thu, key=lambda x: x.local_call_time)]
+
+
+def test_window_with_under_min_slot_left_unused(config):
+    now = datetime(2026, 11, 26, 5, 28, tzinfo=timezone.utc)      # Thu 16:28 Sydney, 2 minutes left
+    r = run([acct()], {}, [pros()], cfg=config, now=now)
+    assert r.ranked[0].local_call_time == datetime(2026, 11, 27, 8, 45, tzinfo=SYD)
+
+
+def test_now_inside_window_everyone_after_now(config):
+    now = datetime(2026, 11, 25, 22, 30, tzinfo=timezone.utc)      # Thu 09:30 Sydney
+    accts = [acct(f"A{i:02d}", name=f"N{i:02d}") for i in range(5)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
+    assert all(x.local_call_time >= now for x in r.ranked)
+    assert r.ranked[0].local_call_time == now.astimezone(SYD)
+
+
+def test_guessed_timezone_treated_like_confirmed(config):
+    # The later-half rule was dropped: guessed and confirmed share one timeline (no shared minutes).
     r = run([acct("A1"), acct("A2", timezone_guessed=True)], {}, [pros("A1"), pros("A2")], cfg=config)
-    t = {x.account.sf_account_id: x.local_call_time for x in r.ranked}
-    assert t["FAKE-A2"] > t["FAKE-A1"]
-    assert t["FAKE-A2"] >= datetime(2026, 11, 26, 10, 0, tzinfo=SYD)
-    assert "Timezone guessed: called later in window" in [x for x in r.ranked
-                                                           if x.account.timezone_guessed][0].reasons
+    t = sorted(x.local_call_time for x in r.ranked)
+    assert t[1] - t[0] >= timedelta(minutes=3)
+    g = [x for x in r.ranked if x.account.timezone_guessed][0]
+    assert "Timezone guessed (country default)" in g.reasons
+
+
+def test_timezones_scheduled_independently(config):
+    accts = [acct("S1"), acct("S2"), acct("P1", tz="Australia/Perth")]
+    r = run(accts, {}, [pros("S1"), pros("S2"), pros("P1")], cfg=config)
+    perth = [x for x in r.ranked if x.account.timezone == "Australia/Perth"][0]
+    assert perth.local_call_time == datetime(2026, 11, 26, 8, 45, tzinfo=ZoneInfo("Australia/Perth"))
 
 
 def test_local_call_time_is_aware_in_account_tz(config):
@@ -496,14 +639,14 @@ def test_summarise_contents(config):
     accts = [acct("A1"), acct("A2", tz=None)]
     r = run(accts, {}, [pros("A1")], cfg=config)
     text = summarise(r)
-    assert "Ranked 1 accounts; skipped 1." in text
+    assert "Ranked 1 accounts; skipped 1; needs prospect 0." in text
     assert "skipped - no timezone: 1" in text
     assert "no real trigger (ranked on fit only): 1" in text
     assert "Acct A1" in text and "Thu 08:45" in text
 
 
 def test_summarise_empty(config):
-    assert summarise(run([], cfg=config)).startswith("Ranked 0 accounts; skipped 0.")
+    assert summarise(run([], cfg=config)).startswith("Ranked 0 accounts; skipped 0; needs prospect 0.")
 
 
 def test_scenario_fixture_end_to_end(config):
@@ -516,7 +659,134 @@ def test_scenario_fixture_end_to_end(config):
     ps = [Prospect(p["id"], None, p["account"], None, p["name"], p["title"], phone_e164=p["phone"])
           for p in fx["prospects"]]
     r = rank_accounts(accounts, sigs, ps, {}, set(), config, now)
-    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-A1", "FAKE-A2", "FAKE-A3"]
+    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-A1", "FAKE-A2"]
+    assert [x.account.sf_account_id for x in r.needs_prospect] == ["FAKE-A3"]
+    assert r.needs_prospect_codes == {"FAKE-A3": "persona_match_no_phone"}
     assert r.ranked[0].reasons[0] == "Funding scoop 6 days ago"
     assert [s.account.sf_account_id for s in r.skipped] == ["FAKE-A4"]
-    assert r.ranked[2].score_breakdown["named_prospect_with_phone"] == 0     # CTO has no phone
+    assert r.needs_prospect[0].score_breakdown["named_prospect_with_phone"] == 0     # CTO has no phone
+
+
+# ------------------------------------------------------------ M2 persona normalisation / aliases
+@pytest.mark.parametrize("title", [
+    "Chief Technology Officer", "Chief Technical Officer", "CTO & Co-founder", "cto",
+    "VP, Product", "VP of Product", "Vice President, Product", "Vice President of Product", "vp product, ANZ",
+    "Head of CX", "Head of Customer Experience", "Head of Products", "Head of Product & Design",
+    "Customer Success Director", "Director of Customer Success", "Head of Customer Success",
+    "Product Director", "Director of Product Management", "Chief Product Officer", "CPO",
+    "Product Managers", "Senior Product Manager", "Product Manager (Growth)", "Group Product Manager",
+    "Head of Customer Support", "Digital Director", "Digital Transformation Manager",
+])
+def test_persona_titles_that_should_match(config, title):
+    from src.ranker import _persona_rank
+    assert _persona_rank(title, config) is not None, title
+
+
+@pytest.mark.parametrize("title", [
+    "Director of Product-Led Growth", "Co-CTO", "Director", "Director of Finance", "Product-Led Growth Lead",
+    "Head of Productivity", "CIO", "Chief Information Officer", "Accountant", "", "VP Sales",
+    "Product Owner",
+])
+def test_persona_titles_that_should_not_match(config, title):
+    from src.ranker import _persona_rank
+    assert _persona_rank(title, config) is None, title
+
+
+def test_persona_cto_alias_is_secondary(config):
+    from src.ranker import _persona_rank
+    assert _persona_rank("Chief Technology Officer", config)[0] == 1
+    assert _persona_rank("VP of Product", config)[0] == 0
+
+
+def test_persona_longest_match_beats_shadowing_primary(config):
+    from src.ranker import _persona_rank
+    assert _persona_rank("Group Head of Digital Workplace", config)[0] == 1   # secondary, not 'Head of Digital'
+    assert _persona_rank("Head of Digital", config)[0] == 0
+
+
+def test_persona_equal_length_prefers_primary(config):
+    from src.ranker import _persona_rank
+    # 'Head of Support' (primary) vs nothing longer: primary wins
+    assert _persona_rank("Head of Support", config)[0] == 0
+
+
+def test_aliases_table_is_documented_constant():
+    from src.ranker import ALIASES
+    flat = {p for g in ALIASES for p in g}
+    assert {"cto", "chief technology officer", "cio", "chief information officer", "cpo",
+            "vp product", "head cx", "customer success director"} <= flat
+
+
+def test_norm_keeps_hyphen_inside_token():
+    from src.ranker import _norm
+    assert _norm("Director of Product-Led Growth") == ["director", "product-led", "growth"]
+    assert _norm("VP, Product & Design") == ["vp", "product", "design"]
+
+
+def test_vp_alias_wins_pick_with_phone(config):
+    ps = [pros(title="Vice President, Product", name="Vee"), pros(title="Product Managers", name="Pm")]
+    assert pick_prospect(ps, config).name == "Vee"
+
+
+# ------------------------------------------------------------ M3 invalid timezone
+@pytest.mark.parametrize("tz", ["", "Mars/Base", "Australia/Nowhere", " "])
+def test_invalid_timezone_skipped_not_crash(config, tz):
+    r = run([acct("A1", tz=tz), acct("A2")], {}, [pros("A1"), pros("A2")], cfg=config)
+    assert [x.account.sf_account_id for x in r.ranked] == ["FAKE-A2"]
+    assert r.skipped[0].skipped_reason == f"invalid timezone {tz!r}"
+
+
+# ------------------------------------------------------------ misc review items
+def test_naive_signal_date_treated_as_utc(config):
+    s = replace(sig(days=3), source_date=(NOW - timedelta(days=3)).replace(tzinfo=None))
+    r = run([acct()], {"FAKE-A1": [s]}, [pros()], cfg=config).ranked[0]
+    assert r.reasons[0] == "Funding scoop 3 days ago"
+
+
+def test_intent_signal_has_label(config):
+    s = sig(kind=SignalKind.INTENT, strength=0.4, days=2, source="zoominfo_intent:1")
+    r = run([acct()], {"FAKE-A1": [s]}, [pros()], cfg=config).ranked[0]
+    assert r.reasons[0] == "Intent signal 2 days ago"
+
+
+def test_duplicate_prospect_objects_counted_once(config):
+    p1 = pros(name="Dup")
+    p2 = replace(p1)
+    r = run([acct()], {}, [p1, p2], cfg=config)
+    assert len(r.prospects["FAKE-A1"]) == 1
+
+
+def test_flags_and_confidence_do_not_change_score(config):
+    a = acct()
+    b = acct(flags=["noise_location"], confidence="low")
+    assert score_of(config, a, [sig()])[0] == score_of(config, b, [sig()])[0]
+
+
+def test_needs_prospect_sorted_best_first_and_deterministic(config):
+    accts = [acct(f"A{i}", name=f"N{i}", employees=[30, 500, 100][i % 3]) for i in range(9)]
+    base = run(accts, {}, [], cfg=config)
+    scores = [x.score for x in base.needs_prospect]
+    assert scores == sorted(scores, reverse=True)
+    rnd = random.Random(3)
+    for _ in range(4):
+        a2 = accts[:]
+        rnd.shuffle(a2)
+        again = run(a2, {}, [], cfg=config)
+        assert [x.account.sf_account_id for x in again.needs_prospect] == \
+               [x.account.sf_account_id for x in base.needs_prospect]
+
+
+def test_summarise_lists_needs_prospect_codes(config):
+    r = run([acct("A1"), acct("A2", name="B")], {}, [pros("A1", phone=None)], cfg=config)
+    text = summarise(r)
+    assert "needs prospect 2" in text
+    assert "needs prospect (NOT callable, no task) - persona_match_no_phone: 1" in text
+    assert "no_prospects_on_account: 1" in text
+
+
+def test_timeline_friday_late_spills_into_monday(config):
+    now = datetime(2026, 11, 27, 5, 20, tzinfo=timezone.utc)     # Fri 16:20 Sydney: 10 min left, 3 slots
+    accts = [acct(f"A{i}", name=f"N{i}") for i in range(5)]
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cfg=config, now=now)
+    days = sorted({x.local_call_time.date() for x in r.ranked})
+    assert days == [date(2026, 11, 27), date(2026, 11, 30)]

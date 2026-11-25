@@ -14,7 +14,7 @@ def test_valid_config_loads(config):
     assert config.tiers["tier1"].min_employees == 200
     assert config.signals.weights.cooldown_penalty == -30
     assert "Funding" in config.signals.scoop_types_keep
-    assert config.filters.drop_if_no_domain is True
+    assert config.filters.drop_if_no_domain is False  # review 1d: ZoomInfo search has no domain
     assert config.sources[0] == "salesforce"
 
 
