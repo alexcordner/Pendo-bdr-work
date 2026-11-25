@@ -1,0 +1,332 @@
+{
+  "_note": "SYNTHETIC cases for src/accounts.py tests. sf_rows / nooks_rows / zoominfo_rows are connector-shaped; each comment-like key names the case.",
+  "sf_rows": [
+    {
+      "Id": "FAKE-ACC-001",
+      "Name": "Alpha Analytics Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 120,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-A01",
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-002",
+      "Name": "Bravo Banking Limited",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Queensland",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 900,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-003",
+      "Name": "Charlie Care Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 3000,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-004",
+      "Name": "Delta Dental Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 19,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-005",
+      "Name": "Echo Energy Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": null,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-006",
+      "Name": "Foxtrot Freight Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 2000,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-007",
+      "Name": "Golf Garden Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 20,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-008",
+      "Name": "Hotel Holdings Pty Ltd",
+      "Website": null,
+      "BillingCountry": "United States",
+      "BillingState": "CA",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 150,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-009",
+      "Name": "India Imports Inc",
+      "Website": null,
+      "BillingCountry": "United States",
+      "BillingState": "CA",
+      "HQ_Country__c": "United States",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 150,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-010",
+      "Name": "Juliet Jewellers Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 150,
+      "Current_Customer__c": true,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-011",
+      "Name": "Kilo Kiwi Ltd",
+      "Website": null,
+      "BillingCountry": "New Zealand",
+      "BillingState": "Auckland",
+      "HQ_Country__c": "New Zealand",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 80,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-K11",
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-012",
+      "Name": "Lima Logistics Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 60,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-L12",
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    },
+    {
+      "Id": "FAKE-ACC-013",
+      "Name": "Sydney Software Pty Ltd",
+      "Website": null,
+      "BillingCountry": "Australia",
+      "BillingState": "New South Wales",
+      "HQ_Country__c": "Australia",
+      "HQ_State_Province__c": null,
+      "BillingCity": null,
+      "ZoomInfo_Employee_Count__c": 300,
+      "Current_Customer__c": false,
+      "SDR_Target__c": false,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "DOZISF__ZoomInfo_Id__c": null,
+      "Days_Since_Last_Activity__c": null,
+      "Assigned_SDR__c": "FAKE-SF-USER-ALEX"
+    }
+  ],
+  "nooks_rows": [
+    {
+      "id": "FAKE-NK-A01",
+      "name": "Alpha Analytics",
+      "domain": "alpha.test",
+      "numEmployees": 125,
+      "_sf_account_id": "FAKE-ACC-001"
+    },
+    {
+      "id": "FAKE-NK-K11",
+      "name": "KILO KIWI LIMITED",
+      "domain": "kilo.test",
+      "numEmployees": 80
+    },
+    {
+      "id": "FAKE-NK-M13",
+      "name": "Mike Media Pty Ltd",
+      "domain": "mike.test",
+      "numEmployees": 70
+    },
+    {
+      "id": "FAKE-NK-N14",
+      "name": "November Networks",
+      "domain": "nov.test",
+      "numEmployees": null
+    }
+  ],
+  "zoominfo_rows": [
+    {
+      "id": "FAKE-ZI-A01",
+      "type": "Company",
+      "attributes": {
+        "name": "Alpha Analytics Pty Ltd"
+      }
+    },
+    {
+      "id": "FAKE-ZI-L12",
+      "type": "Company",
+      "attributes": {
+        "name": "Lima Logistics"
+      }
+    },
+    {
+      "id": "FAKE-ZI-M13",
+      "type": "Company",
+      "attributes": {
+        "name": "The Mike Media Pty. Ltd."
+      }
+    },
+    {
+      "id": "FAKE-ZI-O15",
+      "type": "Company",
+      "attributes": {
+        "name": "Oscar Optics Pty Ltd"
+      }
+    },
+    {
+      "id": "FAKE-ZI-P16",
+      "type": "Company",
+      "attributes": {
+        "name": "Papa Payments"
+      }
+    },
+    {
+      "id": "FAKE-ZI-S99",
+      "type": "Company",
+      "attributes": {
+        "name": "Sydney Software"
+      }
+    }
+  ],
+  "extra_noise_zoominfo": [
+    {
+      "id": "FAKE-ZI-9101",
+      "name": "Sydney"
+    },
+    {
+      "id": "FAKE-ZI-9102",
+      "name": "Funds"
+    },
+    {
+      "id": "FAKE-ZI-9103",
+      "name": "Example Shire Council"
+    },
+    {
+      "id": "FAKE-ZI-9104",
+      "name": "Fakeville CBD Pty Ltd"
+    },
+    {
+      "id": "FAKE-ZI-9105",
+      "name": "Department of Fake Affairs"
+    }
+  ]
+}
