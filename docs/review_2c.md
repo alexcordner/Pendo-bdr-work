@@ -147,3 +147,79 @@ Phase 3 recommendation: do not remove or loosen the scan. Add one new writer mod
 ## What I could not verify
 
 Real Nooks `createTask` behaviour (note length limit, `prospectId` format, `dueAt` handling) since no connector was called; whether Nooks returns `crmId` on resolved prospects (affects H2b); the end-to-end investor-funding drop (M5); and Phase 3 wiring, which does not exist yet.
+
+---
+
+# Re-review of the fixes (worker commit `931e866`, merged into this branch as `ab92f0a`)
+
+Narrow and adversarial, offline, read-only, invented data. `nooks_task_payload` and `recheck_blocked` are gone; `prepare_task` is the only function that builds a payload (checked: the only `"action"` literal in `callsheet.py` is inside it, and no underscore helper can build a payload: `_field_text`, `_check_owner`, `_resolve_prospect` only validate).
+
+## Final verdict: FAIL (narrow). Three small fixes turn it into PASS
+
+Tests: `pytest tests/ -q` 1519 passed; `-W error` 1519 passed. Determinism: 6 shuffles give one output; `PYTHONHASHSEED` 0 and 7 give the same hash (`06004fc9e18b4947`). DST `dueAt` re-checked through `prepare_task` for 2 Oct 2026, 2 Apr 2027 and 25 Sep 2026: all four zones correct (Auckland `+13`/`+12`, Sydney `+11`/`+10`, Brisbane `+10`, Perth `+08`).
+
+### Blocking (fix before Phase 3)
+
+**R1. HIGH: do-not-call bypass by the case of the Nooks id.** `callsheet.py:848-859` (the id is only trimmed), `:896` (`is_blocked` compares exactly).
+```python
+state = State(dnc_prospect_ids={"abc-123-def"})
+prepare_task(line, replace(sp, nooks_id="ABC-123-DEF"), state, FIELDS, OWN)   # BUILT, prospectId 'ABC-123-DEF'
+```
+Whether Nooks ever returns the same id in another case is UNVERIFIED, but the failure is silent and the fix is one line. Fix: also check `nid.lower()` and `nid.upper()` (build a copy of the prospect per variant and call `is_blocked` on each), or refuse ids that are not exactly lower-case. Add a test. Other id attacks all failed correctly: NBSP / tab / newline / trailing-space padding (trimmed, then blocked), zero-width inside or BOM prefix, full-width letters, Arabic-Indic digits (refused by `ID_PATTERN`), 15 vs 18 character SF ids (same contact built, different contact refused, case-only SF difference refused, missing SF id on either side refused).
+
+**R2. HIGH (defence in depth): an empty or reset state builds live payloads.** `callsheet.py:869-905`.
+```python
+prepare_task(line, good, State(is_new=True), FIELDS, OWN)               # BUILT
+prepare_task(line, good, State(was_reset=True, reset_reason="corrupt"), FIELDS, OWN)   # BUILT
+```
+`dnc_is_rebuilt` is False for both, so an empty Do Not Call memory simply finds nobody blocked. Recommend: unless `dry_run is True`, call `state.require_healthy(state, live=True)` (or `if not dnc_is_rebuilt(state): raise SheetError`) at the top of `prepare_task`. Also `isinstance(state, State)` (a `None`, `dict` or `str` state gives `AttributeError`, not `SheetError`: still fails closed, but with an unclear error).
+
+**R3. MEDIUM: a phone number leaks into the `BlockedError` message.** `callsheet.py:896-898`. The reason comes from `state.is_blocked`: `"A: resolved prospect blocked: phone +61400000001 had a Do Not Call call"` (and the same for the sheet contact). Exception text ends up in logs. The earlier fix covered renderers, packets and `repr`, but not this path. Fix: raise with a fixed reason (`"phone number is on the do-not-call list"`), or `_scrub(reason)`.
+
+### Medium / Low (should fix, not blocking on their own)
+
+- **R4. MEDIUM: owner-id and dry-run guards are weaker than they look.** `callsheet.py:836-846`, `:841`. Accepted live: `'owner_id_placeholder'`, `'OWNER_ID_PLACEHOLDER2'`, `'REPLACE_ME'`, `'test'`, `'x'`. `dry_run="no"` (any truthy value) unlocks the placeholder. A `dry_run=True` payload carries nothing marking it as a dry run (it is a plain dict with the same keys; only `ownerId` differs). Fix: `dry_run is True`; compare the placeholder case-insensitively; require a plausible owner id (e.g. `[A-Za-z0-9]{20,40}`, matching the one id shape in CLAUDE.md, UNVERIFIED for all owners); and for dry runs prefix the note with `[DRY RUN]` or return a `dict` subclass `DryRunPayload` so a dry payload cannot be mistaken for a live one.
+- **R5. MEDIUM-LOW (L6 left unfixed; now judged Medium-Low): a `SheetLine` is mutable and is not verified.** `callsheet.py:869`, `:670`, `:901`. Verified paths that still build:
+  - a line copied with `dataclasses.replace` from a spilled or never-sheeted `RankedAccount` (same fields, no `skipped_reason`);
+  - `line.entry.prospect` swapped after the build, then resolved as the "other" contact: built (identity is compared to the mutated entry);
+  - a forged `rank` / `run_date` goes into the tag unvalidated (`#-3`, `1999-01-01`, and `rank="x\n[evil]"` gives a broken first line `[apac-callsheet 2026-11-25 #x`).
+
+  The do-not-contact check still runs on whatever prospect is used, so this cannot bypass R1-class rules; it can send the wrong (scheduled, non-blocked) person or break the tag. Cheap guard: in `prepare_task` verify `isinstance(line.rank, int) and line.rank >= 1` and that the packet snapshot still agrees with the entry (`line.packet.account_key == account_key(line.account)` and `line.packet.prospect_sf_contact_id == line.entry.prospect.sf_contact_id`). Better still: `sheet_tasks(sheet)` that yields lines it created (an identity set kept on the `Sheet`).
+- **R6. LOW: `now` is optional.** `callsheet.py:869`, `:882`. With `now=None` a stale line with a past due time is built (verified). Require `now` unless `dry_run is True`. `now == due` is refused, `now` before due builds, naive `now` raises `ValueError` (good).
+- **R7. LOW: resolved prospect's `sf_account_id` is not compared to the line's account** (a prospect with the right SF contact id and a different account builds). The contact id is the real identity check, so Low.
+- **R8. LOW (M3 residual): scrubbing misses some forms.** `callsheet.py:72-80`. Not redacted: `1300 123 456`, `1800 555 123`, `13 12 34`, 8-digit local numbers (`9999 1234`, `ph 9999-1234`), spelled-out digits ("zero four one two ..."), obfuscated emails (`jo at example dot com`, `jo[at]example.com`, `jo＠example.com` with a full-width `@`, `jo @ example.com`). False positive: `$1000000000` becomes `$[redacted]` (a 9+ digit run). Redacted correctly: all `+61`/`+64` forms, `04xx`, `02 9999 1234`, `(02)`, `+61 (0)2`, full-width and Arabic-Indic digit runs, zero-width-split emails (after `_clean`). Suggest `unicodedata.normalize("NFKC", ...)` first (fixes `＠`), add the 13/1300/1800 and 8-digit patterns, and treat the rest as an accepted limit (document it). The prepare-time opener check uses the same patterns, so the same gaps apply there.
+- **R9. LOW: `ContactHistory.source` is not scrubbed.** `callsheet.py:163`, `:512`, `:524`, `:546`. A caller-supplied `source` containing an email or phone appears in `available_facts[].source` and `contact_history_source` (JSON, packet text, `repr(packet)`). Caller-controlled constant in practice; wrap it in `_clean`.
+- **R10. LOW: `dataclasses.asdict(line)` still includes the full `entry` (email, phone, surname).** `repr`/`str` are fixed, but `asdict` bypasses `repr=False`. Do not log `asdict(line)`; or give `SheetLine` a `to_log()` and remove `entry` from dataclass fields' reach (note only).
+- **R11. LOW: render options.** `render_sheet_text(sheet, -1)` is accepted; the stale / future signal's evidence is still printed under the heading `SIGNALS (real, sourced)` in packet text (the facts list does exclude it and the `facts_note` says "do not quote it", good), so a later session could still quote it. Print stale / future signals under a separate `NOT USABLE AS FACTS` heading.
+- **R12. INFO: `_first_name`.** `'Jr Pat Smith'` gives `Jr`; `"O'Neil Pat"` gives `O'Neil`; surname-first names without a comma (`'Ng Wei'`) cannot be detected. Single-token names return None (shown as "the contact"). Acceptable.
+- **R13. INFO: monkeypatching.** Replacing `callsheet.is_blocked` in-process disables the check; an in-process attacker is out of scope. Mutating the returned dict afterwards is also outside the function's control (a fresh dict is returned each call). Duplicate calls for the same line give identical dicts (no idempotency; the de-dupe belongs to the Phase 3 writer: parse line 1 of the note).
+
+### Status of every earlier finding
+
+| Finding | Status | Evidence |
+|---|---|---|
+| H1 owner guard | FIXED, residual R4 | required argument; blank / None / `5` / `<...>` / full-width refused; exact placeholder (and padded) refused unless `dry_run` |
+| H2a padded id | FIXED | NBSP / tab / newline padding now trimmed before the check (blocked) |
+| H2b missing SF id | FIXED | both sides required, refused when either is missing |
+| H2c link between check and payload | FIXED | single entry point builds from the id it checked (residual: R1 case, R2 state health) |
+| H2d sheet contact's phone / email | FIXED | `BlockedError` for a DNC phone / email present only on the sheet contact |
+| M1 junk opener fields | FIXED | None, zero-width, BOM, `.`, `N/A`, `tbd`, emoji-only refused; `none verified` / `none found` refused as OPENER and GATEKEEPER, allowed for the other three by design |
+| M2 note cap | FIXED | 2,000 characters, refuses (does not truncate). It counts characters, not bytes (non-ASCII text is up to 4x bigger in bytes; the Nooks limit is still UNVERIFIED) |
+| M3 contact data in free text | PARTIAL | title, name, evidence, flags, notes, city, state, website, skipped reasons all redacted; see R8, R9 |
+| M4 `repr` / `str` | FIXED | `repr(line)`, `str(line)`, `repr(sheet)`, `repr(packet)` clean; see R10 for `asdict` |
+| M5 stale / future | FIXED | statuses recomputed from the signal date and the real per-kind limit; boundaries correct (45 ok / 46 stale, 90 ok / 91 stale); future-dated shown as "future-dated: check the source" (not "today"); stale and future signals are excluded from the facts and `has_real_trigger` is False; see R11 |
+| M6 bucket limit | FIXED | `bucket_limit=None` lists all 80 skipped names in text and markdown; the default still shows 25 plus `... and N more` |
+| L1 first names | FIXED, residual R12 | `Dr Pat Smith` gives `Pat`; `Smith, Pat` gives `Pat`; unsure gives None |
+| L2 markdown | FIXED | newlines collapsed, titles shortened, `# | * _ [ ] < >` backslash-escaped; no injected heading |
+| L3 intent-only | FIXED | `has_real_trigger` False, new `trigger_kind`, flag `no dated trigger` |
+| L4 SF 15 / 18 | FIXED | 15 vs 18 same contact builds; different contact refused |
+| L5 blocked prospect on RankResult | FIXED | dropped with a reason |
+| L6 batch builder | NOT FIXED | Medium-Low, see R5 |
+| L7 unused import | FIXED | `timedelta` removed; no unused imports or private functions |
+| L8 id shape | FIXED | `ID_PATTERN` ASCII only |
+| L9 rank gaps | NOT FIXED, documented | Low: acceptable, now commented on `SheetLine.rank` and `build_sheet` |
+| L10 duplicate `_signals_for` | NOT FIXED | Low: only a tie-break; acceptable |
+
+Not verified: whether Nooks ids are case-sensitive or what its note limit is (R1, M2); real `crmId` presence on resolved prospects.
+
+Fix R1, R2 and R3 (each a few lines plus a test) and this is a PASS. R4-R6 are strongly recommended in the same pass because they are one-liners.
