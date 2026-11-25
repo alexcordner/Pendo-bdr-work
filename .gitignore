@@ -1,6 +1,8 @@
 # live data never goes in git
-state/*.json
-logs/*.log
+state/*
+!state/.gitkeep
+logs/*
+!logs/.gitkeep
 output/
 __pycache__/
 .pytest_cache/
