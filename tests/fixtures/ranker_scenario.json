@@ -1,0 +1,19 @@
+{
+  "_note": "Synthetic. FAKE ids only.",
+  "now": "2026-11-25T20:00:00+00:00",
+  "accounts": [
+    {"id": "FAKE-A1", "name": "Alpha Pty Ltd", "employees": 500, "timezone": "Australia/Sydney", "sdr": true},
+    {"id": "FAKE-A2", "name": "Bravo Ltd", "employees": 80, "timezone": "Australia/Perth", "sdr": false},
+    {"id": "FAKE-A3", "name": "Charlie Ltd", "employees": 30, "timezone": "Pacific/Auckland", "sdr": false},
+    {"id": "FAKE-A4", "name": "Delta Ltd", "employees": 400, "timezone": null, "sdr": false}
+  ],
+  "signals": {
+    "FAKE-A1": [{"kind": "funding", "strength": 0.8, "days_ago": 6}],
+    "FAKE-A2": [{"kind": "exec_move", "strength": 0.5, "days_ago": 20}]
+  },
+  "prospects": [
+    {"id": "P1", "account": "FAKE-A1", "name": "Ann Example", "title": "Head of Product", "phone": "+61400000001"},
+    {"id": "P2", "account": "FAKE-A2", "name": "Bob Example", "title": "Product Manager", "phone": "+61400000002"},
+    {"id": "P3", "account": "FAKE-A3", "name": "Cy Example", "title": "CTO", "phone": null}
+  ]
+}
