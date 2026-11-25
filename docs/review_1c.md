@@ -144,3 +144,94 @@ No network, no secrets, Python 3.11+ syntax, `from __future__` annotations, comm
 - Real Nooks disposition strings and whether DNC ever arrives with an unresolvable disposition id (state cannot recognise it).
 - Real Gmail `sent_at` availability (decision 9).
 - I did not audit every one of the 85 worker tests; counts and my own attacks were verified instead.
+
+---
+
+# Re-review (2026-11-25): worker fixes `c162867` plus main `9f5704d`
+
+Scope: offline, read-only, synthetic data only. Reviewed `src/state.py` at 728 lines (schema v2) after merging `origin/phase1/1c-state` and `origin/main` (including `9f5704d`) into this branch. The ranker (`origin/phase1/1f-ranker`, `28980ed`) was run from a scratch copy; it does not contain `9f5704d`, which does not matter for the checks below. Scripts are in the scratchpad and not committed.
+
+**FINAL VERDICT: FAIL, on one item (R1, High, small fix).** Everything else is fixed or low. R1 is a safety hole in the new reset gate, so I will not pass it until it is closed.
+
+## A. Tests and determinism
+- `pytest tests -q`: **300 passed**. `-W error`: **300 passed** (298 on the worker branch, +2 from main).
+- Replay 3x, 50 shuffles and 3 save/load rounds: identical `state_to_dict`. Inputs untouched (deep compare). Same-timestamp calls in either order: same result.
+
+## B. Status of my earlier findings
+
+| ID | Status | Evidence |
+|---|---|---|
+| F1 reset flag | **PARTLY FIXED, see R1** | Truncated file: `was_reset=True`, reason set, `require_healthy` raises `StateResetError`, `rebuilt_from_history=True` passes, file kept as `state.json.corrupt-1` byte-identical (`state.py:111-119, 202-227`). But the flag is not saved: a dry run that saves the reset state makes the next load look healthy with an empty DNC list (R1). |
+| F2 duplicate prospect | **FIXED** | DNC call stores a hash of the prospect's email (`state.py:455-466`). A different id and phone with `firstlast@`, `FIRST.LAST@EXAMPLE.COM`, `first.last+tag@`, `firstlast+x@`, ` first.last@example.com ` are all blocked on call, email and any. A different address or domain is not blocked. Gap: the email is only learned when that prospect is in the `prospects` list passed to `record_calls` (the worker lists this). |
+| F3 name variants | **FIXED** | `Do Not Call.`, `DO  NOT CALL`, `Do-Not-Call`, NBSP, `do_not_call` all recognised (`_norm`, `state.py:136-140`). Not recognised, by design: `Do Not Call (DNC)`, `Do Not Call - Remove`, `DNC`, `Do Not Contact`. Recommend logging any call disposition that contains "do not" or "dnc" but is not the configured name. |
+| F4 phone | **FIXED for E.164 input** | `+61 400 000 010` stores as `+61400000010` and blocks the canonical number. Residual: a national-format value (`0400 000 010`) falls back to `0400000010` and would not match `+61400000010`. Real `to_e164` is already normalised by the loader, so low. |
+| F5 tie-break | **FIXED** | Equal timestamps go to the higher call key; both orders give `connect`. |
+| F7 long DNC | **FIXED** | 300s `Do Not Call` is `no_contact`, `connect_count` 0. |
+| F8 container types | **FIXED** | `prospects` as a string, a DNC list holding an int or being a string, and a v1 file all give `was_reset=True` (fail closed). |
+| F9 gitignore | **FIXED** | `state/*` with `!state/.gitkeep`; `state.json`, `.corrupt-N`, `.state-*.tmp` all ignored. |
+| F10 plus-address | **FIXED via main** | `a.b+news@` matches `a.b@` and `ab@` in both directions (loaders now strips `+tag`). |
+| F11 undated email | **FIXED** | First seen 11-02, 7 days: recent through 11-08, not recent from 11-09; a later re-sighting does not reset `first_seen`; a dated copy upgrades it. |
+| F12 local days | **FIXED** | See table below. |
+| F6 concurrency | Open, accepted | Single nightly job. |
+
+### Cooldown table (account-local dates; no-answer +3, connect +14)
+
+| Call | until (first callable day) |
+|---|---|
+| Sydney 08:50 AEDT Mon 2026-11-02, no answer | 2026-11-05 (was 11-04 under the old UTC rule) |
+| Auckland 08:50 NZDT Mon 2026-11-02 | 2026-11-05 |
+| Perth 08:50 AWST Mon 2026-11-02; Perth 15:00 | 2026-11-05 both |
+| Brisbane 08:50 AEST | 2026-11-05 |
+| Sydney 23:30 AEST Mon 2026-06-01 | 2026-06-04 |
+| Sydney 00:10 AEST Tue 2026-06-02 | 2026-06-05 |
+| Sydney Fri 2026-10-02 (DST starts 10-04) | 2026-10-05 |
+| Sydney Sat 2026-10-03 23:30 (eve of DST) | 2026-10-06 |
+| Sydney Fri 2027-04-02 (DST ends 04-04) | 2027-04-05 |
+| Auckland Thu 2026-09-24 (NZDT starts 09-27) | 2026-09-27 |
+| Sydney 2026-12-30 / 2028-02-27 | 2027-01-02 / 2028-03-01 |
+| Connect Sydney 08:50 2026-11-02 | 2026-11-16 |
+| Connect 11-02 then no answer 11-14 | 2026-11-17 |
+| No tz, or invalid tz (`Mars/Base`) | Sydney default, 2026-11-05 |
+| `is_in_cooldown` Wed 11-04 / Thu 11-05 (after the 11-02 call) | True / False |
+
+DST arithmetic is by calendar day, which is the right behaviour.
+
+### Email hashing
+No raw address appears in `state.json` (checked for `@` and the domain after a DNC plus email round trip). Hashes are `sha256("callsheet-v1:" + normalised email)`: unsalted, so guessable for anyone who has a candidate address list (I confirmed the hash is reproducible offline). **One-line recommendation: accept it.** The file is local and gitignored, and `dnc_phones` and the Nooks ids are stored in plain text anyway, so a keyed hash would add little; the real control is that `state/` never leaves the machine.
+
+## C. New findings
+
+**R1 (HIGH) `state.py:111-119, 202-227`: a reset can be laundered by one dry-run save.** `was_reset` and `is_new` are not persisted. Sequence: file corrupt, `load_state` gives `was_reset=True`, a dry run continues (allowed by the notes) and calls `save_state`, next night's `load_state` gives `was_reset=False, is_new=False`, `require_healthy` passes and DNC is empty. I reproduced it: after the save, the second load had `dnc_prospect_ids=set()` and `require_healthy` did not raise. Also `rebuilt_from_history=True` is an honour-system boolean.
+Fix: persist a marker in the file, for example `dnc_rebuilt_at` (date) plus `dnc_rebuilt_calls` (count), written only by an explicit `mark_dnc_rebuilt(state, calls_seen, earliest_call)` after `record_calls` over the full history. `require_healthy(live=True)` raises unless the marker is set. Fresh State, reset State and v1 migration all start with it unset, so the dry-run save cannot clear it.
+
+**Answer to your first-run question: yes, a first run must be gated the same way.** A missing `state.json` is indistinguishable from a deleted one, and DNC exists only in this file plus Nooks call history. With the persisted marker above, `is_new` and `was_reset` collapse into one rule: no live write until DNC has been rebuilt from full history and the marker is saved. Dry runs can proceed.
+
+**R2 (MEDIUM) Salesforce id keys, answer to your item (4): yes, normalise inside state.** `state.py` keys on whatever `sf_account_id` it receives (`state.py:420, 490, 570`, `record_sheet`, `last_sheet_ids`, `cooldown_until`). With loader output (15-char) and an 18-char lookup, it silently misses. Reproduced: an account stored as `0015g00000AbCdE`; `is_in_cooldown(..., 15-char)` is True, `is_in_cooldown(..., 18-char)` is False, `was_in_last_sheet(18-char)` is False, `cooldown_until` keys are 15-char only. `accounts_by_id` keyed 18-char would also miss in `accounts_by_id.get(sf_id)` (timezone falls back to Sydney, nooks/zoominfo ids not captured). Fix: apply `normalise_sf_id` at every API boundary (`record_calls` prospect and `accounts_by_id` keys, `record_sheet`, `is_in_cooldown`, `was_in_last_sheet`, `cooldown_until` output keys) and when loading a file (so old keys migrate). Synthetic `FAKE-` ids pass through unchanged, so existing tests keep working. The ranker also has to normalise its lookups (`_ids`), or both sides are 15-char only by convention.
+
+**R3 (LOW) `state.py:260-290`:** an account entry with a bad `last_call_date` (for example `"junk"`) loads with no warning (`_date_str` returns None), so `cooldown_until` silently drops that account (fails open on cooldown, not on DNC). Derive the date from `last_call_at` when the stored date is bad, or add a warning.
+
+**R4 (LOW) `state.py:260-345`:** `load_warnings` is not gated by `require_healthy`. I checked: skipped entries are accounts, prospects, email messages and sheets only. A malformed DNC list (ids, phones, emails) makes the whole file a reset, so **a skipped bad entry cannot fail open on DNC**. A skipped account loses its cooldown, a skipped email loses its history, a skipped sheet can serve an account twice in a row. Acceptable, but log the counts.
+
+**R5 (LOW)** The module docstring (`state.py:11-13`) still says days are UTC and loading gives only a warning; it contradicts the new account-local behaviour. Update it.
+
+**R6 (LOW, integration)** The ranker's `is_blocked` reads only `prospect.do_not_call` and `opted_out_email`. State's id, phone and email blocks only reach it if the caller runs `mark_do_not_call(prospects, state)` first (it does set `do_not_call` for the duplicate-email case, verified). Make that a documented step of the sheet builder, or add a one-call helper.
+
+## D. New-code review
+- **`StateResetError` / `require_healthy`:** correct as far as it goes; nothing enforces that a live runner calls it, and the boolean is trusted (R1 fix addresses both).
+- **Schema v2:** v1 files reset (fail closed). No real v1 file exists, so no migration is needed.
+- **`load_warnings`:** see R4. DNC malformed means reset, so no fail-open.
+- **`cooldown_until_by(state, config, kind)`:** works for `nooks_account_id` and `zoominfo_id`; shared id keeps the later date. Alternate ids are captured only when `accounts_by_id` carries them at `record_calls` time.
+- **Ambiguous shared phone:** still blocks both prospects (fail closed). Keep.
+
+## E. Contract with the ranker (run together on synthetic data)
+I ran `state.record_calls`, `record_sheet`, `mark_do_not_call`, `cooldown_until`, `last_sheet_ids` into `rank_accounts` (copy of `28980ed`) on six synthetic accounts (Sydney, Melbourne, Auckland, Perth). Results:
+- `cooldown_until` values are `date` objects, first callable date inclusive. A Sydney 08:50 call on 11-10 gives until 11-13. The ranker, with the first window on 11-11 (09:00 AEDT), applied the -30 cooldown penalty; with the first window on 11-13 (equal to `until`) it did not. Auckland and Perth accounts used their own local dates. **Unchanged plug-in: PASS.**
+- `last_sheet_ids` (a set of ids) gave `skipped: on last sheet` (hard skip). PASS.
+- Duplicate-email DNC prospect, after `mark_do_not_call`: `skipped: all prospects blocked`. PASS.
+- `cooldown_until_by` keyed by nooks and zoominfo ids is picked up by the ranker's `_ids` lookup (cooldown applied to the right accounts). PASS.
+- Not tested: real 1d output, and 18-char ids end to end (R2).
+
+## F. Remaining items needed for PASS
+1. **R1 (High):** persisted `dnc_rebuilt` marker and gate; first run included. `state.py:111-119`.
+2. **R2 (Medium):** `normalise_sf_id` at state's API boundary and on load.
+3. R3 to R6 are low; can be done in the same pass.
