@@ -902,3 +902,80 @@ def test_N5_current_titles_still_match(config, title):
 def test_N5_product_owner_and_engineering_manager_still_unmatched(config):
     from src.ranker import _persona_rank
     assert _persona_rank("Product Owner", config) is None and _persona_rank("Engineering Manager", config) is None
+
+
+# ------------------------------------------------------------ normalised Salesforce id keys (both directions)
+ID15 = "001Fake0000000A"
+ID18 = ID15 + "AAB"
+assert len(ID15) == 15 and len(ID18) == 18
+
+
+def sfacct(sf_id, **kw):
+    return Account(sf_account_id=sf_id, name="Idco", employees=500, timezone="Australia/Sydney", **kw)
+
+
+def sfpros(sf_id, name="Pat"):
+    return Prospect("P-" + name, None, sf_id, None, name, "Head of Product", phone_e164="+61400000001")
+
+
+def sfsig(sf_id):
+    return Signal(sf_id, SignalKind.FUNDING, 1.0, "zoominfo_scoop:id", NOW, "e")
+
+
+@pytest.mark.parametrize("acct_id,key_id", [(ID18, ID15), (ID15, ID18), (ID18, ID18), (ID15, ID15)])
+def test_signal_keys_normalised(config, acct_id, key_id):
+    r = run([sfacct(acct_id)], {key_id: [sfsig(key_id)]}, [sfpros(acct_id)], cfg=config).ranked[0]
+    assert r.score_breakdown["trigger_strength"] == 40
+
+
+@pytest.mark.parametrize("acct_id,key_id", [(ID18, ID15), (ID15, ID18)])
+def test_cooldown_keys_normalised(config, acct_id, key_id):
+    plain = run([sfacct(acct_id)], {}, [sfpros(acct_id)], cfg=config).ranked[0].score
+    r = run([sfacct(acct_id)], {}, [sfpros(acct_id)], cool={key_id: date(2026, 12, 20)}, cfg=config).ranked[0]
+    assert r.score == plain - 30
+
+
+@pytest.mark.parametrize("acct_id,key_id", [(ID18, ID15), (ID15, ID18)])
+def test_last_sheet_ids_normalised(config, acct_id, key_id):
+    r = run([sfacct(acct_id)], {}, [sfpros(acct_id)], last={key_id}, cfg=config)
+    assert not r.ranked and r.skipped[0].skipped_reason == "on last sheet"
+
+
+@pytest.mark.parametrize("acct_id,pros_id", [(ID18, ID15), (ID15, ID18)])
+def test_prospect_join_normalised(config, acct_id, pros_id):
+    r = run([sfacct(acct_id)], {}, [sfpros(pros_id)], cfg=config)
+    assert len(r.ranked) == 1 and r.ranked[0].score_breakdown["named_prospect_with_phone"] == 15
+
+
+def test_blocked_prospect_join_normalised(config):
+    p = replace(sfpros(ID15), do_not_call=True)
+    r = run([sfacct(ID18)], {}, [p], cfg=config)
+    assert r.skipped[0].skipped_reason.startswith("all prospects blocked")
+
+
+def test_account_key_same_for_both_spellings():
+    assert account_key(sfacct(ID15)) == account_key(sfacct(ID18)) == ID15
+
+
+def test_case_is_not_folded_in_ids(config):
+    other = ID15.replace("Fake", "fake")
+    r = run([sfacct(ID15)], {other: [sfsig(other)]}, [sfpros(ID15)], cfg=config).ranked[0]
+    assert r.score_breakdown["trigger_strength"] == 0       # different case = different id
+
+
+def test_two_spellings_in_signal_map_merge(config):
+    s2 = replace(sfsig(ID18), source="zoominfo_scoop:other", strength=0.5)
+    r = run([sfacct(ID18)], {ID15: [sfsig(ID15)], ID18: [s2]}, [sfpros(ID18)], cfg=config).ranked[0]
+    assert r.score_breakdown["trigger_strength"] == 40        # 1.0 + 0.1 capped at 1
+
+
+def test_fake_ids_pass_through(config):
+    r = run([acct()], {"FAKE-A1": [sig()]}, [pros()], last={"FAKE-OTHER"}, cfg=config)
+    assert len(r.ranked) == 1 and r.ranked[0].score_breakdown["trigger_strength"] == 40
+
+
+def test_cooldown_two_spellings_later_date_wins(config):
+    plain = run([sfacct(ID18)], {}, [sfpros(ID18)], cfg=config).ranked[0].score
+    r = run([sfacct(ID18)], {}, [sfpros(ID18)], cool={ID15: date(2026, 12, 20), ID18: date(2026, 11, 1)},
+            cfg=config).ranked[0]
+    assert r.score == plain - 30

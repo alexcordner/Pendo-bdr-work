@@ -63,6 +63,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.config import Config, next_working_windows, tier_for
+from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, Signal, SignalKind
 
 # --- documented constants ---------------------------------------------------------------------
@@ -99,14 +100,21 @@ class RankResult:
 
 
 # --- small helpers ----------------------------------------------------------------------------
+def _k(value: str | None) -> str | None:
+    """Lookup key for any id: Salesforce ids reduce to their 15-char form (18-char ids find 15-char
+    keys and vice versa); other ids (FAKE-, zoominfo, nooks) pass through trimmed."""
+    return normalise_sf_id(value)
+
+
 def account_key(account: Account) -> str:
-    """Stable id for an account: sf id, else zoominfo id, else nooks id, else name."""
-    return (account.sf_account_id or account.zoominfo_id or account.nooks_account_id
+    """Stable id for an account: sf id (normalised), else zoominfo id, else nooks id, else name."""
+    return (_k(account.sf_account_id) or _k(account.zoominfo_id) or _k(account.nooks_account_id)
             or f"name:{account.name}")
 
 
 def _ids(account: Account) -> list[str]:
-    return [i for i in (account.sf_account_id, account.zoominfo_id, account.nooks_account_id) if i]
+    """All normalised ids an account can be looked up by."""
+    return [k for k in (_k(account.sf_account_id), _k(account.zoominfo_id), _k(account.nooks_account_id)) if k]
 
 
 def is_blocked(prospect: Prospect) -> bool:
@@ -212,7 +220,7 @@ def pick_prospect(prospects_for_account: list[Prospect], config: Config) -> Pros
 def _signals_for(account: Account, signals: Mapping[str, list[Signal]]) -> list[Signal]:
     """Real signals for an account (sf id and zoominfo id lookups merged, de-duped by source)."""
     seen, out = set(), []
-    for key in (account.sf_account_id, account.zoominfo_id):
+    for key in (_k(account.sf_account_id), _k(account.zoominfo_id)):
         for s in signals.get(key, []) if key else []:
             if s.kind is SignalKind.NONE or s.source in seen:
                 continue
@@ -361,7 +369,16 @@ def _clean_cooldown(cooldown_until: Mapping[str, date]) -> dict[str, date]:
             v = v.date()
         elif not isinstance(v, date):
             raise ValueError(f"cooldown_until[{k!r}] must be a date, got {type(v).__name__}")
-        out[k] = v
+        key = _k(k) or k
+        out[key] = max(v, out[key]) if key in out else v     # two spellings of one id: later date wins
+    return out
+
+
+def _clean_signals(signals: Mapping[str, list[Signal]]) -> dict[str, list[Signal]]:
+    """Re-key signals by normalised id (lists for two spellings of one id are concatenated)."""
+    out: dict[str, list[Signal]] = {}
+    for k, v in signals.items():
+        out.setdefault(_k(k) or k, []).extend(v)
     return out
 
 
@@ -372,6 +389,8 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
     if now.tzinfo is None:
         raise ValueError("now must be timezone-aware")
     cooldowns = _clean_cooldown(cooldown_until)
+    signals = _clean_signals(signals)
+    last_sheet_ids = {_k(x) or x for x in last_sheet_ids}
     timelines: dict[str, list] = {}          # tz -> usable days (first usable day first)
 
     def days_for(tz: str) -> list:
@@ -382,7 +401,7 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
     # Index prospects by every account id they carry.
     by_acct: dict[str, list[Prospect]] = {}
     for p in prospects:
-        for i in {p.sf_account_id, p.nooks_account_id}:
+        for i in {_k(p.sf_account_id), _k(p.nooks_account_id)}:
             if i:
                 by_acct.setdefault(i, []).append(p)
 

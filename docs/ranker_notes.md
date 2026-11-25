@@ -37,3 +37,6 @@ Stale titles never match: `Former ...`, `Ex-...`, `Ex ...`, `Past ...`, `Interim
 - How many calls per window Alex really makes (the 3-minute minimum is a default, constant `MIN_SLOT_MINUTES`).
 - Weights and factors are defaults, not confirmed by Alex.
 - Not tested against real 1c/1d/1e output.
+
+## Id keys
+Every lookup key (account sf/zoominfo/nooks id, `signals` keys, `cooldown_until` keys, `last_sheet_ids` members, prospect `sf_account_id` / `nooks_account_id` joins, `account_key`) goes through `src.loaders.normalise_sf_id`, so an 18-char Salesforce id finds a 15-char key and the reverse. Case is never folded; FAKE- and other non-SF ids pass through. If two spellings of one id appear in `signals` their lists are merged; in `cooldown_until` the later date wins. `RankResult.prospects` / `needs_prospect_codes` are keyed by the normalised `account_key`.
