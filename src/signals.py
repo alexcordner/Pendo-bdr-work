@@ -507,13 +507,14 @@ _DEAL_ACTIVE = re.compile(
 # Funding scoops that are really "X is being acquired" (ZoomInfo types them Funding): reclassified as M&A.
 _TARGET_WORDING = _DEAL_PASSIVE
 _MONEY_RECEIVED = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes|series\s+[a-z]|seed)(?!\w)", _FLAGS)
-_PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?%")
+_NUM_PCT = r"(\d{1,3}(?:\.\d+)?)\s?(?:%|per\s?cent|percent)"      # 30%, 30 per cent, 30 percent
+_PERCENT = re.compile(_NUM_PCT, _FLAGS)
 # '<n>% of <target>' counts only right after an acquire / holding verb: 'to acquire 30% of Acme', 'buys 19.9% of Acme',
 # 'lifts holding to 30% of Acme'. A percentage about revenue or staff ('which generates 30% of its revenue') does not.
 _PERCENT_OF_VERB = (r"(?:acquir\w*|buy|buys|buying|bought|purchas\w*|take|takes|taking|took|taken|holding|stake|"
                     r"shareholding|hold|holds|holding)")
 _STAKE = re.compile(r"(?<!\w)(?:stake|shareholding|minority\s+interest)(?!\w)", _FLAGS)
-_MAJORITY = re.compile(r"(?<!\w)(?:majority|controlling|100\s?%|full|all\s+of|outright|wholly|remaining)(?!\w)", _FLAGS)
+_MAJORITY = re.compile(r"(?<!\w)(?:majority|controlling|100\s?(?:%|per\s?cent|percent)|full|all\s+of|outright|wholly|remaining)(?!\w)", _FLAGS)
 _DIGITAL_BUSINESS = re.compile(
     r"(?<!\w)(?:software|digital|data|platform|cloud|technology|tech|saas|apps?|analytics|ai|product|customer\s+experience|"
     r"cx|fintech|online|e-?commerce|mobile|cyber\w*)(?!\w)", _FLAGS)
@@ -527,8 +528,11 @@ def _name_token(company_name: str) -> str:
     return cleaned.split(" ")[0] if cleaned else ""
 
 
-def _mentions(text: str, name: str) -> bool:
-    return bool(name) and bool(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text, _FLAGS))
+def _mentions(text: str, name: str, possessive: bool = True) -> bool:
+    """True when ``name`` appears as a whole word. With possessive=False an occurrence like "Acme's market" does not
+    count (the thing named is Acme's market, not Acme)."""
+    tail = "" if possessive else r"(?!['\u2019]s(?!\w))"
+    return bool(name) and bool(re.search(rf"(?<!\w){re.escape(name)}(?!\w){tail}", text, _FLAGS))
 
 
 # "agreement for X to acquire", "deal for X to buy", "allows X to acquire": X is the buyer, not the company named earlier.
@@ -549,6 +553,12 @@ _OBJECT_IS_COMPANY = re.compile(
     _FLAGS)
 
 
+# A capitalised word in the verb's own clause that is not a pronoun / filler: another company is the subject.
+_OTHER_ENTITY = re.compile(
+    r"(?<!\w)(?!(?:It|Its|The|This|That|We|Our|They|Their|He|She|Meanwhile|Separately|Today|Also|Now|In|On|As|And|But|"
+    r"However|Later|Then|After|Before|With|Last|Next)(?!\w))[A-Z][\w&-]*")
+
+
 def ma_role(description: str, company_name: str) -> str:
     """'target', 'acquirer' or 'unclear': the scoop company's role in an M&A description. Deterministic text rules.
     Passive wording ('to be acquired by', 'acquired by', 'merger with', 'sold to') makes the company the target unless
@@ -565,7 +575,7 @@ def ma_role(description: str, company_name: str) -> str:
         return "unclear"
     before, after = text[:m.start()], text[m.end():]
     if m is pas:
-        return "acquirer" if _mentions(after, name) and not _mentions(before, name) else "target"
+        return "acquirer" if _mentions(after, name, False) and not _mentions(before, name) else "target"
     third = _THIRD_PARTY_SUBJECT.search(before)
     if third and not _CAPITALISED_WORD.search(third.group("subject")):
         third = None
@@ -576,26 +586,37 @@ def ma_role(description: str, company_name: str) -> str:
             return "acquirer"
         # the company is the target only when the buyer is acquiring THAT company (named after the verb, or 'it' /
         # 'the company'): 'Acme seeks approval for Bigco to acquire Zeta' says nothing about Acme being bought
-        if _mentions(after, name) or _OBJECT_IS_COMPANY.match(after):
+        if _mentions(after, name, False) or _OBJECT_IS_COMPANY.match(after):
             return "target"
         return "unclear"
     # the company named in the SAME clause before the verb is the buyer; named only in an earlier sentence
     # ('Acme is for sale; Bigco to acquire Acme') and again after the verb, it is the target
     clause = re.split(r"[.;]", before)[-1]
+    if _mentions(m.group(0), name, False) and not _mentions(clause, name):
+        return "target"           # 'lifts holding in Acme to 30%': the company is inside the verb phrase as its object
     if _mentions(clause, name):
         return "acquirer"
-    if _mentions(after, name):
+    if _mentions(after, name, False):
         return "target"
-    return "acquirer" if _mentions(before, name) else "unclear"
+    # named only earlier and not in the verb's own clause: the buyer is whoever the clause names ('Acme opens an office.
+    # Bigco to acquire Zeta' says nothing about Acme); a bare pronoun subject ('It plans to acquire Zeta') keeps Acme
+    if _mentions(before, name) and not _OTHER_ENTITY.search(clause):
+        return "acquirer"
+    return "unclear"
 
 
 def _percent_of_target(text: str, name: str) -> float | None:
-    """The percentage in '<verb> <n>% of <company name>' (acquire / buy / purchase / take / holding / stake to ...),
-    else None. The verb must sit directly before the percentage and the company right after 'of'."""
+    """The percentage in '<verb> <n>% of <company name>' (acquire / buy / purchase / take / holding / stake to ...), also
+    '30 per cent', '30 percent' and 'up to 30%', or 'lifts holding in <company> to <n>%'; else None. The verb must sit
+    directly before the percentage and the company right after 'of' (a possessive, "Acme's market", is not the company)."""
     if not name:
         return None
-    m = re.search(rf"(?<!\w){_PERCENT_OF_VERB}\s+(?:to\s+)?(?:an?\s+|a\s+further\s+|further\s+)?(\d{{1,3}}(?:\.\d+)?)\s?%"
-                  rf"\s+of\s+(?:the\s+)?{re.escape(name)}(?!\w)", text, _FLAGS)
+    nm = re.escape(name)
+    m = re.search(rf"(?<!\w){_PERCENT_OF_VERB}\s+(?:to\s+)?(?:an?\s+|a\s+further\s+|further\s+)?(?:up\s+to\s+)?{_NUM_PCT}"
+                  rf"\s+of\s+(?:the\s+)?{nm}(?!\w)(?!['\u2019]s(?!\w))", text, _FLAGS)
+    if not m:
+        m = re.search(rf"(?<!\w)(?:lifts?|raises?|increases?|boosts?)\s+(?:its\s+)?(?:holding|stake|shareholding)\s+in\s+"
+                      rf"(?:the\s+)?{nm}(?!\w)(?!['\u2019]s(?!\w))\s+to\s+(?:up\s+to\s+)?{_NUM_PCT}", text, _FLAGS)
     return float(m.group(1)) if m else None
 
 

@@ -2793,3 +2793,89 @@ def test_earlier_sentence_mention_does_not_make_the_company_the_buyer(d, name, r
 
 def test_catapult_nine_launches_value():
     assert S.combined_strength(CATAPULT) == 0.7031
+
+
+# ============================================================ fix-triggers4: unrelated earlier mention, per cent spelling, possessives
+@pytest.mark.parametrize("d", [
+    "Acme opens a new office. Bigco to acquire Zeta.", "Acme is a Sydney software firm. Bigco to acquire Zeta",
+    "Acme posted record sales; Bigco to acquire Zeta.", "Acme hires a CFO. Meanwhile Bigco agreed to buy Zeta.",
+])
+def test_company_named_only_in_an_unrelated_earlier_sentence_is_unclear(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("unclear", 0.25)
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme shares jump. Acme to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme announced results. Bigco to acquire Acme.", "Acme Holdings", "target"),
+    ("Acme is a listed firm. It plans to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme is a listed firm. The company plans to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme is a listed firm. Today it said it will acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme opens a new office. Bigco to acquire Zeta.", "Bigco Ltd", "acquirer"),
+    ("Acme opens a new office. Bigco to acquire Zeta.", "Zeta Pty", "target"),
+])
+def test_same_clause_and_pronoun_subjects_still_read_as_before(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_unclear_earlier_mention_is_quarter_weight(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme opens a new office. Bigco to acquire Zeta.", name="Acme Holdings")
+    assert v.factor == 0.5 and v.notes == (S.MA_UNCLEAR_NOTE,)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 30 per cent of Acme.", "Bigco to acquire 30 percent of Acme.", "Bigco to acquire up to 30% of Acme.",
+    "Bigco to acquire up to 30 per cent of Acme.", "Bigco acquires 19.9 per cent of Acme.", "Bigco lifts holding in Acme to 30%.",
+    "Bigco lifts holding in Acme to 30 per cent.", "Bigco raises its stake in Acme to up to 25 percent.",
+])
+def test_per_cent_up_to_and_holding_to_forms_are_minority_targets(d):
+    assert S.classify_ma(d, "Acme Holdings") == ("target", 0.35, S.MA_TARGET_MINORITY_NOTE)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 50 per cent of Acme.", "Bigco to acquire 100 per cent of Acme.", "Bigco to acquire 100 percent of Acme.",
+    "Bigco lifts holding in Acme to 55%.", "Bigco lifts holding in Acme to 55 per cent.",
+    "Bigco to acquire the remaining 49 per cent of Acme.", "Bigco to acquire up to 60% of Acme.",
+])
+def test_majority_forms_with_per_cent_stay_half_weight(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_per_cent_in_the_stake_rule_and_acquirer_side():
+    assert S.classify_ma("Goodman Group to acquire a 9.9 per cent stake in NEXTDC.", "NEXTDC Ltd")[:2] == ("target", 0.35)
+    assert S.classify_ma("Goodman Group to acquire a 9.9 per cent stake in NEXTDC.", "Goodman Group")[:2] == ("acquirer", 0.25)
+    assert S.classify_ma("Bigco lifts holding in Acme to 30%.", "Bigco Ltd")[:2] == ("acquirer", 0.25)
+
+
+@pytest.mark.parametrize("name", ["Acme Holdings"])
+def test_possessive_is_not_the_company_name(name):
+    d = "Bigco takes 15% of Acme's market."
+    assert S.classify_ma(d, name)[:2] == ("unclear", 0.25)
+    assert S._percent_of_target(d, "Acme") is None
+    assert S._percent_of_target("Bigco takes 15% of Acme’s market.", "Acme") is None
+    assert S.classify_ma(d, "Bigco Ltd")[:2] == ("acquirer", 0.25)
+
+
+def test_possessive_helper():
+    assert S._mentions("Acme's market", "Acme") and not S._mentions("Acme's market", "Acme", possessive=False)
+    assert S._mentions("Acme market", "Acme", possessive=False) and S._mentions("Acmes", "Acme") is False
+    assert S._mentions("the Acme.", "Acme", possessive=False)
+
+
+def test_company_still_named_normally_after_a_possessive_elsewhere():
+    d = "Bigco takes 15% of Acme's market. Bigco to acquire 30% of Acme."
+    assert S._percent_of_target(d, "Acme") == 30.0
+
+
+def test_possessive_after_a_for_span_is_not_the_company():
+    assert S.ma_role("Acme secures approval for Bigco to acquire Acme's rival.", "Acme Holdings") == "unclear"
+    assert S.ma_role("Acme secures approval for Bigco to acquire Acme.", "Acme Holdings") == "target"
+
+
+def test_lifts_holding_in_a_possessive_is_not_the_company():
+    assert S._percent_of_target("Bigco lifts holding in Acme's parent to 30%.", "Acme") is None
+    assert S._percent_of_target("Bigco lifts holding in Acme to 30%.", "Acme") == 30.0
+
+
+def test_filler_words_do_not_count_as_another_company():
+    assert S.ma_role("Acme is a listed firm. Meanwhile it will acquire Zeta.", "Acme Holdings") == "acquirer"
+    assert S.ma_role("Acme is a listed firm. However Bigco will acquire Zeta.", "Acme Holdings") == "unclear"
