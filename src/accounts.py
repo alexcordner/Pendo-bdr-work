@@ -11,21 +11,30 @@ Pipeline (``build_account_list``)
      The highest-priority source keeps its fields; missing (None) fields are filled from the
      others, and the ``source_*`` flags are OR-ed.
   3. Drop, with a reason (never silently), in this order:
-     customer, blocked, not_anz, noise_*, over_max_employees, under_min_employees, recently_touched.
+     customer, blocked, not_anz, noise_* (ZoomInfo-only rows ONLY), over_max_employees,
+     under_min_employees, recently_touched.
   4. Sort deterministically (source priority, then name, then ids).
 
 Decisions (also in docs/accounts_notes.md)
   * "Non-ANZ billing, ANZ HQ" group (~420 accounts, ``Account.non_anz_billing_anz_hq``):
-    INCLUDED, never silently dropped. They get the notes ``flagged_non_anz_billing_anz_hq`` and
-    ``low_confidence`` so Alex can review them (``list_flagged``). ``Account`` has no confidence
-    field, so low confidence is carried as a note tag (see ``confidence``).
+    INCLUDED, never silently dropped. They get the flag ``flagged_non_anz_billing_anz_hq`` and
+    ``Account.confidence = "low"`` so Alex can review them (``list_flagged``).
+  * Noise (location, local business, government, vague name) DROPS only ZoomInfo-only rows. Accounts
+    sourced from Salesforce or Nooks (Alex's own book) are never dropped for noise: they are kept
+    with a ``noise_*`` flag, a note and low confidence, and ``summarise`` lists them for review.
+  * Two rows from the SAME source are never merged (e.g. two SF accounts sharing a ZoomInfo id):
+    both are kept and flagged ``possible_duplicate``. A name match with several candidates is not
+    merged either (counted as ``name_merge_ambiguous``); successful name merges are counted too
+    (``name_merged``). Both counters appear in ``stats`` only when non-zero.
+  * Salesforce rows with a blank/junk/unrecognisable country are kept with ``country_unknown``;
+    only a real stated non-ANZ country (and no ANZ HQ) is dropped as ``not_anz``.
   * ``employees is None`` is KEPT with the note ``size_unknown`` (size rules apply only when known).
-  * ZoomInfo-only rows (id and name only) are kept and flagged ``zoominfo_only`` + ``low_confidence``
-    because country, size and domain cannot be established; the ranker should rank them low.
-    Nooks-only rows get ``nooks_only`` + ``low_confidence`` (Nooks rows carry no country).
+  * ZoomInfo-only rows (id and name only) are kept (unless noise) and flagged ``zoominfo_only`` with
+    low confidence because country, size and domain cannot be established; the ranker should rank
+    them low. Nooks-only rows get ``nooks_only`` + low confidence (Nooks rows carry no country).
     Country is only enforced when Salesforce is a source (the only source that states it).
-  * ``filters.drop_if_no_domain`` is NOT applied here: ZoomInfo free search returns no domain, so
-    it would drop every ZoomInfo row. Flagged for the coordinator.
+  * ``filters.drop_if_no_domain`` is not applied here (config now sets it false: ZoomInfo free
+    search returns no domain).
   * Cooldown boundary: an account touched ``d`` days ago is dropped when ``d < cooldown_days``
     (default ``limits.cooldown_days_no_answer``). Touched exactly ``cooldown_days`` ago is eligible
     again. A touch dated today or in the future is always within the window.
@@ -39,7 +48,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Iterable, Mapping
 
-from src.config import Config
+from src.config import Config, canonical_country, is_blank_or_junk
 from src.loaders import LoaderError, account_from_nooks, account_from_sf_row, account_from_zoominfo
 from src.models import Account
 
@@ -57,10 +66,16 @@ R_TOUCHED = "recently_touched"
 R_MALFORMED = "malformed_row"
 
 NOTE_SIZE_UNKNOWN = "size_unknown"
-NOTE_ZOOMINFO_ONLY = "zoominfo_only"
-NOTE_NOOKS_ONLY = "nooks_only"
-NOTE_FLAGGED_GROUP = "flagged_non_anz_billing_anz_hq"
-NOTE_LOW_CONFIDENCE = "low_confidence"
+
+# Machine-readable flags (Account.flags). Notes carry the human text.
+FLAG_ZOOMINFO_ONLY = "zoominfo_only"
+FLAG_NOOKS_ONLY = "nooks_only"
+FLAG_GROUP = "flagged_non_anz_billing_anz_hq"
+FLAG_POSSIBLE_DUPLICATE = "possible_duplicate"
+FLAG_COUNTRY_UNKNOWN = "country_unknown"
+NOISE_FLAGS = (R_NOISE_LOCATION, R_NOISE_LOCAL_BUSINESS, R_NOISE_GOVERNMENT, R_NOISE_VAGUE)
+STAT_NAME_MERGED = "name_merged"
+STAT_NAME_AMBIGUOUS = "name_merge_ambiguous"
 
 # Names of well-known cities: a config drop pattern that is NOT one of these (e.g. "CBD") marks
 # a locality, so "<Place> CBD Florist" is local-business noise, while "Sydney Software Pty Ltd"
@@ -71,10 +86,15 @@ _NAME_SUFFIXES = {"pty", "ltd", "limited", "inc", "incorporated", "llc", "plc", 
 _GENERIC_WORDS = {"funds", "fund", "group", "holdings", "company", "services", "the", "and", "of",
                   "co", "corporation", "business", "limited", "ltd", "pty", "inc"}
 _PLACEHOLDER_WORDS = {"placeholder", "tbd", "unknown", "unnamed"}
+# Government bodies: these prefixes only count at the START of a name ("Department of Health"),
+# so private companies like "Fake Ministry of Sound Media" are not caught.
 _GOV_RE = re.compile(
-    r"\b(government|commissioner|department of|dept of|ministry of|minister for|parliament|"
-    r"public service|office of the|city council|shire council|regional council)\b")
+    r"^(government of|department of|dept of|ministry of|minister for|parliament of|"
+    r"public service|office of the)\b|\b(commissioner|city council|shire council|regional council)\b")
+# Exists ONLY because the synthetic noise fixture marks a non-ANZ ZoomInfo row this way; real
+# ZoomInfo names will not. Applied to ZoomInfo-only rows only (see _drop_reason).
 _NOT_ANZ_RE = re.compile(r"\(not anz\)")
+_ANZ_ALIASES = {"oz", "aotearoa", "straya"}
 
 
 # ---------------------------------------------------------------- result types
@@ -117,8 +137,9 @@ def normalise_name(name: str | None) -> str:
 def noise_reason(account: Account, config: Config) -> tuple[str, str] | None:
     """(reason, detail) when the account is non-company noise, else None.
 
-    Rules: pure location names, locality + trade businesses of small/unknown size (not for
-    Salesforce-book accounts, which are curated), government bodies, vague/placeholder names.
+    Rules: pure location names, locality + trade businesses of small/unknown size, government
+    bodies, vague/placeholder names. Detection only: the CALLER decides drop (ZoomInfo-only) or
+    flag (Salesforce/Nooks accounts are never dropped for noise).
     """
     norm = normalise_name(account.name)
     toks = norm.split()
@@ -136,7 +157,7 @@ def noise_reason(account: Account, config: Config) -> tuple[str, str] | None:
         if not others or (marker_hit and len(others) <= 1):
             return R_NOISE_LOCATION, f"name is just a place ({account.name!r})"
         small = account.employees is None or account.employees < config.company_size.min_employees
-        if marker_hit and small and not account.source_salesforce:
+        if marker_hit and small:
             return R_NOISE_LOCAL_BUSINESS, (
                 f"locality name with trade words and small/unknown size ({account.name!r})")
 
@@ -152,13 +173,28 @@ def _source_of(a: Account) -> str:
     return "salesforce" if a.source_salesforce else "nooks" if a.source_nooks else "zoominfo"
 
 
+def _ids(a: Account) -> list[str]:
+    return [i for i in (a.sf_account_id, a.zoominfo_id, a.nooks_account_id) if i]
+
+
 _FILL_FIELDS = ("website", "country_raw", "country", "billing_state", "billing_city", "hq_state",
                 "hq_country_raw", "employees", "zoominfo_id", "nooks_account_id", "sf_account_id",
                 "timezone", "days_since_last_activity", "prospecting_priority")
 
 
+def _add_flag(a: Account, flag: str, note: str | None = None, low: bool = False) -> None:
+    """Idempotently add a machine flag (and an optional human note); optionally mark low confidence."""
+    if flag not in a.flags:
+        a.flags.append(flag)
+        if note:
+            a.notes.append(note)
+    if low:
+        a.confidence = "low"
+
+
 def _merge_into(base: Account, other: Account, how: str) -> None:
-    """Fold ``other`` (lower priority) into ``base`` (both are objects this module created)."""
+    """Fold ``other`` (lower priority, different source) into ``base``. Both are objects this
+    module created. Every merged id is recorded in the note."""
     filled = []
     for f in _FILL_FIELDS:
         if getattr(base, f) is None and getattr(other, f) is not None:
@@ -173,7 +209,10 @@ def _merge_into(base: Account, other: Account, how: str) -> None:
     base.source_salesforce |= other.source_salesforce
     base.source_nooks |= other.source_nooks
     base.source_zoominfo |= other.source_zoominfo
-    base.notes.append(f"merged {_source_of(other)} row by {how}"
+    for fl in other.flags:
+        if fl not in base.flags:
+            base.flags.append(fl)
+    base.notes.append(f"merged {_source_of(other)} row (ids: {', '.join(_ids(other)) or 'none'}) by {how}"
                       + (f"; filled {', '.join(filled)}" if filled else ""))
 
 
@@ -184,6 +223,14 @@ def _no_conflict(base: Account, other: Account) -> bool:
         if a is not None and b is not None and a != b:
             return False
     return True
+
+
+def _mark_duplicates(a: Account, others: list[Account]) -> None:
+    for o in others:
+        _add_flag(a, FLAG_POSSIBLE_DUPLICATE,
+                  f"possible_duplicate: shares a key with {o.name!r} (ids: {', '.join(_ids(o)) or 'none'}); not merged")
+        _add_flag(o, FLAG_POSSIBLE_DUPLICATE,
+                  f"possible_duplicate: shares a key with {a.name!r} (ids: {', '.join(_ids(a)) or 'none'}); not merged")
 
 
 def _sort_key(a: Account, prio: dict[str, int]):
@@ -200,9 +247,11 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     """Merge the three sources and apply the drop rules. See the module docstring.
 
     ``touched`` maps an account id (sf_account_id, or zoominfo/nooks id for non-SF accounts) to the
-    date it was last touched. ``cooldown_days`` overrides ``limits.cooldown_days_no_answer``.
-    A Nooks row may carry the optional key ``_sf_account_id`` (set by the caller when it was
-    fetched with ``listAccounts filter_crmId=<SF id>``) so it merges into the Salesforce account.
+    date it was last touched (``date``, ``datetime`` or ISO string). ``cooldown_days`` overrides
+    ``limits.cooldown_days_no_answer``. A Nooks row may carry the optional key ``_sf_account_id``
+    (set by the caller when it was fetched with ``listAccounts filter_crmId=<SF id>``) so it
+    merges into the Salesforce account. Salesforce ids are compared as given (15 vs 18 char forms
+    are NOT normalised: callers must use one form).
     """
     cooldown = config.limits.cooldown_days_no_answer if cooldown_days is None else cooldown_days
     prio = {s: i for i, s in enumerate(config.sources)}
@@ -232,45 +281,56 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
 
     # 2. merge in config.sources priority order
     merged: list[Account] = []
-    by_key: dict[tuple[str, str], Account] = {}
+    by_key: dict[tuple[str, str], list[Account]] = defaultdict(list)
     by_name: dict[str, list[Account]] = defaultdict(list)
+    counters: Counter = Counter()
 
     def index(a: Account) -> None:
         for kind, val in (("sf", a.sf_account_id), ("zi", a.zoominfo_id), ("nk", a.nooks_account_id)):
-            if val:
-                by_key.setdefault((kind, val), a)
+            if val and a not in by_key[(kind, val)]:
+                by_key[(kind, val)].append(a)
         n = normalise_name(a.name)
         if n and a not in by_name[n]:
             by_name[n].append(a)
 
     for source in config.sources:
+        has_source = lambda c: getattr(c, f"source_{source}")   # noqa: E731
         for acct in loaded[source]:
             match, how = None, ""
+            same_source: list[Account] = []
             for kind, val, label in (("sf", acct.sf_account_id, "sf_account_id"),
                                      ("zi", acct.zoominfo_id, "zoominfo_id"),
                                      ("nk", acct.nooks_account_id, "nooks_account_id")):
-                if val and (kind, val) in by_key:
-                    match, how = by_key[(kind, val)], label
-                    break
+                for cand in by_key.get((kind, val), []) if val else []:
+                    if has_source(cand):
+                        if cand not in same_source:
+                            same_source.append(cand)      # same source: never merge, flag instead
+                    elif match is None:
+                        match, how = cand, label
+            ambiguous: list[Account] = []
             if match is None:
                 n = normalise_name(acct.name)
-                for cand in by_name.get(n, []) if n else []:
-                    different_source = _source_of(cand) != source and not getattr(
-                        cand, f"source_{source}")
-                    if different_source and _no_conflict(cand, acct):
-                        match, how = cand, "normalised name (last resort, verify)"
-                        break
+                cands = [c for c in by_name.get(n, []) if n and not has_source(c) and _no_conflict(c, acct)]
+                if len(cands) == 1:
+                    match, how = cands[0], "normalised name (last resort, verify)"
+                    counters[STAT_NAME_MERGED] += 1
+                elif len(cands) > 1:
+                    ambiguous = cands
+                    counters[STAT_NAME_AMBIGUOUS] += 1
             if match is None:
                 merged.append(acct)
                 index(acct)
+                _mark_duplicates(acct, same_source)
+                _mark_duplicates(acct, ambiguous)
             else:
                 _merge_into(match, acct, how)
                 index(match)
+                _mark_duplicates(match, same_source)
 
     # 3. flags and drops
     kept: list[Account] = []
     for a in merged:
-        _annotate(a)
+        _annotate(a, config)
         drop = _drop_reason(a, config, touched, today, blocked_account_ids, cooldown)
         if drop:
             reason, detail = drop
@@ -282,34 +342,55 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     result.accounts = sorted(kept, key=lambda a: _sort_key(a, prio))
     result.dropped.sort(key=lambda d: (d.reason, prio.get(d.source, 99), d.name.casefold(), d.id or ""))
     result.stats = dict(Counter(d.reason for d in result.dropped))
+    result.stats.update({k: v for k, v in counters.items() if v})
     return result
 
 
-def _annotate(a: Account) -> None:
-    """Add the review flags (notes) for flagged-group, ZoomInfo-only and Nooks-only accounts."""
-    def add(tag: str, text: str) -> None:
-        if tag not in a.notes:
-            a.notes.append(text)
+def _is_zoominfo_only(a: Account) -> bool:
+    return a.source_zoominfo and not a.source_salesforce and not a.source_nooks
 
+
+def _country_unknown(a: Account) -> bool:
+    """True when a Salesforce account has no usable country evidence (not a real non-ANZ country)."""
+    for raw in (a.country_raw, a.hq_country_raw):
+        if is_blank_or_junk(raw):
+            continue
+        v = " ".join(raw.lower().split())
+        if canonical_country(v) is None and not ("austral" in v or "zealand" in v or v in _ANZ_ALIASES):
+            return False        # a real, stated non-ANZ country
+    return True
+
+
+def _annotate(a: Account, config: Config) -> None:
+    """Set flags / confidence / notes for review. Nothing here drops an account."""
     if a.non_anz_billing_anz_hq:
-        add(NOTE_FLAGGED_GROUP, f"{NOTE_FLAGGED_GROUP}: included for review (billing is non-ANZ, HQ is ANZ)")
-        add(NOTE_LOW_CONFIDENCE, NOTE_LOW_CONFIDENCE)
+        _add_flag(a, FLAG_GROUP, f"{FLAG_GROUP}: included for review (billing is non-ANZ, HQ is ANZ)", low=True)
+    if a.source_salesforce and a.country is None and _country_unknown(a):
+        _add_flag(a, FLAG_COUNTRY_UNKNOWN, f"{FLAG_COUNTRY_UNKNOWN}: no usable BillingCountry/HQ country "
+                  f"({a.country_raw!r} / {a.hq_country_raw!r}); kept for review", low=True)
     if not a.source_salesforce:
-        if a.source_zoominfo and not a.source_nooks:
-            add(NOTE_ZOOMINFO_ONLY, f"{NOTE_ZOOMINFO_ONLY}: no Salesforce/Nooks match; "
-                                    "country, size and domain unverified, rank low")
+        if _is_zoominfo_only(a):
+            _add_flag(a, FLAG_ZOOMINFO_ONLY, f"{FLAG_ZOOMINFO_ONLY}: no Salesforce/Nooks match; "
+                      "country, size and domain unverified, rank low", low=True)
         else:
-            add(NOTE_NOOKS_ONLY, f"{NOTE_NOOKS_ONLY}: no Salesforce match; country unverified, rank low")
-        add(NOTE_LOW_CONFIDENCE, NOTE_LOW_CONFIDENCE)
-    if a.employees is None and not any(n.startswith(NOTE_SIZE_UNKNOWN) for n in a.notes):
+            _add_flag(a, FLAG_NOOKS_ONLY, f"{FLAG_NOOKS_ONLY}: no Salesforce match; country unverified, rank low",
+                      low=True)
+    if not _is_zoominfo_only(a):
+        # Alex's own book (Salesforce / Nooks): noise is flagged for review, never dropped.
+        noise = noise_reason(a, config)
+        if noise:
+            _add_flag(a, noise[0], f"{noise[0]}: {noise[1]}; kept because it is in your own book", low=True)
+    if a.employees is None and NOTE_SIZE_UNKNOWN not in a.notes:
         a.notes.append(NOTE_SIZE_UNKNOWN)
 
 
 def _touch_date(a: Account, touched: Mapping[str, date]) -> date | None:
     dates = []
-    for key in (a.sf_account_id, a.zoominfo_id, a.nooks_account_id):
-        d = touched.get(key) if key else None
-        if isinstance(d, datetime):
+    for key in _ids(a):
+        d = touched.get(key)
+        if isinstance(d, str):
+            d = date.fromisoformat(d[:10])      # ValueError on a bad string is deliberate
+        elif isinstance(d, datetime):
             d = d.date()
         if d is not None:
             dates.append(d)
@@ -319,19 +400,21 @@ def _touch_date(a: Account, touched: Mapping[str, date]) -> date | None:
 def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today: date,
                  blocked: set[str], cooldown: int) -> tuple[str, str] | None:
     """First matching drop rule as (reason, detail), or None to keep."""
+    merged_note = " (after merging sources)" if len(_ids(a)) > 1 else ""
     if a.is_customer:
-        return R_CUSTOMER, "Current_Customer__c is true"
-    ids = {a.sf_account_id, a.zoominfo_id, a.nooks_account_id} - {None}
-    if ids & set(blocked):
-        return R_BLOCKED, f"id in blocked set ({', '.join(sorted(ids & set(blocked)))})"
-    # Country is only known when Salesforce is a source; Salesforce accounts with no ANZ country drop.
-    if a.source_salesforce and a.country is None:
+        return R_CUSTOMER, "Current_Customer__c is true" + merged_note
+    hit = sorted(set(_ids(a)) & set(blocked))
+    if hit:
+        return R_BLOCKED, f"id in blocked set ({', '.join(hit)})"
+    # Country is only known when Salesforce is a source. Blank/junk country is flagged, not dropped.
+    if a.source_salesforce and a.country is None and FLAG_COUNTRY_UNKNOWN not in a.flags:
         return R_NOT_ANZ, f"BillingCountry {a.country_raw!r} / HQ {a.hq_country_raw!r} is not Australia/New Zealand"
-    if _NOT_ANZ_RE.search(a.name.casefold()):
-        return R_NOT_ANZ, f"name marks the company as not ANZ ({a.name!r})"
-    noise = noise_reason(a, config)
-    if noise:
-        return noise
+    if _is_zoominfo_only(a):
+        if _NOT_ANZ_RE.search(a.name.casefold()):
+            return R_NOT_ANZ, f"name marks the company as not ANZ ({a.name!r})"
+        noise = noise_reason(a, config)
+        if noise:
+            return noise
     if a.employees is not None:
         if a.employees > config.company_size.max_employees:
             return R_OVER_MAX, f"{a.employees} employees > max {config.company_size.max_employees}"
@@ -339,7 +422,8 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
             return R_UNDER_MIN, f"{a.employees} employees < min {config.company_size.min_employees}"
     last = _touch_date(a, touched)
     if last is not None and (today - last).days < cooldown:
-        return R_TOUCHED, f"touched {last.isoformat()} ({(today - last).days} days ago) within {cooldown}-day cooldown"
+        return R_TOUCHED, (f"touched {last.isoformat()} ({(today - last).days} days ago) "
+                           f"within {cooldown}-day cooldown")
     return None
 
 
@@ -350,25 +434,34 @@ def list_flagged(accounts: Iterable[Account]) -> list[Account]:
 
 
 def confidence(account: Account) -> str:
-    """'low' for flagged-group / ZoomInfo-only / Nooks-only accounts, else 'normal'.
-    (Account has no confidence field, so this reads the ``low_confidence`` note tag.)"""
-    return "low" if NOTE_LOW_CONFIDENCE in account.notes else "normal"
+    """'low' or 'normal' (reads ``Account.confidence``; kept for callers that used the helper)."""
+    return account.confidence
 
 
 def summarise(result: AccountListResult) -> str:
-    """Plain-text block for the run log: kept/dropped totals, per-reason counts, <=5 sample names each."""
+    """Plain-text block for the run log: totals, kept-but-flagged accounts (count + <=5 names per
+    flag, for Alex to review), drops per reason (count + <=5 names), and merge counters."""
     kept = result.accounts
     lines = [f"accounts kept: {len(kept)}",
-             f"  flagged non-ANZ billing / ANZ HQ (included, low confidence): {len(list_flagged(kept))}",
-             f"  zoominfo_only: {sum(1 for a in kept if any(n.startswith(NOTE_ZOOMINFO_ONLY) for n in a.notes))}",
-             f"  size_unknown: {sum(1 for a in kept if a.size_unknown)}",
-             f"accounts dropped: {len(result.dropped)}"]
+             f"  low confidence: {sum(1 for a in kept if a.confidence == 'low')}",
+             f"  size_unknown: {sum(1 for a in kept if a.size_unknown)}"]
+    by_flag: dict[str, list[str]] = defaultdict(list)
+    for a in kept:
+        for fl in a.flags:
+            by_flag[fl].append(a.name)
+    lines.append("kept but flagged for review:" if by_flag else "kept but flagged for review: none")
+    for fl in sorted(by_flag):
+        names = by_flag[fl]
+        lines.append(f"  {fl}: {len(names)}")
+        lines.append("    e.g. " + "; ".join(names[:5]) + (" ..." if len(names) > 5 else ""))
+    lines.append(f"accounts dropped: {len(result.dropped)}")
     by_reason: dict[str, list[Dropped]] = defaultdict(list)
     for d in result.dropped:
         by_reason[d.reason].append(d)
     for reason in sorted(by_reason):
         items = by_reason[reason]
         lines.append(f"  {reason}: {len(items)}")
-        names = [d.name for d in items[:5]]
-        lines.append("    e.g. " + "; ".join(names) + (" ..." if len(items) > 5 else ""))
+        lines.append("    e.g. " + "; ".join(d.name for d in items[:5]) + (" ..." if len(items) > 5 else ""))
+    lines.append(f"merged by name: {result.stats.get(STAT_NAME_MERGED, 0)}")
+    lines.append(f"name_merge_ambiguous (not merged): {result.stats.get(STAT_NAME_AMBIGUOUS, 0)}")
     return "\n".join(lines)

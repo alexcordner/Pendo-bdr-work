@@ -93,10 +93,10 @@ def test_city_inside_real_company_name_kept(config):
     assert [a.name for a in res.accounts] == ["Sydney Software Pty Ltd"]
 
 
-def test_salesforce_book_account_not_local_business_dropped(config):
-    # curated SF book: a CBD-style name with unknown size is kept (size_unknown), not noise
-    res = build(sf=[sf_row(name="Fakeville CBD Group Services", emp=None)], config=config)
-    assert len(res.accounts) == 1 and res.accounts[0].size_unknown
+def test_salesforce_book_cbd_name_kept_and_flagged(config):
+    res = build(sf=[sf_row(name="Fakeville CBD Florist", emp=None)], config=config)
+    a = res.accounts[0]
+    assert a.size_unknown and "noise_local_business" in a.flags and a.confidence == "low"
 
 
 def test_large_cbd_named_company_kept(config):
@@ -184,8 +184,9 @@ def test_flagged_group_retained_with_flags(config):
     res = build(sf=[BOOK[7]], config=config)
     a = res.accounts[0]
     assert a.non_anz_billing_anz_hq and a.country == "Australia"
+    assert "flagged_non_anz_billing_anz_hq" in a.flags
     assert any(n.startswith("flagged_non_anz_billing_anz_hq") for n in a.notes)
-    assert confidence(a) == "low"
+    assert confidence(a) == "low" and a.confidence == "low"
 
 
 def test_list_flagged_returns_only_group(config):
@@ -217,15 +218,17 @@ def test_dedupe_by_zoominfo_id(config):
     assert len(res.accounts) == 1 and a.source_zoominfo and "zoominfo_id" in a.notes[-1]
 
 
-def test_dedupe_by_nooks_account_id(config):
+def test_same_nooks_id_twice_kept_and_flagged(config):
     nk = {"id": "N1", "name": "Acme", "numEmployees": 50}
     res = build(nk=[nk, dict(nk, name="Acme (dup)")], config=config)
-    assert len(res.accounts) == 1
+    assert len(res.accounts) == 2
+    assert all("possible_duplicate" in x.flags for x in res.accounts)
 
 
-def test_dedupe_by_sf_id_within_salesforce(config):
+def test_same_sf_id_twice_kept_and_flagged(config):
     res = build(sf=[sf_row("S1", "Acme Pty Ltd"), sf_row("S1", "Acme Pty Ltd")], config=config)
-    assert len(res.accounts) == 1
+    assert len(res.accounts) == 2
+    assert all("possible_duplicate" in x.flags for x in res.accounts)
 
 
 @pytest.mark.parametrize("variant", ["EXAMPLE WIDGETS LIMITED", "Example Widgets Ltd.", "the example widgets pty. ltd.",
@@ -280,20 +283,20 @@ def test_cases_fixture_merge_outcomes(config):
 def test_zoominfo_only_kept_and_flagged(config):
     res = build(zi=[{"id": "Z1", "name": "Oscar Optics Pty Ltd"}], config=config)
     a = res.accounts[0]
-    assert any(n.startswith("zoominfo_only") for n in a.notes) and confidence(a) == "low"
+    assert "zoominfo_only" in a.flags and confidence(a) == "low"
     assert a.size_unknown and a.country is None
 
 
 def test_nooks_only_kept_and_flagged(config):
     res = build(nk=[{"id": "N1", "name": "Nov Networks", "numEmployees": 60}], config=config)
     a = res.accounts[0]
-    assert any(n.startswith("nooks_only") for n in a.notes) and confidence(a) == "low"
+    assert "nooks_only" in a.flags and confidence(a) == "low"
 
 
 def test_zoominfo_only_not_flagged_when_in_salesforce(config):
     res = build(sf=[sf_row("S1", "Acme Pty Ltd", **{"DOZISF__ZoomInfo_Id__c": "Z1"})],
                 zi=[{"id": "Z1", "name": "Acme Pty Ltd"}], config=config)
-    assert not any("zoominfo_only" in n for n in res.accounts[0].notes)
+    assert "zoominfo_only" not in res.accounts[0].flags
 
 
 def test_malformed_rows_dropped_with_reason(config):
@@ -432,3 +435,203 @@ def test_summary_lists_each_reason(config):
 def test_summary_empty_result():
     text = summarise(AccountListResult())
     assert "accounts kept: 0" in text and "accounts dropped: 0" in text
+
+
+# ------------------------------------------------------------ review fixes (H1)
+# (name, SF/Nooks flag expected or None, dropped when ZoomInfo-only)
+REVIEW_NAMES = [
+    ("Fake Government Services Pty Ltd", None, False),
+    ("Fake Department of Health Pty Ltd", None, False),
+    ("Fake City Council Software Pty Ltd", "noise_government", True),
+    ("Fake Office of the Chief Digital Officer Pty Ltd", None, False),
+    ("Fake Public Service Credit Union", None, False),
+    ("Fake Ministry of Sound Media Ltd", None, False),
+    ("Fake Parliament Hill Software", None, False),
+    ("Sydney CBD Software Pty Ltd", "noise_location", True),
+    ("Perth CBD Wealth Pty Ltd", "noise_location", True),
+    ("Fake Unknown Holdings", "noise_vague_name", True),
+    ("TBD Pty Ltd", "noise_vague_name", True),
+    ("Brisbane City Council", "noise_government", True),
+    ("Department of Fake Transport Digital Services", "noise_government", True),
+]
+
+
+@pytest.mark.parametrize("name,flag,_zi", REVIEW_NAMES, ids=[n[0] for n in REVIEW_NAMES])
+def test_review_names_kept_from_salesforce(config, name, flag, _zi):
+    res = build(sf=[sf_row("S1", name, emp=150)], config=config)
+    assert [a.name for a in res.accounts] == [name] and not res.dropped
+    if flag:
+        a = res.accounts[0]
+        assert flag in a.flags and a.confidence == "low"
+        assert any(n.startswith(flag) for n in a.notes)
+
+
+@pytest.mark.parametrize("name,flag,_zi", REVIEW_NAMES, ids=[n[0] for n in REVIEW_NAMES])
+def test_review_names_kept_from_nooks(config, name, flag, _zi):
+    res = build(nk=[{"id": "N1", "name": name, "numEmployees": 150}], config=config)
+    assert len(res.accounts) == 1 and not res.dropped
+    if flag:
+        assert flag in res.accounts[0].flags
+
+
+@pytest.mark.parametrize("name,flag,zi_drop", REVIEW_NAMES, ids=[n[0] for n in REVIEW_NAMES])
+def test_review_names_zoominfo_only(config, name, flag, zi_drop):
+    res = build(zi=[{"id": "Z1", "name": name}], config=config)
+    assert bool(res.dropped) == zi_drop
+    if zi_drop:
+        assert res.dropped[0].reason == flag
+
+
+def test_noise_flags_not_added_to_clean_names(config):
+    res = build(sf=[sf_row("S1", "Example Widgets Pty Ltd")], config=config)
+    assert res.accounts[0].flags == [] and res.accounts[0].confidence == "normal"
+
+
+def test_noise_still_drops_for_zoominfo_only_even_when_big_flag_absent(config):
+    assert build(zi=[{"id": "Z1", "name": "Government of Exampleland"}], config=config).stats == {"noise_government": 1}
+
+
+def test_real_drops_still_apply_to_noisy_sf_names(config):
+    res = build(sf=[sf_row("S1", "Brisbane City Council", emp=5000)], config=config)
+    assert res.stats == {"over_max_employees": 1}
+    res = build(sf=[sf_row("S2", "Brisbane City Council")], touched={"S2": TODAY}, config=config)
+    assert res.stats == {"recently_touched": 1}
+    res = build(sf=[sf_row("S3", "TBD Pty Ltd", Current_Customer__c=True)], config=config)
+    assert res.stats == {"customer": 1}
+
+
+# ------------------------------------------------------------ H2: same-source duplicates
+def shared_zi_rows():
+    z = {"DOZISF__ZoomInfo_Id__c": "Z9"}
+    return [sf_row("A1", "Fake One Pty Ltd", **z), sf_row("A2", "Fake Two Pty Ltd", **z)]
+
+
+def test_shared_zoominfo_id_keeps_both_sf_accounts(config):
+    res = build(sf=shared_zi_rows(), config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["A1", "A2"]
+    assert all("possible_duplicate" in a.flags for a in res.accounts)
+    assert "A2" in " ".join(res.accounts[0].notes) and "A1" in " ".join(res.accounts[1].notes)
+
+
+def test_shared_zoominfo_id_touched_applies_to_second_account(config):
+    res = build(sf=shared_zi_rows(), touched={"A2": TODAY}, config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["A1"]
+    assert res.dropped[0].id == "A2" and res.dropped[0].reason == "recently_touched"
+
+
+def test_shared_zoominfo_id_blocked_applies_to_second_account(config):
+    res = build(sf=shared_zi_rows(), blocked={"A2"}, config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["A1"] and res.stats == {"blocked": 1}
+
+
+def test_shared_zoominfo_id_customer_flag_on_second_account_is_not_lost(config):
+    rows = shared_zi_rows()
+    rows[1]["Current_Customer__c"] = True
+    res = build(sf=rows, config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["A1"] and res.stats == {"customer": 1}
+
+
+def test_zoominfo_row_with_shared_id_merges_once_and_records_ids(config):
+    res = build(sf=shared_zi_rows(), zi=[{"id": "Z9", "name": "Shared Zoom"}], config=config)
+    assert len(res.accounts) == 2
+    assert "Z9" in " ".join(res.accounts[0].notes) and res.accounts[0].source_zoominfo
+
+
+def test_cross_source_merge_notes_record_all_ids(config):
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd", **{"DOZISF__ZoomInfo_Id__c": "Z1"})],
+                nk=[{"id": "N7", "name": "Acme", "_sf_account_id": "S1"}],
+                zi=[{"id": "Z1", "name": "Acme"}], config=config)
+    text = " ".join(res.accounts[0].notes)
+    assert "N7" in text and "Z1" in text
+
+
+# ------------------------------------------------------------ M1: ambiguous name merge
+def test_ambiguous_name_match_not_merged(config):
+    sf = [sf_row("S1", "Acme Pty Ltd"), sf_row("S2", "ACME Limited")]
+    res = build(sf=sf, zi=[{"id": "Z1", "name": "Acme"}], config=config)
+    assert len(res.accounts) == 3
+    assert res.stats["name_merge_ambiguous"] == 1 and "name_merged" not in res.stats
+    assert all("possible_duplicate" in a.flags for a in res.accounts)
+    assert not any(a.source_zoominfo and a.source_salesforce for a in res.accounts)
+
+
+def test_name_merge_counted(config):
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd")], zi=[{"id": "Z1", "name": "Acme"}], config=config)
+    assert res.stats == {"name_merged": 1}
+
+
+def test_id_merge_is_not_counted_as_name_merge(config):
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd", **{"DOZISF__ZoomInfo_Id__c": "Z1"})],
+                zi=[{"id": "Z1", "name": "Acme"}], config=config)
+    assert "name_merged" not in res.stats
+
+
+def test_summary_shows_merge_counters(config):
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd"), sf_row("S2", "Acme Ltd")], zi=[{"id": "Z1", "name": "Acme"}],
+                nk=[{"id": "N1", "name": "Beta Co", "numEmployees": 50}], config=config)
+    text = summarise(res)
+    assert "name_merge_ambiguous (not merged): 1" in text and "merged by name: 0" in text
+
+
+# ------------------------------------------------------------ M3: unknown country
+@pytest.mark.parametrize("billing,hq", [(None, None), ("", None), ("n/a", "Other"), ("Oz", None),
+                                         ("Australia (Territory)", None), ("Aotearoa", "unknown")])
+def test_unknown_country_kept_and_flagged(config, billing, hq):
+    res = build(sf=[sf_row(BillingCountry=billing, HQ_Country__c=hq)], config=config)
+    a = res.accounts[0]
+    assert "country_unknown" in a.flags and a.confidence == "low" and not res.dropped
+    assert a.timezone is None
+
+
+def test_real_non_anz_country_still_dropped(config):
+    res = build(sf=[sf_row(BillingCountry="Singapore", HQ_Country__c=None)], config=config)
+    assert res.dropped[0].reason == "not_anz"
+
+
+def test_non_anz_billing_junk_hq_dropped(config):
+    res = build(sf=[sf_row(BillingCountry="United States", HQ_Country__c="n/a")], config=config)
+    assert res.dropped[0].reason == "not_anz"
+
+
+def test_null_billing_anz_hq_is_anz(config):
+    res = build(sf=[sf_row(BillingCountry=None, HQ_Country__c="AU")], config=config)
+    assert res.accounts[0].country == "Australia" and "country_unknown" not in res.accounts[0].flags
+
+
+# ------------------------------------------------------------ M4: (not ANZ) marker
+def test_not_anz_name_marker_ignored_for_salesforce(config):
+    res = build(sf=[sf_row("S1", "Acme (not ANZ) Pty Ltd")], config=config)
+    assert len(res.accounts) == 1
+
+
+def test_not_anz_name_marker_applies_to_zoominfo_only(config):
+    assert build(zi=[{"id": "Z1", "name": "Acme (not ANZ)"}], config=config).stats == {"not_anz": 1}
+
+
+# ------------------------------------------------------------ flags in summary, ISO touched
+def test_summary_lists_flagged_counts_and_samples(config):
+    sf = [sf_row(f"S{i}", f"Perth CBD {chr(65 + i)}", emp=100) for i in range(7)]
+    res = build(sf=sf + [sf_row("OK", "Real Software Pty Ltd")], config=config)
+    text = summarise(res)
+    assert "kept but flagged for review:" in text and "  noise_location: 7" in text
+    block = text.split("  noise_location: 7")[1].splitlines()[1]
+    assert block.count("Perth CBD") == 5 and block.endswith("...")
+    assert "accounts dropped: 0" in text
+
+
+def test_summary_without_flags_says_none(config):
+    assert "kept but flagged for review: none" in summarise(build(sf=[sf_row()], config=config))
+
+
+def test_touched_iso_string_accepted(config):
+    iso = (TODAY - timedelta(days=1)).isoformat()
+    assert build(sf=[sf_row("S1")], touched={"S1": iso}, config=config).stats == {"recently_touched": 1}
+
+
+def test_drop_detail_mentions_merge(config):
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd")], nk=[{"id": "N1", "name": "Acme", "_sf_account_id": "S1"}],
+                blocked=set(), config=config)
+    assert not res.dropped
+    res = build(sf=[sf_row("S1", "Acme Pty Ltd", Current_Customer__c=True)],
+                nk=[{"id": "N1", "name": "Acme", "_sf_account_id": "S1"}], config=config)
+    assert "after merging" in res.dropped[0].detail
