@@ -92,3 +92,8 @@ pts = cfg.signals.weights.sdr_target_boost if acct.is_sdr_target else 0
 windows = next_working_windows(cfg, acct.timezone, now_utc)   # skip with skipped_reason if acct.timezone is None
 ra = RankedAccount(acct, score=..., score_breakdown={...}, window=windows[0].name, local_call_time=windows[0].start)
 ```
+
+## UNVERIFIED (added by coordinator, task 1e)
+- **ZoomInfo intent rows** (`intent_to_signals`): the row shape `{company_id, topic, signal_score 60-100, audience_strength A-E, recorded_date?}` is a placeholder and has NOT been checked against the live connector. Intent is capped at 0.3, can never be the best signal when a real scoop exists, and its evidence reads "interest signal, not a dated event". The call sheet must label it that way.
+- **Scoop pull window**: people-move scoops (Executive Move / New Hire) are kept up to 90 days (others 45, partnership / hiring plan / intent 30), so the Phase 2b ZoomInfo pull must request 90 days. `config.signals.max_age_days` is now only a fallback for kinds missing from `KIND_MAX_AGE_DAYS` in `src/signals.py`.
+- **Ambiguous roles**: a product-role scoop that cannot be confirmed as a digital product role is kept with `ScoopVerdict.ambiguous=True` and strength x0.7; the sheet should show "role ambiguous: check it is a digital product role".
