@@ -631,25 +631,92 @@ def test_corrupt_file_sets_was_reset_and_reason(tmp_path):
     assert st.was_reset and "unusable" in st.reset_reason and not st.is_new
 
 
-def test_missing_file_is_new_not_reset(tmp_path):
+def test_missing_file_is_new_and_gated_for_live(tmp_path):
     st = S.load_state(tmp_path)
     assert st.is_new and not st.was_reset
-    S.require_healthy(st)                               # first run is fine
+    with pytest.raises(S.StateResetError, match="first run"):
+        S.require_healthy(st)                           # a missing file looks like a deleted one
+    S.require_healthy(st, live=False)                   # dry run is allowed
 
 
-def test_require_healthy_raises_after_reset_unless_rebuilt(tmp_path):
-    (tmp_path / S.STATE_FILENAME).write_text("x", encoding="utf-8")
+def test_reset_state_saved_then_reloaded_stays_unhealthy(tmp_path):
+    """R1: a dry run that saves a reset state must not launder the gate."""
+    (tmp_path / S.STATE_FILENAME).write_text("{trunc", encoding="utf-8")
     st = S.load_state(tmp_path)
-    with pytest.raises(S.StateResetError, match="Do Not Call"):
-        S.require_healthy(st)
-    S.require_healthy(st, rebuilt_from_history=True)    # caller confirmed a full history rebuild
+    S.require_healthy(st, live=False)                   # dry run continues
+    S.save_state(st, tmp_path)                          # ...and saves the empty state
+    again = S.load_state(tmp_path)
+    assert not again.was_reset and not again.is_new     # looks like a normal file now
+    with pytest.raises(S.StateResetError):
+        S.require_healthy(again)                        # but the marker is missing: still unhealthy
 
 
-def test_healthy_loaded_state_passes_require_healthy(tmp_path):
-    S.save_state(S.State(), tmp_path)
-    st = S.load_state(tmp_path)
-    assert not st.was_reset
+def test_marker_persists_across_save_load(tmp_path):
+    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 120)
     S.require_healthy(st)
+    S.save_state(st, tmp_path)
+    back = S.load_state(tmp_path)
+    S.require_healthy(back)
+    assert back.dnc_rebuilt_at == "2026-11-25" and back.dnc_rebuilt_calls == 120
+
+
+def test_rebuild_after_reset_clears_gate(config, scenario, tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text("bad", encoding="utf-8")
+    st = S.load_state(tmp_path)
+    prospects, calls, _ = scenario
+    st = S.record_calls(st, calls, prospects, config=config)
+    st = S.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"])
+    S.require_healthy(st)
+    assert "FAKE-P6" in st.dnc_prospect_ids
+
+
+@pytest.mark.parametrize("n", [0, -1, None, True, "5", 1.5])
+def test_rebuild_from_zero_or_bad_count_rejected(n):
+    with pytest.raises(ValueError):
+        S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), n)
+
+
+def test_marker_not_set_by_record_calls_or_other_steps(config, scenario):
+    prospects, calls, sent = scenario
+    st = S.record_calls(S.State(), calls, prospects, config=config)
+    st = S.record_sent_emails(S.record_sheet(st, date(2026, 11, 24), ["A"]), sent, prospects)
+    assert not S.dnc_is_rebuilt(st)
+    with pytest.raises(S.StateResetError):
+        S.require_healthy(st)
+
+
+def test_marker_survives_record_steps(config):
+    st = S.mark_dnc_rebuilt(S.State(), date(2026, 11, 25), 3)
+    st = S.record_calls(st, [call("C1")], [pros()], config=config)
+    st = S.record_sheet(st, date(2026, 11, 25), ["A"])
+    assert S.dnc_is_rebuilt(st)
+
+
+def test_dry_run_gate_logs_warning(caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        S.require_healthy(S.State(), live=False)
+    assert "not trusted" in caplog.text
+
+
+def test_record_calls_report_has_calls_seen(config):
+    st = rec([call("C1"), call("C2", pid=None, to="+61400000555")], config=config)
+    assert st.report["record_calls"]["calls_seen"] == 2
+
+
+def test_bad_marker_values_reset(tmp_path):
+    for bad in ({"dnc_rebuilt_at": "junk"}, {"dnc_rebuilt_calls": "9"}, {"dnc_rebuilt_calls": True}):
+        (tmp_path / S.STATE_FILENAME).write_text(json.dumps({"version": 2, **bad}), encoding="utf-8")
+        st = S.load_state(tmp_path)
+        assert st.was_reset and not S.dnc_is_rebuilt(st)
+        for f in tmp_path.glob("state.json.corrupt-*"):
+            f.unlink()
+
+
+def test_marker_with_zero_calls_in_file_is_not_trusted(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text(
+        json.dumps({"version": 2, "dnc_rebuilt_at": "2026-11-25", "dnc_rebuilt_calls": 0}), encoding="utf-8")
+    with pytest.raises(S.StateResetError):
+        S.require_healthy(S.load_state(tmp_path))
 
 
 @pytest.mark.parametrize("raw", [
@@ -922,3 +989,138 @@ def test_future_dated_email_reason_is_sane():
     st = S.record_sent_emails(S.State(), [sent_email(when="2026-12-30T00:00:00Z")], [pros()])
     recent, reason = S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 25), 7)
     assert recent
+
+
+# ================================================================= R2: Salesforce id normalisation
+ID15, ID18 = "0015g00000AbCdE", "0015g00000AbCdEAAA"      # synthetic ids; same record, two forms
+
+
+def _acct_state(config, stored_as, tz="Australia/Sydney", when="2026-11-10T01:00:00Z"):
+    p = pros(acct=stored_as)
+    return rec([call("C1", when=when)], prospects=[p],
+               accounts_by_id={stored_as: FakeAcct(tz)}, config=config)
+
+
+@pytest.mark.parametrize("stored,lookup", [(ID15, ID18), (ID18, ID15), (ID15, ID15), (ID18, ID18)])
+def test_is_in_cooldown_both_id_forms(config, stored, lookup):
+    st = _acct_state(config, stored)
+    assert S.is_in_cooldown(st, lookup, date(2026, 11, 11), config)
+    assert not S.is_in_cooldown(st, lookup, date(2026, 11, 13), config)
+
+
+@pytest.mark.parametrize("stored,lookup", [(ID15, ID18), (ID18, ID15)])
+def test_cooldown_until_and_last_touched_keyed_canonically(config, stored, lookup):
+    st = _acct_state(config, stored)
+    assert list(S.cooldown_until(st, config)) == [ID15]
+    assert list(S.last_touched(st)) == [ID15]
+    assert S.cooldown_until(st, config).get(S._sf(lookup)) == date(2026, 11, 13)
+
+
+@pytest.mark.parametrize("stored,lookup", [(ID15, ID18), (ID18, ID15)])
+def test_sheet_both_id_forms(stored, lookup):
+    st = S.record_sheet(S.State(), date(2026, 11, 24), [stored, lookup, None])
+    assert st.sheets[-1]["account_ids"] == [ID15]               # deduped across forms
+    assert S.was_in_last_sheet(st, lookup) and S.was_in_last_sheet(st, stored)
+    assert S.last_sheet_ids(st) == {ID15}
+
+
+def test_accounts_by_id_18_char_keys_supply_timezone(config):
+    c = call("C1", when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))
+    st = rec([c], prospects=[pros(acct=ID15)], accounts_by_id={ID18: FakeAcct("Australia/Sydney")}, config=config)
+    assert st.accounts[ID15].last_call_date == "2026-11-02"      # Sydney local, not the UTC date Nov 1
+
+
+def test_accounts_by_id_15_char_keys_with_18_char_prospect(config):
+    c = call("C1", when=local(2026, 11, 2, 8, 50, "Pacific/Auckland"))
+    st = rec([c], prospects=[pros(acct=ID18)], accounts_by_id={ID15: FakeAcct("Pacific/Auckland", nooks="N1")},
+             config=config)
+    assert list(st.accounts) == [ID15] and st.accounts[ID15].last_call_date == "2026-11-02"
+    assert st.accounts[ID15].nooks_account_id == "N1"
+
+
+def test_prospect_and_state_use_same_key_across_forms(config):
+    st = rec([call("C1")], prospects=[pros(acct=ID15)], config=config)
+    st = rec([call("C2", when="2026-11-11T01:00:00Z")], prospects=[pros(acct=ID18)], state=st, config=config)
+    assert list(st.accounts) == [ID15] and st.prospects["FAKE-P1"].call_count == 2
+
+
+def test_record_sent_emails_both_id_forms():
+    st = S.record_sent_emails(S.State(), [sent_email()], [pros(acct=ID18)],
+                              {ID15: FakeAcct("Australia/Sydney")})
+    assert list(st.accounts) == [ID15]
+    assert S.last_touched(st) == {ID15: date(2026, 11, 20)}
+
+
+def test_account_without_usable_id_in_prospect_is_no_account(config):
+    st = rec([call("C1")], prospects=[pros(acct="   ")], config=config)
+    assert st.accounts == {} and st.report["record_calls"]["no_account"] == 1
+
+
+def test_none_and_blank_ids_everywhere(config):
+    st = S.State()
+    assert not S.is_in_cooldown(st, None, date(2026, 11, 1), config)
+    assert not S.is_in_cooldown(st, "  ", date(2026, 11, 1), config)
+    assert not S.was_in_last_sheet(S.record_sheet(st, date(2026, 11, 1), [None, "", " "]), None)
+
+
+def test_file_with_mixed_id_forms_migrates_on_load(config, tmp_path):
+    raw = {"version": 2, "accounts": {
+        ID18: {"last_call_at": "2026-11-10T01:00:00+00:00", "last_call_date": "2026-11-10",
+               "last_call_key": "A", "last_outcome": "no_contact"},
+        ID15: {"last_call_at": "2026-11-12T01:00:00+00:00", "last_call_date": "2026-11-12",
+               "last_call_key": "B", "last_outcome": "connect",
+               "last_connect_at": "2026-11-12T01:00:00+00:00", "last_connect_date": "2026-11-12",
+               "zoominfo_id": "Z1"}},
+        "sheets": [{"run_date": "2026-11-24", "account_ids": [ID18]}]}
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert list(st.accounts) == [ID15]
+    a = st.accounts[ID15]
+    assert a.last_call_date == "2026-11-12" and a.last_outcome == "connect" and a.zoominfo_id == "Z1"
+    assert S.was_in_last_sheet(st, ID15)
+    assert S.cooldown_until(st, config)[ID15] == date(2026, 11, 26)
+
+
+def test_synthetic_fake_ids_unchanged(config):
+    st = rec([call("C1")], config=config)
+    assert list(st.accounts) == ["FAKE-ACC-1"]
+
+
+# ================================================================= R3: malformed stored dates
+def _load(tmp_path, acct):
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps({"version": 2, "accounts": {"A": acct}}), encoding="utf-8")
+    return S.load_state(tmp_path)
+
+
+def test_bad_last_call_date_falls_back_to_utc_instant_and_warns(config, tmp_path, caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        st = _load(tmp_path, {"last_call_at": "2026-11-10T01:00:00+00:00", "last_call_date": "junk",
+                              "last_outcome": "no_contact"})
+    assert st.accounts["A"].last_call_date == "2026-11-10"
+    assert S.cooldown_until(st, config)["A"] == date(2026, 11, 13)       # cooldown NOT dropped
+    assert any("malformed last_call_date" in w for w in st.load_warnings)
+    assert "malformed last_call_date" in caplog.text
+
+
+def test_missing_date_with_instant_uses_utc_date_quietly(config, tmp_path):
+    st = _load(tmp_path, {"last_call_at": "2026-11-10T01:00:00+00:00", "last_outcome": "no_contact"})
+    assert st.accounts["A"].last_call_date == "2026-11-10" and st.load_warnings == []
+
+
+def test_bad_connect_and_email_dates_fall_back(tmp_path):
+    st = _load(tmp_path, {"last_connect_at": "2026-11-05T01:00:00+00:00", "last_connect_date": 5,
+                          "last_email_at": "2026-11-06T01:00:00+00:00", "last_email_date": "x"})
+    assert st.accounts["A"].last_connect_date == "2026-11-05"
+    assert st.accounts["A"].last_email_date == "2026-11-06"
+    assert len(st.load_warnings) == 2
+
+
+def test_bad_date_and_no_instant_warns_and_stays_none(tmp_path):
+    st = _load(tmp_path, {"last_call_date": "junk"})
+    assert st.accounts["A"].last_call_date is None and st.load_warnings
+
+
+def test_load_logs_summary_count(tmp_path, caplog):
+    with caplog.at_level(logging.WARNING, logger="src.state"):
+        _load(tmp_path, {"last_call_date": "junk"})
+    assert "malformed entr" in caplog.text

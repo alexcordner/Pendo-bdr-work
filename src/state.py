@@ -8,9 +8,11 @@ Design notes
   * Replaying the same calls / emails / sheet twice changes nothing (calls dedupe on nooks_id).
   * Unknown, missing or None ids never raise and are never guessed: they are counted in
     ``state.report`` and skipped.
-  * Dates in state are UTC. A call's "day" is the UTC date of ``started_at``.
-  * Loading is tolerant: a missing, corrupt or newer-version file gives an empty State plus a
-    logged warning. A corrupt file is moved aside (never overwritten or deleted).
+  * Instants are stored in UTC, but a call's or email's "day" is ACCOUNT-LOCAL (see below).
+  * Salesforce ids are normalised with ``loaders.normalise_sf_id`` at every API boundary and on
+    load, so a 15-character and an 18-character id reach the same account.
+  * Loading is tolerant: a missing, corrupt or newer-version file gives an empty State (flagged,
+    with a logged warning). A corrupt file is moved aside (never overwritten or deleted).
 
 Outcomes: a call is a ``connect`` only if its disposition is NOT one of the configured
 no-answer / voicemail / gatekeeper / bad-number / do-not-call names AND duration >=
@@ -21,8 +23,11 @@ Days are ACCOUNT-LOCAL: the date a call or email happened is computed in the acc
 (``Account.timezone`` from ``accounts_by_id``; Australia/Sydney when unknown or invalid) and stored
 as a date. Callers pass an account-local ``today`` to ``is_in_cooldown`` / ``emailed_recently``.
 
-Safety: if state.json was unreadable the returned State has ``was_reset=True``. A live run must call
-``require_healthy`` (see docs/state_notes.md); a dry run may continue.
+Safety (Do Not Call memory): a State is only trusted for LIVE writes once Do Not Call has been
+rebuilt from the FULL Nooks call history and ``mark_dnc_rebuilt`` has stored a marker in state.json.
+A new, missing, corrupt or reset state starts without the marker, so the gate cannot be cleared by
+saving an empty state. ``require_healthy(state, live=True)`` enforces it; dry runs only warn.
+See docs/state_notes.md for the runner contract.
 """
 from __future__ import annotations
 
@@ -39,7 +44,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .config import Config
-from .loaders import Disposition, disposition_id_for_name, normalise_email_for_match, normalise_phone
+from .loaders import (Disposition, disposition_id_for_name, normalise_email_for_match, normalise_phone,
+                      normalise_sf_id)
 from .models import CallRecord, Prospect, SentEmail
 
 log = logging.getLogger(__name__)
@@ -100,6 +106,9 @@ class State:
     # hashed recipient key -> {message_id: {"sent_on": local iso date | None, "first_seen": iso date}}
     emails: dict[str, dict[str, dict]] = field(default_factory=dict)
     sheets: list[dict] = field(default_factory=list)                      # [{run_date, account_ids}]
+    # Marker set ONLY by mark_dnc_rebuilt (after a full-history record_calls). Saved in the file.
+    dnc_rebuilt_at: str | None = None                                     # iso run date
+    dnc_rebuilt_calls: int = 0                                            # calls the rebuild saw
     # ---- below: NOT saved
     report: dict[str, dict] = field(default_factory=dict)                 # counts from record_* calls
     was_reset: bool = False                  # True when a state file existed but could not be used
@@ -108,18 +117,51 @@ class State:
     load_warnings: list[str] = field(default_factory=list)                # skipped malformed entries
 
 
-def require_healthy(state: State, rebuilt_from_history: bool = False) -> None:
-    """Gate for LIVE runs. Raises StateResetError when the state file was unreadable (so DNC memory,
-    cooldowns and email history are gone) unless the caller confirms it re-fetched the FULL Nooks
-    call history and re-ran record_calls on it (rebuilding Do Not Call). The nightly runner must
-    refuse to write tasks or drafts when this raises. Dry runs need not call it."""
-    if state.was_reset and not rebuilt_from_history:
+def dnc_is_rebuilt(state: State) -> bool:
+    """True once mark_dnc_rebuilt has stored its marker (persisted, so it survives save/load)."""
+    return bool(state.dnc_rebuilt_at) and state.dnc_rebuilt_calls > 0
+
+
+def mark_dnc_rebuilt(state: State, run_date: date, calls_seen: int) -> State:
+    """Record that Do Not Call was rebuilt from the FULL Nooks call history. Call it only AFTER
+    ``record_calls`` has run over every page of listCalls. ``calls_seen`` is the total number of
+    calls given to record_calls for the rebuild (sum each ``state.report['record_calls']['calls_seen']``
+    over the pages). A rebuild from 0 calls is rejected (ValueError): an empty fetch is
+    indistinguishable from a failed one. Returns a new State; saves nothing."""
+    if not isinstance(calls_seen, int) or isinstance(calls_seen, bool) or calls_seen <= 0:
+        raise ValueError(f"cannot mark Do Not Call as rebuilt from {calls_seen!r} calls (need at least 1)")
+    st = copy.deepcopy(state)
+    st.dnc_rebuilt_at, st.dnc_rebuilt_calls = run_date.isoformat(), calls_seen
+    return st
+
+
+def require_healthy(state: State, live: bool = True) -> None:
+    """Gate for runs that write tasks or drafts. With ``live=True`` raises StateResetError unless the
+    persisted Do Not Call marker is set (see mark_dnc_rebuilt). A first run, a deleted file and a
+    corrupt file all start without the marker, so all are gated the same way, and saving a reset
+    state cannot clear it. With ``live=False`` (dry run) it only logs a warning and returns."""
+    if dnc_is_rebuilt(state):
+        return
+    why = state.reset_reason or ("no state file (first run, or it was deleted)" if state.is_new
+                                 else "Do Not Call has not been rebuilt from full call history")
+    if live:
         raise StateResetError(
-            f"state was reset ({state.reset_reason}); refusing live writes until the full Nooks call "
-            "history is re-fetched to rebuild Do Not Call (pass rebuilt_from_history=True once done)")
+            f"Do Not Call memory is not trusted ({why}); refusing live writes. Fetch the FULL Nooks call "
+            "history, run record_calls, then mark_dnc_rebuilt and save before a live run")
+    log.warning("state: Do Not Call memory is not trusted (%s); dry run continues, live runs would stop", why)
 
 
 # ---------------------------------------------------------------- small helpers
+def _sf(v: str | None) -> str | None:
+    """Canonical Salesforce id key (15-char); FAKE- ids and None pass through."""
+    return normalise_sf_id(v)
+
+
+def _norm_accounts(accounts_by_id) -> dict:
+    """accounts_by_id re-keyed by the canonical id (so an 18-char key finds a 15-char lookup)."""
+    return {k2: v for k, v in (accounts_by_id or {}).items() if (k2 := _sf(k))}
+
+
 def _hash_email(addr: str | None) -> str | None:
     """sha256 of the normalised (dot-stripped, lower-case) address, so raw emails are not stored.
     Matching still uses loaders.normalise_email_for_match."""
@@ -210,6 +252,8 @@ def state_to_dict(state: State) -> dict:
         "dnc_emails": sorted(state.dnc_emails),
         "emails": {k: {m: dict(v) for m, v in sorted(msgs.items())} for k, msgs in sorted(state.emails.items())},
         "sheets": state.sheets,
+        "dnc_rebuilt_at": state.dnc_rebuilt_at,
+        "dnc_rebuilt_calls": state.dnc_rebuilt_calls,
     }
 
 
@@ -230,6 +274,33 @@ def _str_list(raw: dict, key: str) -> set[str]:
     return set(v)
 
 
+def _local_or_utc(a: dict, field_name: str, instant: datetime | None, key, warn: list) -> str | None:
+    """Stored local date, or (when it is missing/malformed) the UTC date of the stored instant, so a
+    bad date never silently drops a cooldown. A malformed (not merely absent) value adds a warning."""
+    stored = a.get(field_name)
+    if _date_str(stored):
+        return stored
+    if stored is not None:
+        warn.append(f"account {key!r}: malformed {field_name} {stored!r}"
+                    + ("; using the UTC date of the stored instant" if instant else ""))
+    return instant.astimezone(timezone.utc).date().isoformat() if instant else None
+
+
+def _merge_accounts(x: AccountState, y: AccountState) -> AccountState:
+    """Two stored entries that normalise to the same id (15- and 18-char): keep the newer call, the
+    later connect / email, and any alternate ids."""
+    base, other = (x, y) if (x.last_call_at or datetime.min.replace(tzinfo=timezone.utc)) >= \
+        (y.last_call_at or datetime.min.replace(tzinfo=timezone.utc)) else (y, x)
+    out = copy.deepcopy(base)
+    for at, dt in (("last_connect_at", "last_connect_date"), ("last_email_at", "last_email_date")):
+        if getattr(other, at) and (not getattr(out, at) or getattr(other, at) > getattr(out, at)):
+            setattr(out, at, getattr(other, at))
+            setattr(out, dt, getattr(other, dt))
+    out.nooks_account_id = out.nooks_account_id or other.nooks_account_id
+    out.zoominfo_id = out.zoominfo_id or other.zoominfo_id
+    return out
+
+
 def state_from_dict(raw: dict) -> State:
     """Rebuild a State. Raises ValueError when a top-level container is the wrong type or a DNC list
     is malformed (load_state turns that into a flagged reset). Single malformed account / prospect /
@@ -246,17 +317,29 @@ def state_from_dict(raw: dict) -> State:
     st.dnc_prospect_ids = _str_list(raw, "dnc_prospect_ids")
     st.dnc_phones = _str_list(raw, "dnc_phones")
     st.dnc_emails = _str_list(raw, "dnc_emails")
+    at, n = raw.get("dnc_rebuilt_at"), raw.get("dnc_rebuilt_calls", 0)
+    if at is not None and not _d_in(at):
+        raise ValueError("'dnc_rebuilt_at' must be an ISO date")      # fail closed: marker not trusted
+    if not isinstance(n, int) or isinstance(n, bool):
+        raise ValueError("'dnc_rebuilt_calls' must be an integer")
+    st.dnc_rebuilt_at, st.dnc_rebuilt_calls = at, n
 
     for k, a in accounts.items():
         if not isinstance(a, dict):
             warn.append(f"malformed account entry {k!r}")
             continue
-        st.accounts[k] = AccountState(
-            _dt_in(a.get("last_call_at")), _date_str(a.get("last_call_date")), _str_or_none(a.get("last_call_key")),
+        key = _sf(k)
+        if not key:
+            warn.append(f"account entry with unusable id {k!r}")
+            continue
+        call_at, conn_at, mail_at = (_dt_in(a.get(f)) for f in ("last_call_at", "last_connect_at", "last_email_at"))
+        acc = AccountState(
+            call_at, _local_or_utc(a, "last_call_date", call_at, k, warn), _str_or_none(a.get("last_call_key")),
             _str_or_none(a.get("last_outcome")), _str_or_none(a.get("last_disposition")),
-            _dt_in(a.get("last_connect_at")), _date_str(a.get("last_connect_date")),
-            _dt_in(a.get("last_email_at")), _date_str(a.get("last_email_date")),
+            conn_at, _local_or_utc(a, "last_connect_date", conn_at, k, warn),
+            mail_at, _local_or_utc(a, "last_email_date", mail_at, k, warn),
             _str_or_none(a.get("nooks_account_id")), _str_or_none(a.get("zoominfo_id")))
+        st.accounts[key] = _merge_accounts(st.accounts[key], acc) if key in st.accounts else acc
 
     for k, p in prospects.items():
         if not isinstance(p, dict):
@@ -287,11 +370,14 @@ def state_from_dict(raw: dict) -> State:
     for s in sheets:
         if isinstance(s, dict) and _d_in(s.get("run_date")) and isinstance(s.get("account_ids"), list):
             st.sheets.append({"run_date": s["run_date"],
-                              "account_ids": [x for x in s["account_ids"] if isinstance(x, str)]})
+                              "account_ids": list(dict.fromkeys(
+                                  k for x in s["account_ids"] if isinstance(x, str) and (k := _sf(x))))})
         else:
             warn.append("malformed sheet entry")
     for w in warn:
         log.warning("state: skipped %s", w)
+    if warn:
+        log.warning("state: %d malformed entr(ies) skipped or repaired on load", len(warn))
     return st
 
 
@@ -414,8 +500,8 @@ def _link_prospect(call: CallRecord, by_id: dict, by_phone: dict) -> tuple[Prosp
 def _account_id_for(p: Prospect | None, accounts_by_id) -> str | None:
     if p is None:
         return None
-    if p.sf_account_id:
-        return p.sf_account_id
+    if _sf(p.sf_account_id):
+        return _sf(p.sf_account_id)
     if p.nooks_account_id and accounts_by_id:
         for sf_id, acct in accounts_by_id.items():
             if sf_id and getattr(acct, "nooks_account_id", None) == p.nooks_account_id:
@@ -439,14 +525,14 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
     Nooks prospect for the same person stays blocked.
     """
     st = copy.deepcopy(state)
-    accounts_by_id = accounts_by_id or {}
+    accounts_by_id = _norm_accounts(accounts_by_id)
     by_id = {p.nooks_id: p for p in prospects if p.nooks_id}
     by_phone: dict[str, list[Prospect]] = {}
     for p in prospects:
         if (k := _phone_key(p.phone_e164)):
             by_phone.setdefault(k, []).append(p)
 
-    rep = {"new": 0, "duplicate": 0, "unmatched": 0, "unmatched_call_ids": [],
+    rep = {"calls_seen": len(calls), "new": 0, "duplicate": 0, "unmatched": 0, "unmatched_call_ids": [],
            "unmatched_reasons": {}, "no_account": 0, "dnc_added": 0}
 
     # Do Not Call is sticky and does not need an account match: record it first, for every call.
@@ -610,6 +696,7 @@ def is_in_cooldown(state: State, account_id: str | None, today: date, config: Co
     """True while the account's cooldown end is later than ``today``. ``today`` must be the
     account-LOCAL date (the ranker uses windows[0].start.date() in the account timezone).
     Unknown / None account is not in cooldown."""
+    account_id = _sf(account_id)
     if not account_id:
         return False
     until = cooldown_until(state, config).get(account_id)
@@ -622,7 +709,7 @@ def record_sheet(state: State, run_date: date, account_ids: list[str | None]) ->
     duplicates). A second record for the same date replaces the first (re-runs are idempotent).
     Only the newest SHEETS_KEPT sheets are kept."""
     st = copy.deepcopy(state)
-    ids = list(dict.fromkeys(a for a in account_ids if a))
+    ids = list(dict.fromkeys(k for a in account_ids if (k := _sf(a))))
     iso = run_date.isoformat()
     st.sheets = [s for s in st.sheets if s["run_date"] != iso] + [{"run_date": iso, "account_ids": ids}]
     st.sheets.sort(key=lambda s: s["run_date"])
@@ -631,12 +718,13 @@ def record_sheet(state: State, run_date: date, account_ids: list[str | None]) ->
 
 
 def last_sheet_ids(state: State) -> set[str]:
-    return set(state.sheets[-1]["account_ids"]) if state.sheets else set()
+    return {k for a in state.sheets[-1]["account_ids"] if (k := _sf(a))} if state.sheets else set()
 
 
 def was_in_last_sheet(state: State, account_id: str | None) -> bool:
     """True if the account was on the most recent recorded sheet (so don't serve it twice in a row)."""
-    return bool(account_id) and account_id in last_sheet_ids(state)
+    key = _sf(account_id)
+    return bool(key) and key in last_sheet_ids(state)
 
 
 # ---------------------------------------------------------------- email history
@@ -652,12 +740,12 @@ def record_sent_emails(state: State, sent: list[SentEmail], prospects: list[Pros
     (Australia/Sydney if no account is known)."""
     st = copy.deepcopy(state)
     seen_on = (today or datetime.now(timezone.utc).date()).isoformat()
-    accounts_by_id = accounts_by_id or {}
+    accounts_by_id = _norm_accounts(accounts_by_id)
     acct_by_key: dict[str, str] = {}
     for p in prospects:
         k = normalise_email_for_match(p.email)
-        if k and p.sf_account_id:
-            acct_by_key[k] = p.sf_account_id
+        if k and _sf(p.sf_account_id):
+            acct_by_key[k] = _sf(p.sf_account_id)
 
     rep = {"new": 0, "duplicate": 0, "skipped_no_key": 0, "date_unknown": 0}
     for s in sent:
