@@ -1,0 +1,383 @@
+{
+  "_note": "SYNTHETIC search_scoops shape. Type/topic ids are fake. No domain or size on the company; contacts[] has no job title. Cases: Funding, Executive Move, New Hire (relevant and not), M&A, Product Launch, Partnership, Project/Pain Point with and without Pendo topics, generic 'more open roles in Medical & Health'.",
+  "data": [
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1001",
+          "name": "Example Widgets Pty Ltd"
+        },
+        "description": "Example Widgets has secured $5 million in additional funding.",
+        "id": "FAKE-SCOOP-1",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T1",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y1",
+            "type": "Funding"
+          }
+        ],
+        "link": "https://example.com/news",
+        "linkText": "See details"
+      },
+      "id": "FAKE-SCOOP-1",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1002",
+          "name": "Fakeville Software Pty Ltd"
+        },
+        "description": "<Person> will join as Chief Product Officer.",
+        "id": "FAKE-SCOOP-2",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T2",
+            "topic": "Executive Moves"
+          },
+          {
+            "id": "FAKE-T3",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y3",
+            "type": "New Hire"
+          },
+          {
+            "id": "FAKE-Y4",
+            "type": "Executive Move"
+          }
+        ],
+        "contacts": [
+          {
+            "firstName": "<First>",
+            "id": 0,
+            "lastName": "<Last>"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-2",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1003",
+          "name": "Sample Logistics Ltd"
+        },
+        "description": "<Person> will join as Head of Finance.",
+        "id": "FAKE-SCOOP-3",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T2",
+            "topic": "Executive Moves"
+          },
+          {
+            "id": "FAKE-T3",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y3",
+            "type": "New Hire"
+          },
+          {
+            "id": "FAKE-Y4",
+            "type": "Executive Move"
+          }
+        ],
+        "contacts": [
+          {
+            "firstName": "<First>",
+            "id": 0,
+            "lastName": "<Last>"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-3",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1001",
+          "name": "Example Widgets Pty Ltd"
+        },
+        "description": "Example Widgets announced the launch of a new mobile app.",
+        "id": "FAKE-SCOOP-4",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T5",
+            "topic": "Product Launch"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y5",
+            "type": "Product Launch"
+          }
+        ],
+        "link": "https://example.com/news",
+        "linkText": "See details"
+      },
+      "id": "FAKE-SCOOP-4",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1002",
+          "name": "Fakeville Software Pty Ltd"
+        },
+        "description": "Fakeville Software agreed to acquire Sample Logistics.",
+        "id": "FAKE-SCOOP-5",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T6",
+            "topic": "Mergers & Acquisitions (M&A)"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y6",
+            "type": "Mergers & Acquisitions (M&A)"
+          }
+        ],
+        "link": "https://example.com/news",
+        "linkText": "See details"
+      },
+      "id": "FAKE-SCOOP-5",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1003",
+          "name": "Sample Logistics Ltd"
+        },
+        "description": "Sample Logistics partnered with a digital platform vendor.",
+        "id": "FAKE-SCOOP-6",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T7",
+            "topic": "Partnerships"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y7",
+            "type": "Partnership"
+          }
+        ],
+        "link": "https://example.com/news",
+        "linkText": "See details"
+      },
+      "id": "FAKE-SCOOP-6",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1002",
+          "name": "Fakeville Software Pty Ltd"
+        },
+        "description": "According to an internal source, the company is working on a customer experience programme.",
+        "id": "FAKE-SCOOP-7",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T8",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "FAKE-T9",
+            "topic": "Customer Experience"
+          },
+          {
+            "id": "FAKE-T10",
+            "topic": "Product Management"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y8",
+            "type": "Pain Point"
+          },
+          {
+            "id": "FAKE-Y9",
+            "type": "Project"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-7",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1003",
+          "name": "Sample Logistics Ltd"
+        },
+        "description": "According to an internal source, the company is replacing its finance system.",
+        "id": "FAKE-SCOOP-8",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T8",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "FAKE-T11",
+            "topic": "Finance"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y8",
+            "type": "Pain Point"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-8",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1001",
+          "name": "Example Widgets Pty Ltd"
+        },
+        "description": "According to an internal source, the company is evaluating AI tooling for HR.",
+        "id": "FAKE-SCOOP-9",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T8",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "FAKE-T12",
+            "topic": "Human Resources"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y8",
+            "type": "Pain Point"
+          },
+          {
+            "id": "FAKE-Y9",
+            "type": "Project"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-9",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1003",
+          "name": "Sample Logistics Ltd"
+        },
+        "description": "Sample Logistics is hiring for more open roles in Medical & Health.",
+        "id": "FAKE-SCOOP-10",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T13",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y10",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-10",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1002",
+          "name": "Fakeville Software Pty Ltd"
+        },
+        "description": "Fakeville Software is hiring more open roles in Legal.",
+        "id": "FAKE-SCOOP-11",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T13",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y10",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-11",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "FAKE-ZI-1001",
+          "name": "Example Widgets Pty Ltd"
+        },
+        "description": "Example Widgets is hiring a Head of Digital and several engineers.",
+        "id": "FAKE-SCOOP-12",
+        "originalPublishedDate": "2026-11-20T00:00:00Z",
+        "publishedDate": "2026-11-20T00:00:00Z",
+        "topics": [
+          {
+            "id": "FAKE-T13",
+            "topic": "Hiring Plans"
+          },
+          {
+            "id": "FAKE-T14",
+            "topic": "Engineering"
+          }
+        ],
+        "types": [
+          {
+            "id": "FAKE-Y10",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "FAKE-SCOOP-12",
+      "type": "Scoop"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "_note": "SYNTHETIC listCallDispositions shape. Ids are placeholders; real code must resolve by NAME at run time.",
+  "data": [
+    {
+      "id": "disp-no-answer",
+      "name": "No Answer",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "disp-voicemail",
+      "name": "Left Voicemail",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "disp-bad-number",
+      "name": "Bad Number / Wrong Number",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "disp-gatekeeper",
+      "name": "Gatekeeper",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-do-not-call",
+      "name": "Do Not Call",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-wrong-person",
+      "name": "Wrong Person",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-left-company",
+      "name": "Person Left Company",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-hang-up",
+      "name": "Hang Up",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-follow-up-keep-in-sequence",
+      "name": "Follow-Up - Keep in Sequence",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-follow-up-remove-from-sequence",
+      "name": "Follow-Up - Remove from Sequence",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-meeting",
+      "name": "Meeting Scheduled",
+      "source": "nooks_sep",
+      "callOutcome": "Meeting",
+      "archived": false
+    },
+    {
+      "id": "disp-objection-not-interested",
+      "name": "Objection: Not Interested",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-objection-not-a-priority",
+      "name": "Objection: Not a Priority",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-objection-budget",
+      "name": "Objection: Budget",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-objection-already-have-a-solution",
+      "name": "Objection: Already Have a Solution",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "disp-objection-bad-fit",
+      "name": "Objection: Bad fit",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    }
+  ]
+}

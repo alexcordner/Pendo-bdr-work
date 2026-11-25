@@ -1,0 +1,15 @@
+{
+  "_note": "SYNTHETIC summary shape of the old manual_email backlog (rounded). Untouched by this project.",
+  "rows_seen": "about 200",
+  "in_sequence": "all",
+  "one_off": 0,
+  "dominant_sequence_share_pct": 95,
+  "due_range": [
+    "2026-04",
+    "2026-11"
+  ],
+  "statuses": {
+    "ready": "all"
+  },
+  "total_unverified": true
+}

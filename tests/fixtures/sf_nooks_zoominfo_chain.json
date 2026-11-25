@@ -1,0 +1,49 @@
+{
+  "_note": "SYNTHETIC join path. Nooks prospect.crmId = SF Contact.Id; Contact.AccountId = SF Account.Id; Account.DOZISF__ZoomInfo_Id__c = ZoomInfo company id; Nooks account via listAccounts filter_crmId=<SF Account Id>.",
+  "verified_pairs": [
+    {
+      "sf_account": {
+        "Id": "FAKE-001-001",
+        "Name": "Example Widgets Pty Ltd",
+        "BillingCountry": "Australia",
+        "BillingState": "New South Wales",
+        "ZoomInfo_Employee_Count__c": 215,
+        "Current_Customer__c": false,
+        "SDR_Target__c": true,
+        "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-1001"
+      },
+      "zoominfo_search_companies_by_id": {
+        "id": "FAKE-ZI-1001",
+        "type": "Company",
+        "attributes": {
+          "name": "Example Widgets Pty Ltd"
+        }
+      },
+      "nooks_account_by_crmId": {
+        "id": "FAKE-NOOKS-ACCT-1",
+        "name": "Example Widgets Pty Ltd",
+        "domain": "example-widgets.test",
+        "numEmployees": 215,
+        "source": "salesforce"
+      }
+    }
+  ],
+  "prospect_to_account_chain": [
+    {
+      "nooks_prospect": {
+        "id": "FAKE-NOOKS-PROSPECT-1",
+        "crmId": "FAKE-003-001",
+        "title": "Head of Product",
+        "primaryEmail": "first.last@example.com",
+        "account": {
+          "id": "FAKE-NOOKS-ACCT-1"
+        }
+      },
+      "sf_contact": {
+        "Id": "FAKE-003-001",
+        "AccountId": "FAKE-001-001"
+      },
+      "sf_account_id": "FAKE-001-001"
+    }
+  ]
+}

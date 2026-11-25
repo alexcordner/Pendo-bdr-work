@@ -1,0 +1,55 @@
+{
+  "_note": "SYNTHETIC. Rule: keep a leading +; '00' prefix -> '+'; strip other non-digits; digits starting 61/64 and >=11 long get '+'; leading 0 -> country calling code from account country (AU +61, NZ +64); never override an explicit + with the account country.",
+  "sf_examples": [
+    "+61 400 000 001",
+    "+64 9-000 0104",
+    "0200000102",
+    "61390000003",
+    "+64200000005",
+    "+6490000106",
+    "0200000107"
+  ],
+  "nooks_call_to_examples": [
+    "+61400000001",
+    "+61 400 000 008",
+    "+6590000109"
+  ],
+  "test_vectors": [
+    {
+      "in": "+61 400 000 001",
+      "account_country": "Australia",
+      "out": "+61400000001"
+    },
+    {
+      "in": "0200000102",
+      "account_country": "New Zealand",
+      "out": "+64200000002"
+    },
+    {
+      "in": "0400000012",
+      "account_country": "Australia",
+      "out": "+61400000012"
+    },
+    {
+      "in": "61390000003",
+      "account_country": "Australia",
+      "out": "+61390000003"
+    },
+    {
+      "in": "+64 9-000 0104",
+      "account_country": "Australia",
+      "out": "+6490000104"
+    },
+    {
+      "in": "+61 400 000 008",
+      "account_country": "New Zealand",
+      "out": "+61400000008"
+    },
+    {
+      "in": "0061400000013",
+      "account_country": "Australia",
+      "out": "+61400000013"
+    }
+  ],
+  "observed_match": "A SF MobilePhone with spaces equals a Nooks call.to after stripping spaces."
+}

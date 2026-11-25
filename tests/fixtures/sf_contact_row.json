@@ -1,0 +1,35 @@
+{
+  "_note": "SYNTHETIC. Contact phone and opt-out fields. No DoNotCall column on Contact.",
+  "records": [
+    {
+      "Id": "FAKE-003-001",
+      "AccountId": "FAKE-001-001",
+      "Phone": null,
+      "MobilePhone": "+61 400 000 001",
+      "HasOptedOutOfEmail": false,
+      "Title": "Head of Product",
+      "Email": "first.last@example.com",
+      "MailingCountry": "Australia"
+    },
+    {
+      "Id": "FAKE-003-002",
+      "AccountId": "FAKE-001-002",
+      "Phone": "02 0000 0002",
+      "MobilePhone": null,
+      "HasOptedOutOfEmail": true,
+      "Title": "VP Product",
+      "Email": "user@example.com",
+      "MailingCountry": "Australia"
+    },
+    {
+      "Id": "FAKE-003-003",
+      "AccountId": "FAKE-001-003",
+      "Phone": "+64 9-000 0104",
+      "MobilePhone": "+64200000005",
+      "HasOptedOutOfEmail": false,
+      "Title": "Head of Digital",
+      "Email": "user@example.com",
+      "MailingCountry": "New Zealand"
+    }
+  ]
+}

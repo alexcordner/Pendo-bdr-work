@@ -1,0 +1,50 @@
+{
+  "_note": "SYNTHETIC rounded-shape distribution of BillingState for ANZ non-customers (illustrative, not real counts).",
+  "top": {
+    "New South Wales": 35,
+    "Victoria": 25,
+    "Queensland": 13,
+    "<null>": 8,
+    "Western Australia": 5,
+    "Auckland": 4,
+    "South Australia": 3,
+    "Australian Capital Territory": 1,
+    "Tasmania": 1,
+    "NSW": 1,
+    "VIC": 1,
+    "Other": 1,
+    "n/a": 1,
+    "NY": 1
+  },
+  "abbreviations_seen": [
+    "NSW",
+    "VIC",
+    "QLD",
+    "WA",
+    "SA",
+    "ACT"
+  ],
+  "abbreviations_not_seen_but_expected": [
+    "TAS",
+    "NT"
+  ],
+  "junk_or_foreign_examples": [
+    "NY",
+    "TX",
+    "Other",
+    "n/a",
+    "NULL",
+    "Outside U.S./Canada"
+  ],
+  "city_in_state_field": [
+    "Sydney",
+    "Fakeville"
+  ],
+  "misspellings": [
+    "Aukland",
+    "Auk",
+    "AKL",
+    "West Australia"
+  ],
+  "country_value_note": "BillingCountry is mixed case ('AUSTRALIA' next to 'Australia'); some rows are null with HQ_Country__c set."
+}

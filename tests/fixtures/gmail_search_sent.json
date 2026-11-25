@@ -1,0 +1,25 @@
+{
+  "_note": "SYNTHETIC search_threads view=THREAD_VIEW_METADATA_ONLY. Returned addresses have DOTS STRIPPED from the local part. Query with the real dotted address.",
+  "query": "in:sent to:first.last@example.com newer_than:7d",
+  "resultCountEstimate": "1",
+  "threads": [
+    {
+      "id": "FAKE-THREAD-1",
+      "messageCount": 1,
+      "messages": [
+        {
+          "id": "FAKE-MSG-1",
+          "sender": "firstlast@example.org",
+          "threadId": "FAKE-THREAD-1",
+          "toRecipients": [
+            "firstlast@example.com"
+          ]
+        }
+      ]
+    }
+  ],
+  "dot_stripped_expected_match": {
+    "query_address": "first.last@example.com",
+    "returned_address": "firstlast@example.com"
+  }
+}

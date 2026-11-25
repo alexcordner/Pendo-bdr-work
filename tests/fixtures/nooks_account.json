@@ -1,0 +1,10 @@
+{
+  "id": "FAKE-NOOKS-ACCT-1",
+  "name": "Example Widgets Pty Ltd",
+  "domain": "example-widgets.test",
+  "source": "salesforce",
+  "numEmployees": 215,
+  "linkedInUrl": "https://www.example.com/company/example-widgets",
+  "description": "<trimmed>",
+  "_note": "SYNTHETIC. No country/state; crmId usable only as a filter."
+}
