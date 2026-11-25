@@ -482,7 +482,7 @@ def test_combined_literal_numbers():
     kinds = [SignalKind.FUNDING, SignalKind.MA, SignalKind.PRODUCT_LAUNCH, SignalKind.NEW_HIRE]
     f = lambda *xs: S.combined_strength([_sig(kinds[i], x, src=f"s{i}") for i, x in enumerate(xs)])
     assert S.COMBINE_DAMPING == 0.5 and S.SAME_KIND_EXTRA_EACH == 0.15 and S.SAME_KIND_EXTRA_TOTAL == 0.30
-    assert S.MAX_COMBINED_SIGNALS == 3
+    assert S.MAX_COMBINED_SIGNALS == 4
     assert f(0.5, 0.4) == 0.6                # different kinds: 1 - 0.5 * (1 - 0.5*0.4)
     assert f(0.4, 0.5) == 0.6
     assert f(0.5, 0.4, 0.2) == 0.64          # 1 - 0.5 * 0.8 * 0.9
@@ -499,13 +499,13 @@ def test_combined_at_least_best_and_capped():
     assert 0.9 <= c <= 1.0
 
 
-def test_combined_adding_signals_never_lowers_and_stops_after_three():
+def test_combined_adding_signals_never_lowers_and_stops_after_four():
     kinds = [SignalKind.FUNDING, SignalKind.MA, SignalKind.PRODUCT_LAUNCH, SignalKind.NEW_HIRE, SignalKind.HIRING_PLAN]
     sigs, vals = [], []
     for i, k in enumerate(kinds):
         sigs.append(_sig(k, 0.5 - i * 0.05, src=f"s{i}"))
         vals.append(S.combined_strength(sigs))
-    assert vals[0] < vals[1] < vals[2] and vals[2] == vals[3] == vals[4] and vals[4] < 1.0
+    assert vals[0] < vals[1] < vals[2] < vals[3] and vals[3] == vals[4] and vals[4] < 1.0
 
 
 def test_combined_max_strength_stays_one():
@@ -2120,7 +2120,7 @@ def test_same_kind_extras_capped_each_and_in_total():
     assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.9, 4)
 
 
-def test_only_the_three_strongest_signals_count():
+def test_only_the_strongest_counted_entries_count():
     base = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
             L(0.45, "c", "Gamma Co launched Gamma Hub.")]
     more = base + [L(0.4, "d", "Delta Co launched Delta Hub."), L(0.35, "e", "Echo Co launched Echo Hub.")]
@@ -2136,8 +2136,8 @@ def test_mixed_kinds_keep_the_damped_contribution():
 def test_mixed_kind_case_with_same_kind_repeats():
     sigs = [_sig(SignalKind.EXEC_MOVE, 0.8, src="e"), L(0.6, "l1", "Alpha Co launched Alpha Hub."),
             L(0.5, "l2", "Beta Co launched Beta Hub."), _sig(SignalKind.FUNDING, 0.4, src="f")]
-    # three strongest: exec 0.8, launch 0.6, launch 0.5 -> launch #2 is a same-kind extra (0.15); funding is cut
-    assert S.combined_strength(sigs) == round(1 - 0.2 * (1 - 0.3) * (1 - 0.15), 4)
+    # leads: exec 0.8, launch 0.6 (x0.5), funding 0.4 (x0.5); extra: launch #2 at 0.15 -> all four count
+    assert S.combined_strength(sigs) == round(1 - 0.2 * (1 - 0.3) * (1 - 0.2) * (1 - 0.15), 4)         # 0.9048
 
 
 def test_one_signal_per_kind_is_unchanged_by_the_new_rule():
@@ -2277,7 +2277,7 @@ def test_nextdc_goodman_pair_is_still_the_same_deal(config):
     "Example Co launched a sensor platform for mobile fleets.",
     "Example Co launched a reagent kit for a laboratory assay platform.",
     "Example Co launched a new device with a digital display.",
-    "Example Co launched powder handling equipment with an online store.",
+    "Example Co launched powder handling equipment with a colour display.",
     "Example Co launched hardware for the cloud.",
 ])
 def test_hardware_launch_is_non_digital_even_with_platform_or_interface_words(config, desc):
@@ -2324,9 +2324,11 @@ def test_powder_launch_is_hardware(config):
     assert one(config, "Product Launch", "Example Co launched a metal powder with a digital ordering platform.").factor == 0.5
 
 
-def test_extras_total_cap_is_the_sum_of_two_extras_at_the_default_settings():
-    # SAME_KIND_EXTRA_TOTAL (0.30) equals 2 x SAME_KIND_EXTRA_EACH with MAX_COMBINED_SIGNALS = 3, so it is a guard only
-    assert S.SAME_KIND_EXTRA_TOTAL == (S.MAX_COMBINED_SIGNALS - 1) * S.SAME_KIND_EXTRA_EACH
+def test_same_kind_extras_stop_at_the_total_cap():
+    sigs = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
+            L(0.45, "c", "Gamma Co launched Gamma Hub."), L(0.4, "d", "Delta Co launched Delta Hub.")]
+    # extras 0.15 + 0.15, then the third extra is capped to 0 by the 0.30 total
+    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.85, 4)
 
 
 # ------------------------------------------------------------ notes carried onto Signal: being acquired, role vacated
@@ -2387,3 +2389,127 @@ def test_long_text_with_two_notes_fits(config, accounts):
     d = "Example Co's Interim Chief Digital Officer is leaving. " + "More text. " * 60
     sig = sig_for(config, one(config, "Executive Move", d), accounts)
     assert len(sig.evidence) <= S.EVIDENCE_MAX_CHARS and S.signal_notes(sig) == [S.VACATED_NOTE]
+
+
+# ============================================================ review fixes on 600687a
+# ------------------------------------------------------------ (1) 'with' / 'from' are not third-party buyers
+@pytest.mark.parametrize("d", [
+    "Acme signs agreement with Bigco to acquire Zeta.",
+    "Acme gets approval from the ACCC to acquire Zeta.",
+    "Acme, supported by an agreement with Bigco to acquire Zeta, expands.",
+    "Acme reached a deal with Bigco to acquire Zeta.",
+    "Acme won an offer from Bigco to acquire Zeta.",
+])
+def test_with_or_from_counterparty_does_not_make_the_company_the_target(d):
+    assert S.ma_role(d, "Acme Holdings") == "acquirer"
+
+
+def test_acme_with_bigco_is_a_full_acquirer(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme signs agreement with Bigco to acquire Zeta.", name="Acme Holdings")
+    assert v.factor == 1.0 and v.notes == ()
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme has entered into an agreement for Bigco to acquire a 9.9% stake in the company.", "Acme Holdings", "target"),
+    ("Acme has entered into an agreement for Bigco and Cargo to acquire a stake in the company.", "Bigco Ltd", "acquirer"),
+    ("Acme has entered into an agreement for Bigco and Cargo to acquire a stake in the company.", "Cargo Pty", "acquirer"),
+    ("Acme made a deal for Bigco to buy it.", "Acme Holdings", "target"),
+    ("The board allows Bigco to acquire a stake in Acme.", "Acme Holdings", "target"),
+    ("The regulator permits Bigco to acquire Zeta.", "Bigco Ltd", "acquirer"),
+])
+def test_for_and_allow_constructions_still_work(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_nextdc_goodman_digital_realty_wording_unchanged():
+    assert S.ma_role(NEXTDC_TEXT, "NEXTDC Ltd") == "target"
+    assert S.ma_role(NEXTDC_TEXT, "Goodman Group") == "acquirer"
+    assert S.ma_role(NEXTDC_TEXT, "Digital Realty Trust") == "acquirer"
+
+
+# ------------------------------------------------------------ (2) kind diversity before the cap
+def test_new_hire_is_not_dropped_by_three_stronger_funding_scoops():
+    sigs = [_sig(SignalKind.FUNDING, 0.50, src="f1"), _sig(SignalKind.FUNDING, 0.49, src="f2"),
+            _sig(SignalKind.FUNDING, 0.48, src="f3"), _sig(SignalKind.NEW_HIRE, 0.45, src="h")]
+    with_hire = S.combined_strength(sigs)
+    without = S.combined_strength(sigs[:3])
+    assert with_hire == 0.72 and without == 0.6388 and with_hire > without      # 1 - 0.5 * 0.775 * 0.85 * 0.85
+
+
+def test_best_of_each_kind_is_picked_before_the_cap():
+    sigs = [_sig(SignalKind.FUNDING, 0.5, src="f"), _sig(SignalKind.NEW_HIRE, 0.4, src="h"),
+            _sig(SignalKind.MA, 0.3, src="m"), _sig(SignalKind.PRODUCT_LAUNCH, 0.2, src="l"),
+            _sig(SignalKind.HIRING_PLAN, 0.1, src="p")]
+    # leads damped: 0.2, 0.15, 0.1, 0.05; the cap keeps the best plus the three strongest others
+    assert S.combined_strength(sigs) == round(1 - 0.5 * 0.8 * 0.85 * 0.9, 4)
+
+
+def test_one_signal_per_kind_scores_are_unchanged():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.8, src="e"), _sig(SignalKind.FUNDING, 0.6, src="f")]
+    assert S.combined_strength(sigs) == round(1 - 0.2 * 0.7, 4)
+
+
+def test_catapult_nine_launches_unchanged_by_the_new_order():
+    assert S.combined_strength(CATAPULT) == 0.7038
+
+
+def test_intent_is_never_best_even_with_the_new_order():
+    real, intent = _sig(SignalKind.FUNDING, 0.16, src="f"), _isig(0.3)
+    assert S.combined_strength([real, intent]) == 0.286                 # 1 - 0.84 * (1 - 0.15)
+
+
+def test_new_kind_ranks_among_extras_by_contribution():
+    sigs = [_sig(SignalKind.EXEC_MOVE, 0.9, src="e"), _sig(SignalKind.FUNDING, 0.1, src="f1"),
+            _sig(SignalKind.FUNDING, 0.1, src="f2"), _sig(SignalKind.FUNDING, 0.1, src="f3")]
+    # funding lead counts 0.05; extras 0.1 + 0.1; best + three others = all four entries
+    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.9 * 0.9, 4)
+
+
+# ------------------------------------------------------------ (3) place words are not product names
+@pytest.mark.parametrize("text", [
+    "Gamma launches New Zealand expansion of lending app.", "Gamma launched New Zealand credit card.",
+    "Gamma launched Australian range of cards.", "Gamma launches Sydney pilot.",
+    "Gamma unveils the Asia Pacific expansion.",
+])
+def test_place_and_generic_words_are_not_product_names(text):
+    assert S._product_name(text) is None
+
+
+def test_new_zealand_launches_do_not_dedupe_by_name():
+    a = L(0.5, "a", "Gamma launches New Zealand expansion of lending app.")
+    b = L(0.4, "b", "Gamma launched New Zealand credit card.")
+    assert len(S.dedupe_signals([a, b])) == 2
+
+
+def test_place_words_are_stripped_from_a_real_name():
+    assert S._product_name("Gamma launched Australian VisionPro today.") == "visionpro"
+    assert S._product_name("Gamma launched VisionPro Australia.") == "visionpro"
+
+
+def test_lowercase_product_names_are_a_known_limit():
+    assert S._product_name("Catapult launches the pro tracker for coaches.") is None
+    a = L(0.5, "a", "Catapult launches the pro tracker for coaches in Europe this week for everyone.", day=20)
+    b = L(0.4, "b", "Catapult introduced the pro tracker, a coaching tool for clubs worldwide.", day=20)
+    assert len(S.dedupe_signals([a, b])) == 2                           # different first 60 characters, no capital name
+
+
+# ------------------------------------------------------------ (5) application / webapp / online store are software
+@pytest.mark.parametrize("desc", [
+    "Example Co launches an application for battery monitoring.",
+    "Example Co launched a webapp for sensor fleets.",
+    "Example Co launched Powder Coat Pro online store.",
+    "Example Co launched an online shop for laboratory reagents.",
+    "Example Co launched applications for device management.",
+])
+def test_application_webapp_and_online_store_keep_hardware_words_digital(config, desc):
+    assert one(config, "Product Launch", desc).factor == 1.0
+
+
+def test_hardware_without_a_software_noun_is_still_physical(config):
+    assert one(config, "Product Launch", "Example Co launched a battery for sensor fleets.").factor == 0.5
+
+
+def test_allow_base_form_and_enable_permit_variants():
+    assert S.ma_role("Acme is willing to allow Bigco to acquire a stake in Acme.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will enable Bigco to acquire Zeta.", "Acme Holdings") == "target"
+    assert S.ma_role("Acme will permit Bigco to acquire Zeta.", "Bigco Ltd") == "acquirer"

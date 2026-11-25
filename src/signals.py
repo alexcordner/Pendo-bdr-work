@@ -64,13 +64,13 @@ KIND_HALF_LIFE_DAYS: dict[SignalKind, float] = {
 
 #: Several signals on one account (combined_strength): the strongest signal of each KIND counts in full for the best
 #: one and at COMBINE_DAMPING for the best of every other kind. Extra signals of a kind that already counted add at most
-#: SAME_KIND_EXTRA_EACH each (SAME_KIND_EXTRA_TOTAL together), and only the MAX_COMBINED_SIGNALS strongest signals
+#: SAME_KIND_EXTRA_EACH each (SAME_KIND_EXTRA_TOTAL together), and only the MAX_COMBINED_SIGNALS strongest counted entries
 #: take part at all, so nine launch scoops for one company cannot push an account towards 1.0.
 #: combined = 1 - (1 - best) * prod(1 - contribution). Always >= best and <= 1.0.
 COMBINE_DAMPING = 0.5
 SAME_KIND_EXTRA_EACH = 0.15
 SAME_KIND_EXTRA_TOTAL = 0.30
-MAX_COMBINED_SIGNALS = 3
+MAX_COMBINED_SIGNALS = 4        # counted entries: the best plus up to three others
 #: Two scoops of one company about the same product count once when this close in time.
 NEAR_DUPLICATE_DAYS = 14
 NEAR_DUPLICATE_CHARS = 60
@@ -455,7 +455,7 @@ class _J(NamedTuple):
 _DIGITAL_PRODUCT = re.compile(
     r"(?<!\w)(?:apps?|platforms?|software|digital|mobile|portal|online|website|web|saas|ai|artificial\s+intelligence|"
     r"cloud|api|apis|customer\s+experience|cx|ux|e-?commerce|banking\s+app|internet\s+banking|self-service|"
-    r"dashboard|chatbot|login|subscription\s+service|solutions?|technology)(?!\w)", _FLAGS)
+    r"dashboard|chatbot|login|subscription\s+service|solutions?|technology|applications?|webapps?|online\s+(?:store|shop))(?!\w)", _FLAGS)
 # Hardware / lab / equipment words. When one is present the launch is NOT digital unless the text names a software
 # product itself (_SOFTWARE_NOUN); weak words such as platform, user interface, AI, cloud, mobile, digital do not rescue it.
 _HARDWARE_PRODUCT = re.compile(
@@ -463,7 +463,8 @@ _HARDWARE_PRODUCT = re.compile(
     r"hardware|laborator(?:y|ies)|chromatograph\w*|equipment|powders?|reagents?|assays?|spectromet\w+|analy[sz]ers?|"
     r"wearables?|drones?|batter(?:y|ies)|microscop\w+|centrifuges?|pipettes?)(?!\w)", _FLAGS)
 _SOFTWARE_NOUN = re.compile(
-    r"(?<!\w)(?:software|apps?|saas|portal|website|apis?|e-?commerce|banking\s+app|chatbot|web\s+app\w*)(?!\w)", _FLAGS)
+    r"(?<!\w)(?:software|apps?|applications?|webapps?|saas|portal|website|apis?|e-?commerce|banking\s+app|chatbot|"
+    r"web\s+app\w*|online\s+(?:store|shop))(?!\w)", _FLAGS)
 _CAMEL_AI = re.compile(r"[a-z]AI(?!\w)")            # product names such as 'SignalAI' (case-sensitive on purpose)
 # Financial or property products are not digital products: fund, REIT, trust, portfolio, ETF, property, mortgage...
 # A bank / insurer / super fund launching an APP or platform still matches _DIGITAL_PRODUCT first and counts as digital.
@@ -520,8 +521,11 @@ def _mentions(text: str, name: str) -> bool:
 
 # "agreement for X to acquire", "deal for X to buy", "allows X to acquire": X is the buyer, not the company named earlier.
 _THIRD_PARTY_SUBJECT = re.compile(
-    r"(?<!\w)(?:agreement|deal|offer|proposal|bid|approval|(?:allow|allows|allowed|allowing|enable|enables|enabling|permit|permits))"
-    r"\s+(?:for\s+)?(?P<subject>(?:(?!\bto\b)[^.;]){1,100}?)\s*$", _FLAGS)
+    r"(?<!\w)(?:(?:agreement|deal|offer|proposal|bid|approval)\s+for"
+    r"|allow|allows|allowed|allowing|enable|enables|enabling|permit|permits)"
+    r"\s+(?P<subject>(?:(?!\bto\b)[^.;]){1,100}?)\s*$", _FLAGS)
+# NOT third-party: 'agreement with Bigco to acquire X', 'approval from the ACCC to acquire X' (Bigco / the ACCC are
+# counterparties or regulators; the company named earlier is still the buyer).
 
 
 def ma_role(description: str, company_name: str) -> str:
@@ -1027,10 +1031,25 @@ _PRODUCT_NAME = re.compile(
     r"(?P<name>[A-Z][\w-]*(?:\s+[A-Z][\w-]*){0,3})")
 
 
+# Words that are not product names: places and generic nouns ('launches New Zealand expansion', 'launched Australian range').
+_NOT_A_NAME = frozenset(
+    "australia australian new zealand nz sydney melbourne brisbane perth adelaide canberra hobart darwin auckland "
+    "wellington christchurch queensland victoria tasmania asia pacific apac anz europe european uk us usa america "
+    "american north south east west global international regional national local expansion version range product "
+    "products service services platform solution solutions program programme offering offerings update upgrade "
+    "edition line series the its a an".split())
+
+
 def _product_name(text: str) -> str | None:
-    """The capitalised product name after a launch verb ('Catapult launches PerformanceHub 2'), lower-cased, else None."""
+    """The capitalised product name after a launch verb ('Catapult launches PerformanceHub 2'), lower-cased, else None.
+    Place and generic words (Australia, New Zealand, Sydney, expansion, range...) are not names and are dropped; if
+    nothing is left the answer is None. KNOWN LIMIT: a lower-case product name ('launches the pro tracker') has no
+    capital to find, so it is not matched by name (only by the first 60 characters of the text)."""
     m = _PRODUCT_NAME.search(text or "")
-    return m.group("name").lower() if m else None
+    if not m:
+        return None
+    kept = [t for t in m.group("name").split() if t.lower() not in _NOT_A_NAME]
+    return " ".join(kept).lower() if kept else None
 
 
 def _normalised_start(text: str) -> str:
@@ -1067,27 +1086,38 @@ def combined_strength(signals: list[Signal]) -> float:
 
     1. Same-deal M&A scoops and near-identical scoops (same first 60 characters, or the same product name within 14
        days) count once (dedupe_deals, dedupe_signals).
-    2. Only the MAX_COMBINED_SIGNALS (3) strongest signals take part; the rest add nothing.
-    3. The strongest counts in full. The best signal of each OTHER kind counts at COMBINE_DAMPING (0.5). Further signals
-       of a kind that already counted add at most SAME_KIND_EXTRA_EACH (0.15) each, SAME_KIND_EXTRA_TOTAL (0.30) in total.
+    2. Pick the best signal of each KIND. The strongest of those counts in full; the best of every other kind counts at
+       COMBINE_DAMPING (0.5).
+    3. Then further signals of a kind that already has a best add at most SAME_KIND_EXTRA_EACH (0.15) each,
+       SAME_KIND_EXTRA_TOTAL (0.30) in total.
+    4. Only the MAX_COMBINED_SIGNALS strongest counted entries (the best plus up to three others) are used; the rest
+       add nothing. Kind diversity is decided BEFORE this cap, so a different kind is never dropped just because several
+       same-kind signals are stronger.
     combined = 1 - (1 - best) * prod(1 - contribution). While the account has any real (non-intent) signal the best is
     chosen among those, so intent can only be a damped extra."""
     real = dedupe_signals(dedupe_deals(_real_signals(signals)))
-    dated = sorted((x for x in real if x.kind is not SignalKind.INTENT), key=_signal_sort_key)
-    intent = sorted((x for x in real if x.kind is SignalKind.INTENT), key=_signal_sort_key)
-    ordered = (dated + intent if dated else intent)[:MAX_COMBINED_SIGNALS]
-    if not ordered:
+    if not real:
         return 0.0
-    rest, seen_kinds, extras = 1.0, {ordered[0].kind}, 0.0
-    for sig in ordered[1:]:
-        if sig.kind in seen_kinds:
-            c = min(sig.strength, SAME_KIND_EXTRA_EACH, SAME_KIND_EXTRA_TOTAL - extras)
+    by_kind: dict[SignalKind, list[Signal]] = {}
+    for sig in sorted(real, key=_signal_sort_key):
+        by_kind.setdefault(sig.kind, []).append(sig)
+    leads = {k: v[0] for k, v in by_kind.items()}
+    dated = [x for k, x in leads.items() if k is not SignalKind.INTENT]
+    best = min(dated or leads.values(), key=_signal_sort_key)
+    contributions: list[float] = []
+    for k, lead in leads.items():
+        if lead is not best:
+            contributions.append(COMBINE_DAMPING * lead.strength)
+    extras = 0.0
+    for k, group in by_kind.items():
+        for sig in group[1:]:
+            c = min(sig.strength, SAME_KIND_EXTRA_EACH, max(0.0, SAME_KIND_EXTRA_TOTAL - extras))
             extras += c
-        else:
-            seen_kinds.add(sig.kind)
-            c = COMBINE_DAMPING * sig.strength
+            contributions.append(c)
+    rest = 1.0
+    for c in sorted(contributions, reverse=True)[:MAX_COMBINED_SIGNALS - 1]:
         rest *= 1.0 - c
-    return round(min(1.0, 1.0 - (1.0 - ordered[0].strength) * rest), 4)
+    return round(min(1.0, 1.0 - (1.0 - best.strength) * rest), 4)
 
 
 # ---------------------------------------------------------------- 3. no trigger
