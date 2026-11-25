@@ -1086,7 +1086,7 @@ def test_intent_counts_only_as_damped_other_in_combined():
     assert S.combined_strength([_sig(SignalKind.FUNDING, 0.16), _isig(0.3)]) == 0.286
     assert S.combined_strength([_isig(0.3)]) == 0.3
     # two intents, no real: best intent 0.3, the other damped
-    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.405     # same kind: extra capped at 0.15
+    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.37      # same kind: extra = min(0.5 * 0.2, 0.15)
 
 
 def test_intent_cannot_lift_combined_above_real_plus_damped_intent():
@@ -1635,7 +1635,7 @@ def test_funding_acquirer_of_company_on_ma_type_unaffected(config):
 
 # ------------------------------------------------------------ partnership
 def test_partnership_weights(config, accounts):
-    plain = one(config, "Partnership", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.", name="Beta Corp")
+    plain = one(config, "Partnership", "Beta Corp signs a sponsorship deal with Fin Co.", name="Beta Corp")
     assert plain.factor == pytest.approx(2 / 3) and plain.notes == (S.PARTNERSHIP_NOTE,)
     assert sig_for(config, plain, accounts).strength == 0.1696      # round(0.3 * 0.5 ** (5/21), 4) * 2/3
     rich = one(config, "Partnership", "Beta Corp partners with Fin Co to build a customer mobile app.", name="Beta Corp")
@@ -1843,7 +1843,7 @@ def test_dry_run_examples_through_the_radar(config):
         Scoop("2", "Z2", "Pickles Auctions", "Pickles Auctions to be acquired by EQT.", TODAY - timedelta(days=3), ("Funding",), ()),
         Scoop("3", "Z3", "Goodman Group", d, TODAY - timedelta(days=3), ("Mergers & Acquisitions (M&A)",), ()),
         Scoop("4", "Z4", "NEXTDC Ltd", d, TODAY - timedelta(days=3), ("Mergers & Acquisitions (M&A)",), ()),
-        Scoop("5", "Z5", "Beta Corp", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.", TODAY - timedelta(days=3), ("Partnership",), ()),
+        Scoop("5", "Z5", "Beta Corp", "Beta Corp signs a sponsorship deal with Fin Co.", TODAY - timedelta(days=3), ("Partnership",), ()),
     ]
     out = {e.account.name: e for e in S.trigger_radar(scoops, accts, config, TODAY, top_n=None)}
     assert out["Pickles Auctions"].signal.kind is SignalKind.MA                      # was scored as Funding
@@ -2099,8 +2099,8 @@ CATAPULT = [  # nine launch scoops for one fake company, strengths like the dry 
 
 def test_nine_launches_do_not_stack_towards_one():
     c = S.combined_strength(CATAPULT)
-    # repeated scoop counts once; best 0.59, then two same-kind extras at 0.15 each: 1 - 0.41 * 0.85 * 0.85 = 0.7038
-    assert c == 0.7038
+    # repeated scoop counts once; best 0.59; extras count min(0.5 * s, 0.15): 0.15, 0.135, then 0.015 (0.30 total)
+    assert c == 0.7031
     assert 0.59 < c < 0.75
 
 
@@ -2117,7 +2117,7 @@ def test_same_kind_extras_capped_each_and_in_total():
     sigs = [L(0.6, "a", "Alpha Co launched Alpha Hub."), L(0.5, "b", "Beta Co launched Beta Hub."),
             L(0.1, "c", "Gamma Co launched Gamma Hub.")]
     # extras: min(0.5, 0.15) = 0.15, then min(0.1, 0.15, 0.30 - 0.15) = 0.1
-    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.9, 4)
+    assert S.combined_strength(sigs) == round(1 - 0.4 * 0.85 * 0.95, 4)
 
 
 def test_only_the_strongest_counted_entries_count():
@@ -2450,7 +2450,7 @@ def test_one_signal_per_kind_scores_are_unchanged():
 
 
 def test_catapult_nine_launches_unchanged_by_the_new_order():
-    assert S.combined_strength(CATAPULT) == 0.7038
+    assert S.combined_strength(CATAPULT) == 0.7031
 
 
 def test_intent_is_never_best_even_with_the_new_order():
@@ -2462,7 +2462,7 @@ def test_new_kind_ranks_among_extras_by_contribution():
     sigs = [_sig(SignalKind.EXEC_MOVE, 0.9, src="e"), _sig(SignalKind.FUNDING, 0.1, src="f1"),
             _sig(SignalKind.FUNDING, 0.1, src="f2"), _sig(SignalKind.FUNDING, 0.1, src="f3")]
     # funding lead counts 0.05; extras 0.1 + 0.1; best + three others = all four entries
-    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.9 * 0.9, 4)
+    assert S.combined_strength(sigs) == round(1 - 0.1 * 0.95 * 0.95 * 0.95, 4)
 
 
 # ------------------------------------------------------------ (3) place words are not product names
@@ -2622,3 +2622,92 @@ def test_growth_percentages_do_not_make_a_minority_target():
 
 def test_percentage_of_with_the_stake_word_unchanged():
     assert S.classify_ma("Goodman Group to acquire a 9.9% stake in NEXTDC.", "NEXTDC Ltd")[:2] == ("target", 0.35)
+
+
+# ============================================================ Iren-shaped partnership stacking (third dry run): a score must not RISE
+def old_combined(strengths):
+    """The formula before the per-kind stacking rules: best in full, every other signal at 0.5."""
+    best, rest = max(strengths), 1.0
+    for x in sorted(strengths, reverse=True)[1:]:
+        rest *= 1 - 0.5 * x
+    return round(1 - (1 - best) * rest, 4)
+
+
+def partnership_trio(strengths=(0.29, 0.19, 0.19)):
+    return [Signal("A", SignalKind.PARTNERSHIP, st, f"p{i}", datetime(2026, 11, 20 - 8 * i, tzinfo=timezone.utc),
+                   f"Iren signs a customer contract number {i}.", "Z") for i, st in enumerate(strengths)]
+
+
+def test_three_same_kind_partnerships_do_not_score_above_the_old_formula():
+    sigs = partnership_trio()
+    assert old_combined([0.29, 0.19, 0.19]) == 0.4185
+    assert S.combined_strength(sigs) == 0.4185                    # was 0.487 (a +2.7 point rise at weight 40)
+
+
+def test_new_combined_never_exceeds_the_old_formula_property():
+    import itertools
+    kinds = [SignalKind.PARTNERSHIP, SignalKind.FUNDING, SignalKind.PRODUCT_LAUNCH, SignalKind.EXEC_MOVE]
+    vals = [0.05, 0.1, 0.19, 0.29, 0.45, 0.6, 0.9]
+    n = 0
+    for combo in itertools.product(range(len(kinds)), vals, vals, vals):
+        k, a, b, c = combo
+        sigs = [Signal("A", kinds[k], a, "a", None, "Alpha Co did Alpha one.", "Z"),
+                Signal("A", kinds[k], b, "b", None, "Beta Co did Beta two.", "Z"),
+                Signal("A", kinds[(k + 1) % 4], c, "c", None, "Gamma Co did Gamma three.", "Z")]
+        assert S.combined_strength(sigs) <= old_combined([a, b, c]) + 1e-9, combo
+        n += 1
+    assert n == 4 * 7 ** 3
+
+
+def test_same_kind_extras_never_count_more_than_half_their_strength():
+    sigs = partnership_trio((0.5, 0.19, 0.1))
+    assert S.combined_strength(sigs) == round(1 - 0.5 * (1 - 0.095) * (1 - 0.05), 4)
+
+
+def test_strong_extras_are_capped_at_0_15_each():
+    sigs = partnership_trio((0.9, 0.8, 0.7))
+    assert S.combined_strength(sigs) == pytest.approx(1 - 0.1 * 0.85 * 0.85, abs=1e-4)   # 0.5 * 0.8 and 0.5 * 0.7 both exceed 0.15
+
+
+# ------------------------------------------------------------ infrastructure / compute / ARR contracts are not partnerships
+@pytest.mark.parametrize("desc", [
+    "Iren signs $4bn ARR contracts for AI compute.", "Beta Corp signs an AI data-centre capacity deal worth $2 billion ARR.",
+    "Beta Corp secures a GPU supply agreement.", "Beta Corp signs a 200MW power purchase agreement.",
+    "Beta Corp signs a hyperscaler hosting contract.", "Beta Corp wins a take-or-pay offtake deal.",
+    "Beta Corp signs colocation contracts with a cloud provider.", "Beta Corp signs a multi-year compute deal.",
+])
+def test_infrastructure_contracts_are_dropped_as_partnerships(config, desc):
+    v = one(config, "Partnership", desc, name="Beta Corp")
+    assert not v.keep
+    assert v.reason == ("Dropped: infrastructure or capacity contract (compute, data centre, ARR, power), "
+                        "not a product partnership")
+
+
+@pytest.mark.parametrize("desc", [
+    "Beta Corp partners with Fin Co to build a customer mobile app on GPU compute.",
+    "Beta Corp signs a data-centre deal to host its digital platform for customers.",
+    "Beta Corp signs a software partnership with a cloud provider.",
+])
+def test_infrastructure_wording_with_product_words_is_kept(config, desc):
+    assert one(config, "Partnership", desc, name="Beta Corp").keep
+
+
+def test_plain_partnership_without_infra_words_still_kept_at_0_20(config):
+    v = one(config, "Partnership", "Beta Corp signs a sponsorship deal with Fin Co.", name="Beta Corp")
+    assert v.keep and v.factor == pytest.approx(2 / 3)
+
+
+def test_infrastructure_rule_only_applies_to_partnerships(config):
+    assert one(config, "Funding", "Beta Corp raised $50 million to expand data centre capacity.", name="Beta Corp").keep
+    assert one(config, "Product Launch", "Beta Corp launched a new cloud API for compute capacity.", name="Beta Corp").keep
+
+
+def test_infrastructure_words_are_whole_words():
+    assert not S._INFRASTRUCTURE_DEAL.search("Beta Corp signs a partnership on narrative, warrants and ironwork")
+    assert S._INFRASTRUCTURE_DEAL.search("a 50 MW deal") and S._INFRASTRUCTURE_DEAL.search("$4bn ARR contracts")
+
+
+@pytest.mark.parametrize("desc", ["Beta Corp signs a capacity agreement.", "Beta Corp signs a hyperscaler agreement.",
+                                  "Beta Corp signs a hosting agreement."])
+def test_each_infrastructure_word_works_on_its_own(config, desc):
+    assert not one(config, "Partnership", desc, name="Beta Corp").keep

@@ -479,6 +479,12 @@ _EQUITY = re.compile(r"(?<!\w)(?:equity|series\s+[a-f]|seed|venture|ipo|private\
 # Rumour wording on an M&A scoop.
 _RUMOUR = re.compile(r"(?<!\w)(?:reportedly|in\s+talks|rumou?r\w*|understood\s+to|said\s+to|considering|exploring|eyeing|weighing|approach\w*)(?!\w)", _FLAGS)
 
+# Compute / capacity / ARR contracts ('AI compute contracts', '$4bn ARR contracts', data-centre capacity, power supply)
+# are infrastructure supply deals, not partnerships a Pendo buyer would care about: dropped unless the text also has
+# product / digital / customer wording (_PARTNERSHIP_WORDS).
+_INFRASTRUCTURE_DEAL = re.compile(
+    r"(?<!\w)(?:compute|gpus?|data[\s-]?cent(?:re|er)s?|capacity|megawatts?|mw|arr|annual\s+recurring\s+revenue|"
+    r"colocation|co-location|hyperscal\w*|power\s+purchase|offtake|take-or-pay|contracted\s+revenue|hosting)(?!\w)", _FLAGS)
 # Partnership: product / digital / customer wording makes it worth 0.30, otherwise 0.20. Deliberately narrow:
 # 'AI', 'data', 'cloud', 'infrastructure' alone do not count (an AI data-centre capacity deal is not a Pendo trigger).
 _PARTNERSHIP_WORDS = re.compile(
@@ -798,6 +804,8 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
     if kind is SignalKind.PARTNERSHIP:
         if _PARTNERSHIP_WORDS.search(desc):
             return _J(True)
+        if _INFRASTRUCTURE_DEAL.search(desc):
+            return _J(False, "infrastructure or capacity contract (compute, data centre, ARR, power), not a product partnership")
         return _J(True, PARTNERSHIP_NOTE, factor=PARTNERSHIP_NO_PRODUCT_WEIGHT / KIND_BASE_WEIGHT[kind],
                   notes=(PARTNERSHIP_NOTE,))
     return _J(True)
@@ -1128,7 +1136,8 @@ def combined_strength(signals: list[Signal]) -> float:
     extras = 0.0
     for k, group in by_kind.items():
         for sig in group[1:]:
-            c = min(sig.strength, SAME_KIND_EXTRA_EACH, max(0.0, SAME_KIND_EXTRA_TOTAL - extras))
+            # at most the damped value (never more than the old formula gave) and at most the per-extra / total caps
+            c = min(COMBINE_DAMPING * sig.strength, SAME_KIND_EXTRA_EACH, max(0.0, SAME_KIND_EXTRA_TOTAL - extras))
             extras += c
             contributions.append(c)
     rest = 1.0
