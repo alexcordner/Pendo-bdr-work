@@ -130,7 +130,7 @@ def test_dnc_call_external_to_unresolved_prospect_id_is_invisible(tmp_path):
     txt = Path(r.log_path).read_text()
     print([l for l in txt.splitlines() if "NK-UNRESOLVED-1" in l or "do-not-call" in l.lower() or "unresolved" in l.lower()][:8])
     st = json.loads((tmp_path / "s" / "state.json").read_text())
-    assert "NK-UNRESOLVED-1" in st.get("dnc_prospect_ids", [])
+    assert "nk-unresolved-1" in [x.lower() for x in st.get("dnc_prospect_ids", [])]
 
 
 def test_shared_phone_two_contacts_dnc_by_phone_blocks_both_not_wrong_one(tmp_path):

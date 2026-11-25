@@ -228,3 +228,50 @@ Read-only rules are at the top (§0); credit-spending tools are named; every spi
 
 ## Final: PASS WITH FIXES
 Blocking Phase 3 (not the dry run): **N2**, **N3**. Should fix with them: N1, N4. Nice to have: N5-N8.
+
+---
+
+# Round 3: narrow re-review of `phase2/2a-fixes` (`2e5d58a`, from `main` `e9d478f`)
+
+Offline, read-only, synthetic. `phase2/2a-fixes` conflicts with this branch (add/add in `fetch_runbook.md`, `intake_schema.md`, two test files), so it was reviewed in a detached worktree of `2e5d58a` with my scratch tests copied in, NOT merged here. New scratch tests: `tests/test_review_2a_round3.py` (skips itself on this branch because it needs the new code); `tests/test_review_2a_round2.py` updated for case-insensitive DNC ids.
+
+## Verdict: PASS WITH FIXES (no safety defect; one operational blocker for the live gate, three small fixes)
+
+`pytest` in the worktree: 2084 passed (plain and `-W error` identical; the 1 earlier failure was my own test asserting a case-sensitive DNC id, since fixed). On this branch (no worker changes): all pass, round-3 file skipped.
+
+## N1-N8
+
+| # | Status | Evidence / attacks |
+|---|---|---|
+| N1 manifest checks | FIXED | `merge_pages.derive_last_page` + `_ascending` + `--expect-pages`. Attacks, all rejected with exit 2: Nooks `next=null` in the middle, same terminal page twice, duplicated page, reordered pages, overlapping boundary row; Salesforce short middle page, duplicated pages; ZoomInfo changing `totalResults` or `page.total`; `--expect-pages` mismatch for Nooks, SF and ZoomInfo. Correct results: exactly-2000 SF last page → False; 2000 + empty page → True; ZoomInfo gap / missing page → False; two complete types → True. **Residual:** a missing middle page with FULL neighbours is only caught by `--expect-pages` (the runbook says "always pass it": good, but it is optional in code; consider requiring it for `--derive-last-page`) |
+| N2 untied recent calls | FIXED, but see **O1** | `intake.untied_recent_calls`, `MAX_UNTIED_RECENT_SHARE = 0.05` (blocks only when strictly above). Boundaries: a call exactly 14 d old counts, 14 d + 1 s does not; future-dated calls count as recent (harmless); zero recent calls → share 0 (passes); exactly 5/100 → passes, 6/101 → blocked; prospect id with no account → untied; phone on two prospects → untied. |
+| N3 Gmail coverage | FIXED | `address_hash`, `gmail_uncovered`, `scripts/gmail_queue.py`; live refused while any ranked prospect with an email is uncovered (`pipeline.py`, `stop(... LiveRefused)`). |
+| N4 DNC unmatched | FIXED | log line `DNC calls not matched to any contact: N` and `PHASE3_PRECONDITIONS` (see below) |
+| N5 cursor wording | FIXED | runbook §4 and §7b: `page_after`, value = quoted cursor from `hint` or URL-decoded `page[after]`. Matches the probe fixture hint ("Call `listCalls` again with `page_after` set to ..."). The probe notes themselves never name the parameter; the hint text is the evidence |
+| N6 newest tag wins | FIXED | `parse_sheet_tag` uses `finditer`, newest date |
+| N7 phone inference | unchanged (accepted, Low) | |
+| N8 allow-list | FIXED, one slip | runbook §0 allow-list. **Remove `search_companies` from it** (O3): §6 says "do not call `search_companies`" and the allow-list says it is permitted |
+
+## Specific questions
+
+**N3 hashing.** `sha256("<salt>:<dotless lowercase address>")[:32]` with the public default salt `apac-callsheet-v1` is NOT secrecy: anyone with a guessable address list (first.last@company) can confirm membership by hashing it (`test_hash_and_normalisation` shows a guess matches). It only serves coverage matching and keeps raw addresses out of `gmail_sent.json` meta (an `@` in a hash is a load error: tested) and out of the log (no address in a world run: tested). Treat the hash file as sensitive-as-the-addresses-are-guessable, and keep it in `output/`. Normalisation: case and dots are ignored, a `+tag` is kept (so `jane.doe+news@x` equals `janedoe+news@x` but not `janedoe@x`): fine, since the search uses the real address. Dots-ignored also merges `a.b@corp.com` with `ab@corp.com`: for corporate domains these can be two people; a false "covered" is possible but the chance is negligible. Backfills: coverage is recomputed on each run from the final ranked set, so a replaced prospect is flagged until searched (round loop in §7e works). Prospects without an email are counted separately and never block.
+
+**`gmail_queue.py` hygiene.** Prints counts only; `queue` writes no state or log (verified: no state dir created). But: (a) the output file is mode **0644** (world-readable inside the container); (b) `--out` accepts ANY path: I wrote the address list into `docs/` (a tracked directory) without a complaint. **O2 (Medium):** refuse any `--out` outside `output/` (or require the path to be gitignored via `git check-ignore`) and create the file with mode 0600. The same applies to `recent_call_ids.py` (ids only, uuids, lower risk).
+
+**N1 lexicographic ids (risk of false rejection).** The check compares ids as Python strings. Lower-case UUIDs sort identically to Postgres' byte order, and my tests pass for them; mixed case (`0B` vs `0a`) and Salesforce ids with mixed-case 15-character values (lower- vs upper-case ordering) are rejected. Whether real Nooks pages are lexicographically ascending and how Salesforce orders mixed-case Ids is UNVERIFIED (the probe says "ascending by call id" only). A false rejection fails safe (exit 2, nothing written, live impossible) but would stall every run. **Recommendation:** make duplicate detection order-agnostic (a set of ids across the manifest rejects duplicated or overlapping pages regardless of ordering) and replace strict ascending by cursor continuity: decode each non-final Nooks `links.next` cursor (base64 `{"id": ...}`) and require it to equal the last row id of that page; keep strict ascending only behind `--strict-order`. Keep `--expect-pages` as the real guard for gaps.
+
+**Runbook §5 and §7e as the executing session.** Executable and unambiguous: exact parameters, the snippets and scripts print counts or one cursor only, the 25-id batches are small, and the loop (dry run → queue → search → hashes → merge → re-run) is clear. Addresses enter the session's context for the search (stated openly). The `--also` flag in the example command works on the first round too (a missing file is skipped), though the text says to omit it. Estimate 65-110 calls remains plausible; the tie-out step adds ≤ 4 calls (≤ 100 ids / 25).
+
+**Phase 3 preconditions text (`pipeline.PHASE3_PRECONDITIONS`, log section and `--live` output).** Contains two items: the Nooks-id DNC/opt-out re-check and Gmail coverage. **Incomplete (O4, Low):** the owner id from `getMe` passed as `expected_owner_id` (documented in `docs/callsheet_notes.md:58`, enforced by `prepare_task`), refusal of dry-run payloads, tasks only for `ranked` (never `spilled` / `needs_prospect` / `skipped`), and `record_sheet` only after the writes succeed are not in the log text a Phase 3 session will actually read. Add them (one line each, pointing at `callsheet`).
+
+## New findings
+
+- **O1 (Medium-High, operational): the 5% gate can be unsatisfiable.** A recent call whose prospect id resolves to a Lead (`crmId` `00Q...`) or to a Contact outside Alex's book (or a null account) can never get a Salesforce account, yet `untied_recent_calls` counts it as untied. Repro `test_calls_to_resolved_lead_or_non_book_prospects_still_count_as_untied`: 3 calls on Lead-typed prospects, 3 of 5 recent calls untied, live blocked, and fetching the prospects (the runbook's remedy) does not change that. The probe says ~1/5 of Nooks prospects have a null account and many are Leads. Fails safe, but may stall every live run. Fix: after the resolve step, classify a call whose prospect resolved to a non-book / Lead record as "resolved, not in book" (cannot cool down a book account, so excluded from the threshold, still logged), and threshold only on ids that are still unresolved or resolved to a book Contact lacking an account.
+- **O5 (Low):** calls with no prospect and no usable number are excluded from the share by design. That is reasonable (nothing can tie them) but 19% of calls look like this; log their share of recent calls and warn above, say, 25%, so a mass of manual dials is visible rather than silent. With 100% of calls `external` the gate passes (`test_all_external_does_not_block`).
+- **O6 (Low):** a 5% tolerance is about 20+ calls out of ~450 in 14 days; the cooldown that matters most is the 3-day one. Consider also requiring 0 untied calls in the last `cooldown_days_no_answer` days (small numbers, so cheap to resolve).
+
+## Leftover judgement calls
+Unchanged from round 2: all five worker decisions, F13 and the `not_anz` cap remain acceptable. "Unlinkable" `external` calls not counted against the threshold: acceptable with O5.
+
+## FINAL: PASS WITH FIXES
+Safe to keep running the live DRY RUN and to start Phase 3 design. Before the first live write: O1 (else the gate may never open), O2 (address-file path/mode), O3 (`search_companies` in the allow-list), O4 (precondition text). Optional: order-agnostic duplicate check instead of strict ascending, `--expect-pages` mandatory, O5/O6.
