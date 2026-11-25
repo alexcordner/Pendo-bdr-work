@@ -1887,3 +1887,193 @@ def test_same_deal_text_thresholds():
     assert not S._same_deal_text("Alpha Bravo Charlie Delta Echo went ahead.", "Alpha Bravo Xray Yankee Zulu went ahead.")
     assert not S._same_deal_text("Nextdc Reuters said.", "Nextdc said.")            # one shared token is not enough
     assert S._same_deal_text("Goodman Group buys 9.9% of NEXTDC.", "Goodman Group acquires a 9.9% stake in NEXTDC.")
+
+
+# ============================================================ phase 2 addendum: debt, funds, promotions, rumours
+# ------------------------------------------------------------ (a) debt funding
+@pytest.mark.parametrize("desc", [
+    "AirTrunk has secured $2.99 billion in Debt funding. Investors included Banco Santander.",
+    "Example Co secured a $50 million credit facility.", "Example Co closed a $20 million term loan.",
+    "Example Co issued $100 million of senior notes.", "Example Co raised $200 million in bonds.",
+    "Example Co secured a revolving credit line.", "Example Co completed a debt refinancing.",
+])
+def test_debt_funding_is_quarter_weight(config, accounts, desc):
+    v = one(config, "Funding", desc, name="AirTrunk")
+    assert v.keep and v.kind is SignalKind.FUNDING and v.notes == (S.DEBT_NOTE,)
+    assert v.reason == "Kept: Funding, debt facility, not an equity round, 5 days ago"
+    assert sig_for(config, v, accounts).strength == 0.212                 # 0.25 * 0.5 ** (5/21)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co secured $5 million in funding.", "Example Co raised $20 million in a Series B round.",
+    "Example Co closed a seed round.", "Example Co raised $30 million of venture capital.",
+    "Example Co secured a $50 million credit facility and Series A equity.",
+    "Example Co raised $40 million in growth equity.",
+])
+def test_equity_rounds_keep_full_funding_weight(config, accounts, desc):
+    v = one(config, "Funding", desc)
+    assert v.keep and v.notes == () and v.factor == 1.0
+    assert sig_for(config, v, accounts).strength == 0.5087                # 0.6 * 0.5 ** (5/21)
+
+
+def test_debt_funding_fades_below_the_floor_after_27_days(config):
+    assert judge(config, desc="Example Co secured a $50 million credit facility.", days=27).keep
+    v = judge(config, desc="Example Co secured a $50 million credit facility.", days=28)
+    assert not v.keep and "faded below floor" in v.reason
+
+
+def test_debt_wording_is_whole_word(config):
+    assert one(config, "Funding", "Example Co raised $10 million from a loanee network.").factor == 1.0
+    assert one(config, "Funding", "Example Co secured funding for its notesbook app.").factor == 1.0
+
+
+# ------------------------------------------------------------ (b) fund / property launches
+@pytest.mark.parametrize("desc", [
+    "Charter Hall has announced the launch of the Charter Hall Convenience Retail Fund.",
+    "Example Co launches a new REIT.", "Example Co launched a listed property trust.",
+    "Example Co launched a new ETF.", "Example Co launched a new mortgage product.",
+    "Example Co launched a home loan for first buyers.", "Example Co launched a new insurance policy.",
+    "Example Co launches a managed portfolio.",
+])
+def test_financial_or_property_launch_is_discounted(config, accounts, desc):
+    v = one(config, "Product Launch", desc)
+    assert v.keep and v.notes == (S.FINANCIAL_LAUNCH_NOTE,) and v.factor == 0.25
+    assert v.reason == "Kept: Product Launch, financial or property product launch, not a digital product, 5 days ago"
+    assert sig_for(config, v, accounts).strength == 0.1696                # round(0.8 * 0.5 ** (5/21), 4) * 0.25
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Bank launched a new banking app for its funds customers.",
+    "Example Insurer launches a digital insurance platform.",
+    "Example Super launched a member portal for its fund.",
+    "Example Co launched an online mortgage tool.",
+])
+def test_bank_or_fund_launching_a_digital_product_stays_full_weight(config, desc):
+    v = one(config, "Product Launch", desc)
+    assert v.factor == 1.0 and v.notes == ()
+
+
+def test_physical_launch_without_financial_words_stays_at_0_40(config):
+    assert one(config, "Product Launch", "Example Co launched lab consumables.").factor == 0.5
+
+
+# ------------------------------------------------------------ (c) digital launches named in the dry run
+@pytest.mark.parametrize("desc", [
+    "Ai-Media launch of Lexi Access, a new solution targeting higher education.",
+    "Atturra SignalAI, an AI-powered product.", "Atturra launched SignalAI.",
+    "Example Co launched a new workplace technology.",
+])
+def test_named_dry_run_digital_launches_keep_full_weight(config, desc):
+    v = one(config, "Product Launch", desc)
+    assert v.factor == 1.0 and v.notes == ()
+
+
+def test_camel_case_ai_is_case_sensitive():
+    assert S._CAMEL_AI.search("SignalAI") and not S._CAMEL_AI.search("Maintain the rail") and not S._CAMEL_AI.search("Saia")
+
+
+# ------------------------------------------------------------ (d) C-suite promotions
+@pytest.mark.parametrize("desc", [
+    "One New Zealand Group has promoted from Chief Financial Officer to the role of CEO.",
+    "Example Co's Jane promoted from Chief Operating Officer to CEO.",
+    "Example Co's Jane moves from Chief Financial Officer to Managing Director.",
+    "Example Co's Jane has moved from the role of CFO to the role of CEO.",
+])
+def test_csuite_promotion_without_a_buyer_role_dropped(config, desc):
+    v = one(config, "Executive Move", desc, days=86)
+    assert not v.keep and v.reason.startswith("Dropped: C-suite move from") and "buyer role" in v.reason
+
+
+def test_csuite_promotion_reason_literal(config):
+    v = one(config, "Executive Move", "One New Zealand Group promoted from Chief Financial Officer to the role of CEO.", days=86)
+    assert v.reason == ("Dropped: C-suite move from 'Chief Financial Officer' to 'CEO': "
+                        "neither the new nor the vacated role is a buyer role")
+
+
+def test_promotion_into_a_buyer_role_counts(config):
+    v = one(config, "Executive Move", "Example Co's Sam moved from Head of Marketing to Chief Digital Officer.")
+    assert v.keep and v.reason == "Kept: Executive Move, new role 'Chief Digital Officer', 5 days ago"
+
+
+def test_promotion_out_of_a_buyer_role_vacates_it(config):
+    v = one(config, "Executive Move", "Example Co's Jane moves from Chief Technology Officer to CEO.")
+    assert v.keep and v.reason == "Kept: Executive Move, vacated role 'Chief Technology Officer', new leader likely, 5 days ago"
+
+
+def test_promotion_with_start_date(config):
+    v = one(config, "Executive Move",
+            "Example Co's Sam promoted from Head of Marketing to Chief Digital Officer, effective 1 November.", days=30)
+    assert v.keep and v.event_date == datetime(2026, 11, 1, tzinfo=timezone.utc) and "started 24 days ago" in v.reason
+
+
+def test_role_inside_a_promotion_sentence_is_not_taken_from_the_other_text(config):
+    # the company name contains 'Digital' but neither role is a buyer role
+    v = one(config, "Executive Move", "Example Digital Group promoted Jane from Chief Financial Officer to CEO.")
+    assert not v.keep
+
+
+# ------------------------------------------------------------ (e) rumoured acquisitions
+def test_rumoured_acquirer_is_half_the_acquirer_weight(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "SG Fleet is reportedly in talks to acquire FleetPartners.", name="SG Fleet")
+    assert v.keep and v.factor == 0.5 and S.RUMOUR_NOTE in v.notes
+    assert v.reason == ("Kept: Mergers & Acquisitions (M&A), acquirer of a digital business or a full acquisition; "
+                        "reported talks, not a confirmed deal, 5 days ago")
+    assert sig_for(config, v, accounts).strength == 0.2119                # 0.25 * 0.5 ** (5/21)
+
+
+def test_confirmed_acquirer_is_not_halved(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "SG Fleet agreed to acquire FleetPartners.", name="SG Fleet")
+    assert v.factor == 1.0 and v.notes == ()
+
+
+def test_rumoured_minority_acquirer_stacks(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Gamma Group is reportedly in talks to take a 9.9% stake in NEXTDC.", name="Gamma Group")
+    assert v.factor == 0.25 and v.notes == (S.MA_MINORITY_NOTE, S.RUMOUR_NOTE)
+
+
+@pytest.mark.parametrize("word", ["reportedly", "in talks", "rumoured", "understood to", "considering", "exploring"])
+def test_rumour_words(config, word):
+    d = f"SG Fleet is {word} to acquire FleetPartners." if word != "in talks" else "SG Fleet is in talks to acquire FleetPartners."
+    assert one(config, "Mergers & Acquisitions (M&A)", d, name="SG Fleet").factor == 0.5
+
+
+def test_rumoured_target_keeps_target_weight(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "SG Fleet is reportedly in talks to acquire FleetPartners.", name="FleetPartners Group")
+    assert v.factor == 1.0 and v.notes == ()           # documented: the rumour discount applies to the acquirer only
+
+
+# ------------------------------------------------------------ (f) FleetPartners / SG Fleet and Goodman / NEXTDC pairs
+def test_fleet_pair_is_the_same_deal(config):
+    d = "SG Fleet is reportedly in talks to acquire FleetPartners."
+    sa = Scoop("F-1", "ZS", "SG Fleet Group", d, TODAY - timedelta(days=5), ("Mergers & Acquisitions (M&A)",), ())
+    sb = Scoop("F-2", "ZF", "FleetPartners Group", d, TODAY - timedelta(days=5), ("Mergers & Acquisitions (M&A)",), ())
+    va, vb = S.filter_scoops([sa, sb], config, TODAY)
+    assert va.same_deal_as == ("FleetPartners Group",) and vb.same_deal_as == ("SG Fleet Group",)
+    assert va.reason.endswith("; same deal as FleetPartners Group") and vb.reason.endswith("; same deal as SG Fleet Group")
+    assert (va.factor, vb.factor) == (0.5, 1.0)
+
+
+def test_fleet_pair_with_different_wording(config):
+    sa = Scoop("F-1", "ZS", "SG Fleet Group", "SG Fleet is reportedly in talks to acquire FleetPartners.", TODAY - timedelta(days=5),
+               ("Mergers & Acquisitions (M&A)",), ())
+    sb = Scoop("F-2", "ZF", "FleetPartners Group", "FleetPartners has received an approach from SG Fleet.", TODAY - timedelta(days=5),
+               ("Mergers & Acquisitions (M&A)",), ())
+    va, vb = S.filter_scoops([sa, sb], config, TODAY)
+    assert va.same_deal_as and vb.same_deal_as
+
+
+def test_promotion_between_two_buyer_roles_reports_the_new_role(config):
+    v = one(config, "Executive Move", "Example Co's Jo moves from Chief Technology Officer to Chief Digital Officer.")
+    assert v.keep and v.reason == "Kept: Executive Move, new role 'Chief Digital Officer', 5 days ago"
+
+
+def test_signal_notes_for_debt_fund_and_rumour(config, accounts):
+    d = sig_for(config, one(config, "Funding", "Example Co secured a $50 million credit facility."), accounts)
+    f = sig_for(config, one(config, "Product Launch", "Example Co launches a new property trust."), accounts)
+    r = sig_for(config, one(config, "Mergers & Acquisitions (M&A)", "SG Fleet is reportedly in talks to acquire FleetPartners.", name="SG Fleet"), accounts)
+    assert S.signal_notes(d) == [S.DEBT_NOTE] and S.signal_notes(f) == [S.FINANCIAL_LAUNCH_NOTE]
+    assert S.signal_notes(r) == [S.RUMOUR_NOTE]
+
+
+def test_solution_and_technology_count_as_digital(config):
+    assert one(config, "Product Launch", "Example Co launched a new solution for universities.").factor == 1.0

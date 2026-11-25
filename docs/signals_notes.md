@@ -6,12 +6,12 @@ Module: `src/signals.py`. Offline, deterministic, no LLM. Tests: `tests/test_sig
 | Kind | Base weight | Variants (multiplier on the base, shown as a note) | Half-life (days) |
 |---|---|---|---|
 | exec_move | 0.90 | role ambiguous x0.7 | 45 |
-| product_launch | 0.80 | physical or unclear launch: 0.40 (x0.5) | 21 |
+| product_launch | 0.80 | physical or unclear launch: 0.40 (x0.5); fund / property / financial product launch: 0.20 (x0.25) | 21 |
 | project_pain | 0.80 | | 21 |
 | new_hire | 0.65 | role ambiguous x0.7 | 45 |
-| funding | 0.60 (was 0.70) | | 21 |
+| funding | 0.60 (was 0.70) | debt facility / loan / bond / credit line: 0.25 | 21 |
 | hiring_plan | 0.55 | | 21 |
-| ma | 0.50 (was 0.60) | target 0.50; acquirer of a digital business or a full acquisition 0.50; acquirer of a minority stake or unrelated business 0.25; direction unclear 0.25 | 21 |
+| ma | 0.50 (was 0.60) | target 0.50; acquirer of a digital business or a full acquisition 0.50; acquirer of a minority stake or unrelated business 0.25; direction unclear 0.25; acquirer in reported talks x0.5 of the acquirer weight | 21 |
 | partnership | 0.30 (was 0.45) | without product / digital / customer words: 0.20 | 21 |
 | intent (UNVERIFIED) | 0.30, cap 0.30 | | 21 |
 
@@ -32,6 +32,11 @@ First real dry run: 648 scoops, 258 kept, 20 ranked accounts with a trigger. Exa
 - **Exec moves:** a role holder who LEFT is a valid trigger (a new leader is coming): 'CTO left to join another org', 'Interim Chief Digital Officer leaving', 'Head of Product has resigned' are kept with 'role ... vacated, new leader likely'. A departure is vacated only if the text names no incoming leader (joins, appointed, named, hired, replaces, successor...). A bare CEO departure is still dropped (no buyer role). The 'former X' background rule is unchanged: 'a former CIO of a rival lender' is not a vacancy.
 - **Incoming start date:** 'effective 1 December', 'will start on 15 October', 'starting December 1, 2026', 'from 2026-12-01' (needs a hint word such as joins, starts, effective, appointed in the same sentence). A past start date is the age basis and the signal's `source_date` (reason 'started N days ago'), and it can rescue a scoop published beyond the 90-day limit. A future start date counts as age 0 and `source_date` stays the publish date. A year-less date takes the publish year, or the next year when that would be more than 60 days before publication. Applies to Executive Move / New Hire only.
 - **Evidence notes:** `Signal.evidence` may end with ` (note)` groups: role ambiguous, physical or unclear product launch, acquirer of a minority stake or unrelated business, M&A direction unclear, partnership without product words, same deal as X. `signal_notes(signal)` lists them; `is_ambiguous(signal)` is the role flag. The description is shortened so evidence plus notes stays within 280 characters.
+- **Debt funding:** wording such as debt, loan, credit facility / line, notes, bonds, debenture, revolving, refinancing, borrowing, facility makes a Funding scoop 0.25 with 'debt facility, not an equity round', unless equity wording (equity, Series A-F, seed, venture, IPO, private placement) is also present. 'secured $ in funding' with no debt words stays 0.60. Debt funding hits the floor after day 27.
+- **Fund / property launches:** after the digital check fails, fund / REIT / trust / portfolio / ETF / property / mortgage / insurance policy or product / loan product / home loan / term deposit / annuity wording makes a launch 0.20 (x0.25 of 0.80) with 'financial or property product launch, not a digital product'. A bank, insurer or super fund launching an app, platform, portal, online tool still counts as digital (the digital check runs first). Digital words now also include 'solution(s)', 'technology' and CamelCase product names ending in AI ('SignalAI'); 'a new solution targeting higher education' is full weight. Limit: 'cleaning solution' also reads as digital.
+- **C-suite promotions:** 'promoted / moves / moved / elevated from X to (the role of) Y' judges the NEW role (Y) and the VACATED role (X) separately, never the rest of the sentence. If neither is a buyer role the scoop is dropped ('C-suite move from 'Chief Financial Officer' to 'CEO': neither the new nor the vacated role is a buyer role'). New role a buyer role: kept ('new role ...'); only the vacated role a buyer role (CTO to CEO): kept as a vacancy ('vacated role ..., new leader likely'). If both are buyer roles the new role is reported.
+- **Rumoured deals:** reportedly, in talks, rumoured, understood to, said to, considering, exploring, eyeing, weighing, approach make the ACQUIRER half weight (0.25 for a full acquisition, 0.125 for a minority stake) with 'reported talks, not a confirmed deal'. The target keeps 0.50: the rumour discount is applied to the acquirer only, as asked; the target of a rumoured deal is just as uncertain, so this is a judgement call to revisit. Sellers ('to sell', 'divests') have no rule yet and read as unclear.
+- **Real-data calibration (dry run):** of 118 M&A scoops about 46 acquirer, 51 target, 6 seller, 15 unclear; of 45 funding scoops 44 are recipients.
 - **Known limits:** M&A role needs the company named in the text; ZoomInfo scoops attached to a parent or alias name will read 'unclear' (0.25). Deal-pair detection only compares scoops in the same batch, and needs shared names or figures. The sector word lists are plain regex and will miss unseen wording. Intent is unchanged.
 
 ### Age limits and floor

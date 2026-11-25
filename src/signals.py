@@ -44,6 +44,9 @@ KIND_BASE_WEIGHT: dict[SignalKind, float] = {
 #: M&A: 0.50 target, 0.50 acquirer of a digital business or a full acquisition, 0.25 acquirer of a minority stake or an
 #: unrelated business, 0.25 direction unclear. Partnership: 0.30, or 0.20 without product / digital / customer words.
 LAUNCH_NON_DIGITAL_WEIGHT = 0.40
+LAUNCH_FINANCIAL_WEIGHT = 0.20      # property / fund / financial product launch (0.25 x 0.8)
+FUNDING_DEBT_WEIGHT = 0.25          # debt facility, loan, bond, credit line: not a growth round
+MA_RUMOUR_FACTOR = 0.5              # 'reportedly in talks to acquire': x0.5 of the acquirer weight
 MA_MINORITY_OR_UNRELATED_WEIGHT = 0.25
 MA_UNCLEAR_WEIGHT = 0.25
 PARTNERSHIP_NO_PRODUCT_WEIGHT = 0.20
@@ -389,6 +392,9 @@ MA_ACQUIRER_FULL_NOTE = "acquirer of a digital business or a full acquisition"
 MA_MINORITY_NOTE = "acquirer of a minority stake or unrelated business"
 MA_UNCLEAR_NOTE = "M&A direction unclear: check the deal"
 PARTNERSHIP_NOTE = "partnership without product, digital or customer words: check relevance"
+DEBT_NOTE = "debt facility, not an equity round"
+FINANCIAL_LAUNCH_NOTE = "financial or property product launch, not a digital product"
+RUMOUR_NOTE = "reported talks, not a confirmed deal"
 SAME_DEAL_PREFIX = "same deal as "
 
 
@@ -437,7 +443,20 @@ class _J(NamedTuple):
 _DIGITAL_PRODUCT = re.compile(
     r"(?<!\w)(?:apps?|platforms?|software|digital|mobile|portal|online|website|web|saas|ai|artificial\s+intelligence|"
     r"cloud|api|apis|customer\s+experience|cx|ux|e-?commerce|banking\s+app|internet\s+banking|self-service|"
-    r"dashboard|chatbot|login|subscription\s+service)(?!\w)", _FLAGS)
+    r"dashboard|chatbot|login|subscription\s+service|solutions?|technology)(?!\w)", _FLAGS)
+_CAMEL_AI = re.compile(r"[a-z]AI(?!\w)")            # product names such as 'SignalAI' (case-sensitive on purpose)
+# Financial or property products are not digital products: fund, REIT, trust, portfolio, ETF, property, mortgage...
+# A bank / insurer / super fund launching an APP or platform still matches _DIGITAL_PRODUCT first and counts as digital.
+_FINANCIAL_PRODUCT = re.compile(
+    r"(?<!\w)(?:funds?|reits?|trusts?|portfolios?|etfs?|propert(?:y|ies)|mortgages?|insurance\s+(?:policy|policies|product)|"
+    r"loan\s+products?|home\s+loans?|term\s+deposits?|superannuation\s+product|annuit(?:y|ies))(?!\w)", _FLAGS)
+# Funding: debt wording means a facility, not a growth round, unless equity wording is also present.
+_DEBT = re.compile(
+    r"(?<!\w)(?:debt|loans?|credit\s+(?:facilit\w+|lines?)|credit|(?:senior\s+|convertible\s+|secured\s+)?notes|bonds?|"
+    r"debentures?|revolving|refinanc\w+|borrowing|facilit(?:y|ies)|mortgage)(?!\w)", _FLAGS)
+_EQUITY = re.compile(r"(?<!\w)(?:equity|series\s+[a-f]|seed|venture|ipo|private\s+placement|pre-ipo|growth\s+round)(?!\w)", _FLAGS)
+# Rumour wording on an M&A scoop.
+_RUMOUR = re.compile(r"(?<!\w)(?:reportedly|in\s+talks|rumou?r\w*|understood\s+to|said\s+to|considering|exploring|eyeing|weighing|approach\w*)(?!\w)", _FLAGS)
 
 # Partnership: product / digital / customer wording makes it worth 0.30, otherwise 0.20. Deliberately narrow:
 # 'AI', 'data', 'cloud', 'infrastructure' alone do not count (an AI data-centre capacity deal is not a Pendo trigger).
@@ -454,7 +473,7 @@ _DEAL_PASSIVE = re.compile(
 _DEAL_ACTIVE = re.compile(
     r"(?<!\w)(?:(?:to\s+)?acquire|acquires|acquired|acquiring|(?:to\s+)?buy|buys|bought|(?:to\s+)?purchase|purchases|"
     r"(?:to\s+)?take\s+over|takes\s+over|snaps?\s+up|"
-    r"(?:(?:to\s+)?takes?|taking|(?:has\s+)?taken|took)\s+(?:an?\s+)?(?:\w+\s+)?stake\s+in|"
+    r"(?:(?:to\s+)?takes?|taking|(?:has\s+)?taken|took)\s+(?:an?\s+)?(?:\S+\s+)?stake\s+in|"
     r"(?:takeover|acquisition|buyout)\s+(?:bid\s+|offer\s+)?(?:of|for))(?!\w)", _FLAGS)
 # Funding scoops that are really "X is being acquired" (ZoomInfo types them Funding): reclassified as M&A.
 _TARGET_WORDING = _DEAL_PASSIVE
@@ -613,6 +632,13 @@ def incoming_start_date(description: str, published: datetime) -> datetime | Non
     return None
 
 
+# 'promoted from Chief Financial Officer to the role of CEO', 'moves from CTO to CEO'
+_TRANSITION = re.compile(
+    r"(?<!\w)(?:promoted|moves?|moved|moving|elevated|appointed|transitions?|transitioned|steps?\s+up|stepped\s+up)\s+from\s+"
+    r"(?:the\s+(?:role|position)\s+of\s+)?(?P<old>[^.;]+?)\s+to\s+(?:the\s+)?(?:(?:role|position)\s+of\s+)?(?P<new>[^.;,]+)",
+    _FLAGS)
+
+
 def role_vacated(description: str) -> bool:
     """True when a relevant role holder LEFT and the text names no incoming leader ('CTO left to join another org',
     'Interim Chief Digital Officer leaving'). A vacancy is a valid trigger: a new leader is coming."""
@@ -634,6 +660,20 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
                          "Customer Success, Product Development or Digital Workplace)")
 
     if kind in (SignalKind.EXEC_MOVE, SignalKind.NEW_HIRE):
+        tr = _TRANSITION.search(desc)
+        if tr:
+            # 'promoted from CFO to CEO': judge the NEW role and the VACATED role separately, never the whole sentence
+            new_rm, old_rm = role_match(tr.group("new")), role_match(tr.group("old"))
+            if not new_rm.role and not old_rm.role:
+                return _J(False, f"C-suite move from '{tr.group('old').strip()}' to '{tr.group('new').strip()}': "
+                                 "neither the new nor the vacated role is a buyer role")
+            rm = new_rm if new_rm.role else old_rm
+            start = incoming_start_date(desc, scoop.published_date)
+            where = "new role" if new_rm.role else "vacated role"
+            detail = f"{where} '{rm.role}'" + ("" if new_rm.role else ", new leader likely")
+            if start:
+                detail += f", incoming leader starts {start.date().isoformat()}"
+            return _J(True, detail, rm.ambiguous, event_date=start)
         rm = role_match(desc)
         if not rm.role:
             return _J(False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description")
@@ -669,17 +709,26 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
         why = _funding_drop_reason(scoop)
         if why:
             return _J(False, why)
+        if _DEBT.search(desc) and not _EQUITY.search(desc):
+            return _J(True, DEBT_NOTE, factor=FUNDING_DEBT_WEIGHT / KIND_BASE_WEIGHT[kind], notes=(DEBT_NOTE,))
         return _J(True)
 
     if kind is SignalKind.PRODUCT_LAUNCH:
-        if _DIGITAL_PRODUCT.search(desc):
+        if _DIGITAL_PRODUCT.search(desc) or _CAMEL_AI.search(desc):
             return _J(True)
+        if _FINANCIAL_PRODUCT.search(desc):
+            return _J(True, FINANCIAL_LAUNCH_NOTE, factor=LAUNCH_FINANCIAL_WEIGHT / KIND_BASE_WEIGHT[kind],
+                      notes=(FINANCIAL_LAUNCH_NOTE,))
         return _J(True, LAUNCH_NOTE, factor=LAUNCH_NON_DIGITAL_WEIGHT / KIND_BASE_WEIGHT[kind], notes=(LAUNCH_NOTE,))
 
     if kind is SignalKind.MA:
         role, weight, note = classify_ma(desc, scoop.company_name)
-        full = role == "target" or weight >= KIND_BASE_WEIGHT[kind]
-        return _J(True, note, factor=weight / KIND_BASE_WEIGHT[kind], notes=() if full else (note,))
+        notes = [] if role == "target" or weight >= KIND_BASE_WEIGHT[kind] else [note]
+        if role == "acquirer" and _RUMOUR.search(desc):
+            weight *= MA_RUMOUR_FACTOR
+            note += "; " + RUMOUR_NOTE
+            notes.append(RUMOUR_NOTE)
+        return _J(True, note, factor=weight / KIND_BASE_WEIGHT[kind], notes=tuple(notes))
 
     if kind is SignalKind.PARTNERSHIP:
         if _PARTNERSHIP_WORDS.search(desc):
@@ -806,7 +855,8 @@ def _trim_evidence(text: str, reserve: int = 0) -> str:
 AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
 #: Every warning note that can follow the evidence text, one ' (note)' per note. signal_notes() reads them back.
 NOTE_PREFIXES = ("role ambiguous", "physical or unclear product launch", "acquirer of a minority stake",
-                 "M&A direction unclear", "partnership without product", SAME_DEAL_PREFIX.strip())
+                 "M&A direction unclear", "partnership without product", "debt facility", "financial or property",
+                 "reported talks", SAME_DEAL_PREFIX.strip())
 
 
 def _suffix(notes) -> str:
