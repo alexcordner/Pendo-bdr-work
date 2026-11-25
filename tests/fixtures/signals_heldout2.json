@@ -1,0 +1,341 @@
+{
+ "_note": "Round 2 held-out, labels written before running.",
+ "rows": [
+  {
+   "id": "G001",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Product Manager, Fresh Produce, for its supermarket chain.",
+   "expect": "drop",
+   "pattern": "retail category 'product manager' (merchandise, not digital)",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G002",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Product Manager, Dairy.",
+   "expect": "drop",
+   "pattern": "retail category product manager",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G003",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Product, Wine Portfolio.",
+   "expect": "drop",
+   "pattern": "physical product head",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G004",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Product Quality Assurance for its food plant.",
+   "expect": "drop",
+   "pattern": "product quality",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G005",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co appointed a Director of Product Assurance, Pharmaceuticals.",
+   "expect": "drop",
+   "pattern": "pharma product assurance",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G006",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Technology Manager for plant operations.",
+   "expect": "drop",
+   "pattern": "plant technology (OT), not product",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G007",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Customer Service for its retail stores.",
+   "expect": "drop",
+   "pattern": "store customer service",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G008",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Customer Support Team Leader for its call centre.",
+   "expect": "drop",
+   "pattern": "junior TL",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G009",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co appointed a Head of Product Engineering, Mining Equipment.",
+   "expect": "drop",
+   "pattern": "physical product engineering",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G010",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Head of Digital Mining Operations.",
+   "expect": "drop",
+   "pattern": "digital + mining ops",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G011",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Customer Experience for its hotels.",
+   "expect": "keep",
+   "pattern": "CX head in hospitality",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G012",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Director of Customer Success at a software firm.",
+   "expect": "keep",
+   "pattern": "CS director",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G013",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has welcomed a Chief Information and Technology Officer.",
+   "expect": "keep",
+   "pattern": "CITO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G014",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has named a Chief Data and Analytics Officer.",
+   "expect": "drop",
+   "pattern": "data officer (decision pending)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G015",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Customer Insights.",
+   "expect": "drop",
+   "pattern": "insights (research), not CX tooling",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G016",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Product Director for its digital banking app.",
+   "expect": "keep",
+   "pattern": "product director + digital banking app",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G017",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Product Lead, Home Loans.",
+   "expect": "drop",
+   "pattern": "banking product lead (financial product)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G018",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief Digital Officer, replacing the Chief Marketing Officer.",
+   "expect": "keep",
+   "pattern": "CDO with CMO in text",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G019",
+   "types": [
+    "Executive Move"
+   ],
+   "topics": [],
+   "description": "Example Co has appointed a Chief Marketing Officer, replacing the Chief Digital Officer.",
+   "expect": "drop",
+   "pattern": "CMO new; CDO departing",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G020",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co hired a Head of Mobile Engineering.",
+   "expect": "keep",
+   "pattern": "head mobile engineering",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G021",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired an Application Support Analyst.",
+   "expect": "drop",
+   "pattern": "junior",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G022",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Head of Customer Engagement and Loyalty.",
+   "expect": "drop",
+   "pattern": "marketing loyalty",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G023",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co plans to hire 20 data scientists and machine learning engineers.",
+   "expect": "drop",
+   "pattern": "data science (not Pendo buyer)",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G024",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co plans to hire 15 software engineers and two product managers.",
+   "expect": "keep",
+   "pattern": "software engineers + PMs",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G025",
+   "types": [
+    "Hiring Plans"
+   ],
+   "topics": [],
+   "description": "Example Co is hiring 80 customer support agents ahead of its app launch.",
+   "expect": "drop",
+   "pattern": "volume agents + weak words",
+   "judge": true,
+   "age_days": 5
+  },
+  {
+   "id": "G026",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired an Executive Assistant to the CTO.",
+   "expect": "drop",
+   "pattern": "assistant to the CTO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G027",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a CTO.",
+   "expect": "keep",
+   "pattern": "bare CTO",
+   "judge": false,
+   "age_days": 5
+  },
+  {
+   "id": "G028",
+   "types": [
+    "New Hire"
+   ],
+   "topics": [],
+   "description": "Example Co has hired a Chief Technology Officer from a retail rival; the CEO and CFO are unchanged.",
+   "expect": "keep",
+   "pattern": "CTO with other C-suite words",
+   "judge": false,
+   "age_days": 5
+  }
+ ]
+}

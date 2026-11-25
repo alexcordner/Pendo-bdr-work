@@ -34,7 +34,7 @@ KIND_BASE_WEIGHT: dict[SignalKind, float] = {
     SignalKind.MA: 0.60,              # integration brings platform consolidation
     SignalKind.HIRING_PLAN: 0.55,     # hiring product / CX / engineering roles
     SignalKind.PARTNERSHIP: 0.45,     # often marketing noise
-    SignalKind.INTENT: 0.50,          # UNVERIFIED connector shape: never stronger than half a fresh scoop
+    SignalKind.INTENT: 0.30,          # UNVERIFIED connector shape: interest, not a dated event; capped low
     SignalKind.NONE: 0.0,
 }
 
@@ -51,6 +51,23 @@ KIND_HALF_LIFE_DAYS: dict[SignalKind, float] = {
 #: Several signals on one account: the best counts in full, every other one counts at this fraction.
 #: combined = 1 - (1 - best) * prod(1 - COMBINE_DAMPING * other). Always >= best and <= 1.0.
 COMBINE_DAMPING = 0.5
+
+#: Longest a scoop of each kind stays useful (days). People moves are a long buying window, so 90; partnerships,
+#: hiring notes and intent fade faster. ``config.signals.max_age_days`` is only the default for a kind missing here
+#: (today every kind is listed, so the config value caps nothing). The caller must PULL scoops far enough back:
+#: a 90-day window for people-move scoops (Phase 2b), otherwise the 90-day limit never gets used.
+KIND_MAX_AGE_DAYS: dict[SignalKind, int] = {
+    SignalKind.EXEC_MOVE: 90, SignalKind.NEW_HIRE: 90,
+    SignalKind.FUNDING: 45, SignalKind.PRODUCT_LAUNCH: 45, SignalKind.MA: 45, SignalKind.PROJECT_PAIN: 45,
+    SignalKind.PARTNERSHIP: 30, SignalKind.HIRING_PLAN: 30, SignalKind.INTENT: 30,
+}
+
+#: A signal weaker than this is not worth a call reason: dropped with the reason 'faded below floor'.
+MIN_STRENGTH_FLOOR = 0.10
+
+#: A kept people move whose role is probably a physical-goods 'product' role (retail, food, mining...) is KEPT but
+#: flagged 'role ambiguous' and its strength is multiplied by this.
+AMBIGUOUS_ROLE_FACTOR = 0.7
 
 #: Longest evidence text kept (characters, including the ellipsis).
 EVIDENCE_MAX_CHARS = 280
@@ -104,10 +121,11 @@ def _first_hit(text: str, keywords) -> str | None:
 
 # Role detection for Executive Move / New Hire / Management Move. The scoop has no title field, so we
 # read the description. A role counts only when a title word sits next to a Pendo-buyer domain word
-# ("Head of Product", "Chief Digital Officer", "VP, Customer Success", "Product Director", "IT Director")
-# AND the words right after it do not turn it into a non-buyer function ("Head of Product Supply",
-# "Director of Support Services (aged care)"). See _NEGATIVE. 'officer' is deliberately not a title word
-# on its own ("Customer Support Officer" is junior); "Chief X Officer" matches through 'chief'.
+# ("Head of Product", "Chief Digital Officer", "VP, Customer Success", "Product Director", "IT Director";
+# one free word may sit between: "Head of Platform Engineering") AND the words right after it do not turn it into
+# a non-buyer function ("Head of Product Supply", "Director of Support Services (aged care)"). See _NEGATIVE.
+# 'officer' is deliberately not a title word on its own ("Customer Support Officer" is junior); "Chief X Officer"
+# matches through 'chief'. A role held by someone's assistant ("Executive Assistant to the CTO") does not count.
 _TITLE = (r"chief|head|vp|svp|evp|avp|vice[\s-]+president|president|director|manager|lead|owner|"
           r"general\s+manager|gm")
 _DOMAIN = (r"product|digital|customer\s+experience|cx|customer\s+success|customer\s+support|customer\s+service|"
@@ -116,35 +134,97 @@ _DOMAIN = (r"product|digital|customer\s+experience|cx|customer\s+success|custome
 _SEP = r"[\s,/&:-]+"
 _TITLE_THEN_DOMAIN = re.compile(
     rf"(?<!\w)(?:{_TITLE})(?!\w){_SEP}(?:(?:of|and)\s+)?(?:(?:global|regional|senior|group|apac|anz|asia\s+pacific)\s+)?"
-    rf"(?:{_DOMAIN})(?!\w)", _FLAGS)
+    rf"(?:(?!(?:for|of|and|to|the|its|a|an|in|at|with|on)\b)\w+[\s-]+)?(?:{_DOMAIN})(?!\w)", _FLAGS)
 _DOMAIN_THEN_TITLE = re.compile(
     rf"(?<!\w)(?:{_DOMAIN})(?!\w){_SEP}(?:\w+{_SEP}){{0,1}}(?:{_TITLE})(?!\w)", _FLAGS)
 # Acronyms and phrases that name a role on their own. 'IT' is matched case-sensitively so the pronoun 'it' never counts.
-_ROLE_ACRONYMS = re.compile(r"(?<!\w)(?:CTO|CPO|CDO|CIO|CXO)(?!\w)|(?i:chief\s+(?:technology|information|product|digital|experience|customer)\s+officer)")
+_ROLE_ACRONYMS = re.compile(
+    r"(?<!\w)(?:CTO|CPO|CDO|CIO|CXO)(?!\w)"
+    r"|(?i:chief\s+(?:technology|information|product|digital|experience|customer)\s+officer)"
+    r"|(?i:chief\s+(?:information|technology|digital|product)\s+and\s+\w+\s+officer)")
 _IT_ROLE = re.compile(r"(?<!\w)(?:(?i:head|director|manager|lead|chief|vp|svp)[\s,]+(?:(?i:of)\s+)?IT(?!\w)|IT\s+(?i:director|manager|head|lead)(?!\w))")
-# Marketing titles contain a domain word but are not buyers ("Product Marketing Manager", "Digital Marketing Lead").
-_MARKETING = re.compile(r"(?:product|digital)\s+marketing", _FLAGS)
+# Someone else's role: "Executive Assistant to the CTO", "PA to the Head of Product".
+_ASSISTANT_BEFORE = re.compile(
+    r"(?:assistant|\bPA|\bEA|secretary|chief\s+of\s+staff)\s+(?:to|for)\s+(?:the\s+|its\s+|our\s+|a\s+)?$", _FLAGS)
 # Words that, inside the role phrase or the 3 words after it, mean the role is some other function
 # ("Head of Product Supply and Logistics", "Technology Procurement Director", "Head of Product Compliance").
+# Marketing is here too, which is why "Product Marketing Manager" and "Digital Marketing Lead" drop.
 _NEGATIVE = re.compile(
     r"(?<!\w)(?:supply|compliance|procurement|purchasing|logistics|manufactur\w*|marketing|social\s+media|finance|"
     r"financial|legal|facilit\w+|safety|sales|risk|warehouse|aged\s+care|hospital|clinical|nursing|network|"
     r"support\s+services?|human\s+resources|hr|people|recruit\w*)(?!\w)", _FLAGS)
+# Physical-goods qualifiers. A 'product' role followed by one of these (within 4 words) is a goods role, not a
+# digital product role: "Product Manager, Dairy", "Head of Product, Wine Portfolio", "Product Quality Assurance".
+_PHYSICAL = re.compile(
+    r"(?<!\w)(?:food|dairy|wine|beverage|plant|factory|fmcg|grocery|groceries|produce|supermarket|apparel|fresh|"
+    r"meat|bakery|pharma\w*|mining|merchandis\w*|agricultur\w*|farm\w*|textile|quality\s+assurance|assurance)"
+    r"(?:s|es)?(?!\w)",
+    _FLAGS)
+# Softer industry context elsewhere in the description: the 'product' role may still be physical goods. The
+# scoop is KEPT but flagged ambiguous (strength x AMBIGUOUS_ROLE_FACTOR).
+_INDUSTRY_CONTEXT = re.compile(
+    r"(?<!\w)(?:retail\w*|supermarkets?|grocery|stores?|manufactur\w*|factory|wholesale|mining|farm\w*|food|"
+    r"beverages?|consumer\s+goods|fmcg|hardware|equipment|pharma\w*|construction)(?!\w)", _FLAGS)
+# A product role followed by a comma and a category word ("Head of Product, Footwear", "Product Lead, Home Loans")
+# is probably a goods or line-of-business role. Digital words and geography after the comma are fine ("Head of
+# Product, Digital", "Product Manager, ANZ"); anything else makes the role ambiguous (kept, flagged).
+_COMMA_QUALIFIER = re.compile(r"\s*,\s*([A-Za-z][A-Za-z&'-]*)")
+_QUALIFIER_OK = frozenset({
+    "digital", "mobile", "app", "apps", "platform", "platforms", "online", "web", "ecommerce", "e-commerce", "software",
+    "data", "cloud", "saas", "ai", "customer", "experience", "growth", "design", "engineering", "technology", "anz",
+    "apac", "australia", "new", "nz", "asia", "global", "regional", "emea", "pacific", "and", "the", "a", "an",
+    "who", "will", "to", "as", "after", "from", "at", "formerly", "previously", "effective", "joining", "based"})
+# The tail of a role phrase stops at these words ("Chief Customer Officer to unify sales, success and support").
+_TAIL_STOP = frozenset({"to", "who", "will", "as", "after", "that", "which", "previously", "formerly", "from", "at"})
+
+
+@dataclass(frozen=True)
+class RoleMatch:
+    """Result of role_match: the matched role phrase (None = no relevant role) and whether it is ambiguous."""
+
+    role: str | None
+    ambiguous: bool = False
+
+
+def _tail_words(text: str, end: int, limit: int) -> list[str]:
+    """Up to ``limit`` words after ``end``, stopping at a sentence break or a _TAIL_STOP word."""
+    tail = re.split(r"[.;]", text[end:], maxsplit=1)[0]
+    out: list[str] = []
+    for w in re.findall(r"[A-Za-z&]+", tail):
+        if w.lower() in _TAIL_STOP or len(out) >= limit:
+            break
+        out.append(w)
+    return out
+
+
+def role_match(description: str) -> RoleMatch:
+    """Find a Pendo-buyer role in a people-move description.
+
+    Relevant: product / digital / CX / customer success / support / engineering / technology / mobile / IT /
+    digital-workplace roles. Not relevant: a bare 'CEO' or 'Chief Executive Officer', CFO, finance, legal, an
+    assistant to a CTO, a buyer word inside a non-buyer role (_NEGATIVE), a product role in physical goods (_PHYSICAL).
+    ``ambiguous`` is True for a kept 'product' role when the rest of the description sounds like retail / food /
+    manufacturing (_INDUSTRY_CONTEXT): keep it, but the caller should say so and weaken the signal."""
+    text = description
+    for rx in (_ROLE_ACRONYMS, _IT_ROLE, _TITLE_THEN_DOMAIN, _DOMAIN_THEN_TITLE):
+        for m in rx.finditer(text):
+            if _ASSISTANT_BEFORE.search(text[max(0, m.start() - 30):m.start()]):
+                continue
+            if _NEGATIVE.search(m.group(0) + " " + " ".join(_tail_words(text, m.end(), 3))):
+                continue
+            is_product = bool(re.search(r"(?<!\w)product", m.group(0), _FLAGS))
+            if is_product and _PHYSICAL.search(m.group(0) + " " + " ".join(_tail_words(text, m.end(), 4))):
+                continue
+            q = _COMMA_QUALIFIER.match(text, m.end())
+            qualifier = bool(q) and q.group(1).lower() not in _QUALIFIER_OK
+            ambiguous = is_product and (bool(_INDUSTRY_CONTEXT.search(text)) or qualifier)
+            return RoleMatch(" ".join(m.group(0).split()), ambiguous)
+    return RoleMatch(None)
 
 
 def relevant_role(description: str) -> str | None:
-    """The matched role phrase if the description names a product / digital / CX / customer success /
-    support / engineering / technology / mobile / IT / digital-workplace role, else None.
-    A bare 'CEO' or 'Chief Executive Officer' (or CFO, finance, legal...) is NOT relevant, and neither is a
-    buyer word inside a non-buyer role (see _NEGATIVE)."""
-    text = _MARKETING.sub(" ", description)
-    for rx in (_ROLE_ACRONYMS, _IT_ROLE, _TITLE_THEN_DOMAIN, _DOMAIN_THEN_TITLE):
-        for m in rx.finditer(text):
-            tail = re.split(r"[.;]", text[m.end():], maxsplit=1)[0]
-            context = m.group(0) + " " + " ".join(re.findall(r"[A-Za-z&]+", tail)[:3])
-            if not _NEGATIVE.search(context):
-                return " ".join(m.group(0).split())
-    return None
+    """The matched role phrase, or None. See role_match for the rules."""
+    return role_match(description).role
 
 
 # Hiring notes need a buyer-role context before a keep keyword may beat a drop keyword (or count at all).
@@ -221,20 +301,47 @@ def signal_strength(kind: SignalKind, days: float) -> float:
 # ---------------------------------------------------------------- 1. filter
 @dataclass(frozen=True)
 class ScoopVerdict:
-    """Keep / drop decision for one scoop. ``reason`` is always filled; ``kind`` is NONE when dropped."""
+    """Keep / drop decision for one scoop. ``reason`` is a short sentence for the call sheet, always filled
+    ('Kept: Executive Move, role 'Head of Digital', 6 days ago' / 'Dropped: generic hiring note ...').
+    ``kind`` is NONE when dropped. ``ambiguous`` marks a kept role that may be a physical-goods 'product' role."""
 
     scoop: Scoop
     keep: bool
     kind: SignalKind
     reason: str
+    ambiguous: bool = False
+
+
+AMBIGUOUS_NOTE = "role ambiguous: check it is a digital product role"
+
+
+def verdict_summary(v: ScoopVerdict) -> str:
+    """One-line, call-sheet-ready sentence for a verdict (the reason, whitespace-collapsed)."""
+    return " ".join(v.reason.split())
 
 
 def _lower_set(values) -> set[str]:
     return {v.strip().lower() for v in values}
 
 
-def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, str]:
-    """Apply the per-kind keep rules. Returns (keep, reason)."""
+def _age_phrase(days: int) -> str:
+    if days < 0:
+        return "today (future-dated, treated as today)"
+    return "today" if days == 0 else ("1 day ago" if days == 1 else f"{days} days ago")
+
+
+def max_age_for(kind: SignalKind, config: Config) -> int:
+    """Age limit in days for a kind: KIND_MAX_AGE_DAYS, else the config default (signals.max_age_days)."""
+    return KIND_MAX_AGE_DAYS.get(kind, config.signals.max_age_days)
+
+
+def _strength(kind: SignalKind, days: float, ambiguous: bool = False) -> float:
+    s = signal_strength(kind, days)
+    return round(s * AMBIGUOUS_ROLE_FACTOR, 4) if ambiguous else s
+
+
+def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, str, bool]:
+    """Apply the per-kind keep rules. Returns (keep, detail, ambiguous); the detail is a phrase, not a full sentence."""
     desc = scoop.description or ""
     topics = _lower_set(scoop.topics)
     sg = config.signals
@@ -242,15 +349,15 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
     if kind is SignalKind.PROJECT_PAIN:
         hit = sorted(topics & PROJECT_TOPICS)
         if hit:
-            return True, f"Project/Pain Point with buyer topic: {', '.join(hit)}"
+            return True, f"buyer topic {', '.join(hit)}", False
         return False, "Project/Pain Point without a Pendo-buyer topic (needs Customer Experience, Product Management, " \
-                      "Customer Success, Product Development or Digital Workplace)"
+                      "Customer Success, Product Development or Digital Workplace)", False
 
     if kind in (SignalKind.EXEC_MOVE, SignalKind.NEW_HIRE):
-        role = relevant_role(desc)
-        if role:
-            return True, f"{'executive/management move' if kind is SignalKind.EXEC_MOVE else 'new hire'} in a relevant role: '{role}'"
-        return False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description"
+        rm = role_match(desc)
+        if rm.role:
+            return True, f"role '{rm.role}'", rm.ambiguous
+        return False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description", False
 
     if kind is SignalKind.HIRING_PLAN:
         # Generic hiring (nurses, drivers, legal, 'more open roles in Medical & Health') is dropped unless the
@@ -259,69 +366,74 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
         context = hiring_context(desc)
         drop_kw = _first_hit(desc, sg.keywords_drop)
         if drop_kw and not context:
-            return False, f"generic hiring note (matches drop keyword '{drop_kw}', no buyer-role context)"
+            return False, f"generic hiring note (matches drop keyword '{drop_kw}', no buyer-role context)", False
         if context:
-            return True, f"hiring with buyer-role context: '{context}'"
+            return True, f"buyer role '{context}'", False
         hit = sorted(topics & HIRING_TOPICS)
         if hit:
-            return True, f"hiring with relevant topic: {', '.join(hit)}"
+            return True, f"relevant topic {', '.join(hit)}", False
         strong = _first_hit(desc, [k for k in sg.keywords_keep if k.strip().lower() not in WEAK_KEEP_KEYWORDS])
         if strong:
-            return True, f"hiring with buyer keyword '{strong}' in the description"
+            return True, f"buyer keyword '{strong}'", False
         weak = _first_hit(desc, sg.keywords_keep)
         extra = f" (only the weak keyword '{weak}')" if weak else ""
-        return False, "hiring note with no relevant topic, buyer role or strong keyword" + extra
+        return False, "hiring note with no relevant topic, buyer role or strong keyword" + extra, False
 
     if kind is SignalKind.FUNDING:
         if _is_investor_note(scoop):
-            return False, "investor note: about the investor, not a company that received funding"
-        return True, "funding"
-
-    labels = {SignalKind.MA: "M&A", SignalKind.PRODUCT_LAUNCH: "product launch", SignalKind.PARTNERSHIP: "partnership"}
-    return True, labels[kind]
+            return False, "investor note: about the investor, not a company that received funding", False
+    return True, "", False
 
 
 def filter_scoops(scoops: list[Scoop], config: Config, today: date | datetime) -> list[ScoopVerdict]:
-    """One verdict per input scoop, in input order. Never drops silently: every verdict has a reason.
+    """One verdict per input scoop, in input order. Never drops silently: every verdict has a reason sentence.
 
-    Order of checks: age (older than ``signals.max_age_days`` is dropped; exactly that many days is kept),
-    then type (must be in ``signals.scoop_types_keep``, or be Project / Pain Point which has its own topic gate),
-    then the per-kind rules in ``_judge_kind``.
+    Checks: scoop type (must be in ``signals.scoop_types_keep``, or be Project / Pain Point which has its own topic
+    gate); then for each kind the scoop could be, in weight order: age limit for that kind (KIND_MAX_AGE_DAYS;
+    exactly the limit is kept, one more day is dropped), the per-kind rules in ``_judge_kind``, and the strength floor
+    (MIN_STRENGTH_FLOOR). The highest-weight kind that passes everything wins.
     """
     sg = config.signals
     allowed_types = _lower_set(sg.scoop_types_keep) | {"project", "pain point"}
     verdicts: list[ScoopVerdict] = []
     for s in scoops:
         days = (_as_date(today) - _as_date(s.published_date)).days
-        if days > sg.max_age_days:
-            verdicts.append(ScoopVerdict(s, False, SignalKind.NONE,
-                                         f"expired: {days} days old, older than max_age_days={sg.max_age_days}"))
-            continue
         types = [t for t in s.types if t.strip().lower() in allowed_types]
         if not types:
             shown = ", ".join(s.types) if s.types else "none"
-            verdicts.append(ScoopVerdict(s, False, SignalKind.NONE, f"scoop type not a Pendo trigger (types: {shown})"))
+            verdicts.append(ScoopVerdict(s, False, SignalKind.NONE, f"Dropped: scoop type not a Pendo trigger (types: {shown})"))
             continue
         kinds = {TYPE_TO_KIND[t.strip().lower()] for t in types if t.strip().lower() in TYPE_TO_KIND}
         if not kinds:
             # Configured as keep but this module has no kind for it: say so instead of guessing.
             verdicts.append(ScoopVerdict(s, False, SignalKind.NONE,
-                                         f"type {', '.join(types)} has no SignalKind mapping in signals.py"))
+                                         f"Dropped: type {', '.join(types)} has no SignalKind mapping in signals.py"))
             continue
-        passed: dict[SignalKind, str] = {}
+        passed: dict[SignalKind, tuple[str, bool]] = {}
         failed: list[str] = []
         for k in _by_weight(kinds):
-            ok, why = _judge_kind(k, s, config)
-            if ok:
-                passed[k] = why
-            else:
+            limit = max_age_for(k, config)
+            if days > limit:
+                failed.append(f"expired, {days} days old (limit {limit} for {k.value})")
+                continue
+            ok, why, ambiguous = _judge_kind(k, s, config)
+            if not ok:
                 failed.append(why)
+                continue
+            strength = _strength(k, max(0, days), ambiguous)
+            if strength < MIN_STRENGTH_FLOOR:
+                failed.append(f"faded below floor ({strength:.2f} < {MIN_STRENGTH_FLOOR:.2f}, {days} days old)")
+                continue
+            passed[k] = (why, ambiguous)
         if passed:
             best = _by_weight(passed)[0]
-            note = " (future-dated, treated as today)" if days < 0 else ""
-            verdicts.append(ScoopVerdict(s, True, best, passed[best] + note))
+            detail, ambiguous = passed[best]
+            label = next(t for t in types if TYPE_TO_KIND.get(t.strip().lower()) is best)
+            parts = [label] + ([detail] if detail else []) + [_age_phrase(days)]
+            reason = "Kept: " + ", ".join(parts) + (f"; {AMBIGUOUS_NOTE}" if ambiguous else "")
+            verdicts.append(ScoopVerdict(s, True, best, reason, ambiguous))
         else:
-            verdicts.append(ScoopVerdict(s, False, SignalKind.NONE, "; ".join(failed)))
+            verdicts.append(ScoopVerdict(s, False, SignalKind.NONE, "Dropped: " + "; ".join(failed)))
     return verdicts
 
 
@@ -375,7 +487,7 @@ def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dic
         signals.append(Signal(
             sf_account_id=acct.sf_account_id,
             kind=v.kind,
-            strength=signal_strength(v.kind, age_days(s.published_date, today)),
+            strength=_strength(v.kind, age_days(s.published_date, today), v.ambiguous),
             source=f"{SOURCE_PREFIX}:{s.id}",
             source_date=s.published_date,
             evidence=_trim_evidence(s.description),
@@ -386,17 +498,29 @@ def scoops_to_signals(verdicts: list[ScoopVerdict], accounts_by_zoominfo_id: dic
     return SignalBatch(signals, unmatched)
 
 
+def _real_signals(signals: list[Signal]) -> list[Signal]:
+    return [x for x in signals if x.kind is not SignalKind.NONE]
+
+
 def best_signal(signals: list[Signal]) -> Signal | None:
     """Strongest signal; ties go to the newer one, then kind name, then source (deterministic).
-    None for an empty list: use ``no_trigger_signal(account)`` when a Signal is needed."""
-    real = [s for s in signals if s.kind is not SignalKind.NONE]
-    return min(real, key=_signal_sort_key) if real else None
+    An INTENT signal is never the best while the account has any real (non-intent) signal: the opener must quote
+    a dated event, not an unverified interest signal. None for an empty list: use ``no_trigger_signal(account)``."""
+    real = _real_signals(signals)
+    dated = [x for x in real if x.kind is not SignalKind.INTENT]
+    pool = dated or real
+    return min(pool, key=_signal_sort_key) if pool else None
 
 
 def combined_strength(signals: list[Signal]) -> float:
     """Diminishing returns over all signals of one account, in 0.0-1.0.
-    The best counts fully, each other counts at COMBINE_DAMPING: 1 - (1-best) * prod(1 - d*other)."""
-    strengths = sorted((s.strength for s in signals if s.kind is not SignalKind.NONE), reverse=True)
+    The best counts fully, each other counts at COMBINE_DAMPING: 1 - (1-best) * prod(1 - d*other).
+    When the account has any real (non-intent) signal, the best is chosen among those only, so intent can only
+    count as a damped 'other'."""
+    real = _real_signals(signals)
+    dated = sorted((x.strength for x in real if x.kind is not SignalKind.INTENT), reverse=True)
+    intent = sorted((x.strength for x in real if x.kind is SignalKind.INTENT), reverse=True)
+    strengths = dated + intent if dated else intent
     if not strengths:
         return 0.0
     rest = 1.0
@@ -455,7 +579,7 @@ def trigger_radar(scoops: list[Scoop], accounts: list[Account], config: Config, 
     entries: list[RadarEntry] = []
     for zi, sigs in grouped.items():
         sigs.sort(key=_signal_sort_key)
-        best = sigs[0]
+        best = best_signal(sigs)
         entries.append(RadarEntry(by_zi[zi], best, combined_strength(sigs), _why(best, len(sigs), today), tuple(sigs)))
 
     def key(e: RadarEntry):
@@ -475,9 +599,11 @@ def trigger_radar(scoops: list[Scoop], accounts: list[Account], config: Config, 
 INTENT_TOPICS = frozenset({"digital experience", "product analytics", "customer experience", "digital adoption",
                            "product onboarding", "user onboarding"})
 #: Audience strength A (strongest) to E multiplies the score. Intent is weaker evidence than a dated event,
-#: so the strength is also capped at INTENT_MAX_STRENGTH (= the INTENT base weight): half of a fresh scoop at most.
+#: so the strength is also capped at INTENT_MAX_STRENGTH (= the INTENT base weight, 0.3) while the shape is UNVERIFIED.
 INTENT_AUDIENCE_FACTOR = {"A": 1.0, "B": 0.85, "C": 0.7, "D": 0.55, "E": 0.4}
-INTENT_MAX_STRENGTH = KIND_BASE_WEIGHT[SignalKind.INTENT]   # 0.5
+INTENT_MAX_STRENGTH = KIND_BASE_WEIGHT[SignalKind.INTENT]   # 0.3
+#: A row with no recorded_date is treated as this many days old (never as brand new).
+INTENT_UNDATED_AGE_DAYS = 21
 INTENT_SCORE_RANGE = (60, 100)
 INTENT_SOURCE_PREFIX = "zoominfo_intent"
 
@@ -497,8 +623,10 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
     """UNVERIFIED placeholder: intent rows -> Signals (kind INTENT).
 
     Only Pendo-relevant topics (INTENT_TOPICS) count. strength = (score-60)/40 x audience factor, capped at
-    INTENT_MAX_STRENGTH (0.5), then decayed by recency when ``recorded_date`` is present (no date = no decay).
-    A row whose strength comes out at 0.0 (a score of exactly 60) is SKIPPED with a reason, never emitted as a zero signal.
+    INTENT_MAX_STRENGTH (0.3), then decayed with the intent half-life (21 days) from ``recorded_date``; a missing date
+    counts as INTENT_UNDATED_AGE_DAYS (21) old. Older than KIND_MAX_AGE_DAYS[INTENT] (30), or below MIN_STRENGTH_FLOOR
+    ('faded below floor'), is skipped with a reason. A strength of 0.0 (a score of exactly 60) is skipped too, never
+    emitted as a zero signal. Evidence says 'interest signal, not a dated event' so the call sheet can label it.
     Signal.source is 'zoominfo_intent:<company_id>:<topic>'.
     One signal per (company, topic): the highest score wins. Every row that is not turned into a signal is appended to
     ``skipped`` as (row, reason) when a list is passed, so nothing disappears silently.
@@ -540,15 +668,23 @@ def intent_to_signals(rows: list[dict], accounts: list[Account], config: Config,
         aud = str(row["audience_strength"]).strip().upper()
         base = min(INTENT_MAX_STRENGTH, (score - lo) / (hi - lo) * INTENT_AUDIENCE_FACTOR[aud])
         when = _parse_intent_date(row.get("recorded_date"))
-        strength = round(min(1.0, max(0.0, base * (recency_factor(age_days(when, today), half_life_for(SignalKind.INTENT)) if when else 1.0))), 4)
+        days = age_days(when, today) if when else INTENT_UNDATED_AGE_DAYS
+        strength = round(min(1.0, max(0.0, base * recency_factor(days, half_life_for(SignalKind.INTENT)))), 4)
         topic = str(row["topic"]).strip()
-        if strength <= 0.0:
+        if days > KIND_MAX_AGE_DAYS[SignalKind.INTENT]:
+            skipped.append((row, f"expired, {days} days old (limit {KIND_MAX_AGE_DAYS[SignalKind.INTENT]} for intent)"))
+            continue
+        if base <= 0.0:
             skipped.append((row, f"strength 0.0 (signal_score {int(score)} is at the bottom of the {lo}-{hi} range): not a trigger"))
+            continue
+        if strength < MIN_STRENGTH_FLOOR:
+            skipped.append((row, f"faded below floor ({strength:.2f} < {MIN_STRENGTH_FLOOR:.2f})"))
             continue
         out.append(Signal(
             sf_account_id=by_zi[cid].sf_account_id, kind=SignalKind.INTENT, strength=strength,
             source=f"{INTENT_SOURCE_PREFIX}:{cid}:{topic.lower()}", source_date=when,
-            evidence=f"ZoomInfo intent (UNVERIFIED shape): researching '{topic}', score {int(score)}, audience {aud}",
+            evidence=(f"ZoomInfo intent (UNVERIFIED shape): interest signal, not a dated event. "
+                      f"Researching '{topic}', score {int(score)}, audience {aud}"),
             zoominfo_id=cid,
         ))
     out.sort(key=_signal_sort_key)

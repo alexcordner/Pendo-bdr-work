@@ -270,8 +270,12 @@ def test_scoop_one_day_past_max_age_dropped(verdicts):
     assert not v.keep and "expired" in v.reason and "46" in v.reason
 
 
-def test_age_boundary_with_custom_config(config):
+def test_config_max_age_is_only_the_default_for_kinds_missing_from_the_table(config, monkeypatch):
     cfg = replace(config, signals=replace(config.signals, max_age_days=10))
+    # every kind is listed, so the config value caps nothing today
+    assert S.filter_scoops([make_scoop(days=40)], cfg, TODAY)[0].keep
+    monkeypatch.delitem(S.KIND_MAX_AGE_DAYS, SignalKind.FUNDING)
+    assert S.max_age_for(SignalKind.FUNDING, cfg) == 10
     assert S.filter_scoops([make_scoop(days=10)], cfg, TODAY)[0].keep
     assert not S.filter_scoops([make_scoop(days=11)], cfg, TODAY)[0].keep
 
@@ -348,7 +352,7 @@ def test_strength_table_literal_numbers():
     assert S.signal_strength(SignalKind.PRODUCT_LAUNCH, 10) == 0.5751  # 0.8 * 0.5 ** (10/21)
     assert S.signal_strength(SignalKind.FUNDING, 45) == 0.1585         # 0.7 * 0.5 ** (45/21)
     assert S.signal_strength(SignalKind.PARTNERSHIP, 21) == 0.225
-    assert S.signal_strength(SignalKind.INTENT, 0) == 0.5
+    assert S.signal_strength(SignalKind.INTENT, 0) == 0.3
 
 
 def test_per_kind_half_lives():
@@ -668,11 +672,14 @@ def test_intent_skip_reasons(intent_rows, accounts, config):
 
 
 def test_intent_score_60_skipped_not_zero_signal(accounts, config):
-    row = {"company_id": "FAKE-ZI-2001", "topic": "Digital Experience", "signal_score": 60, "audience_strength": "A"}
+    row = {"company_id": "FAKE-ZI-2001", "topic": "Digital Experience", "signal_score": 60, "audience_strength": "A",
+           "recorded_date": "2026-11-25"}
     skipped = []
     assert S.intent_to_signals([row], accounts, config, TODAY, skipped) == []
     assert skipped and "strength 0.0" in skipped[0][1]
-    assert S.intent_to_signals([{**row, "signal_score": 61}], accounts, config, TODAY)[0].strength == 0.025
+    skipped.clear()
+    assert S.intent_to_signals([{**row, "signal_score": 61}], accounts, config, TODAY, skipped) == []
+    assert "faded below floor" in skipped[0][1]          # 0.025 < 0.10
 
 
 def test_intent_highest_score_wins_per_company_topic(intent_rows, accounts, config):
@@ -686,33 +693,58 @@ def test_intent_literal_strengths(accounts, config):
         r = {"company_id": "FAKE-ZI-2001", "topic": topic, "signal_score": score, "audience_strength": aud}
         if date:
             r["recorded_date"] = date
-        return S.intent_to_signals([r], accounts, config, TODAY)[0].strength
-    assert S.INTENT_MAX_STRENGTH == 0.5
-    assert strength(100, "A") == 0.5                      # 1.0 capped at 0.5
-    assert strength(90, "A") == 0.5                       # 0.75 capped
-    assert strength(80, "B") == 0.425                     # 0.5 * 0.85
-    assert strength(75, "C") == 0.2625                    # 0.375 * 0.7
-    assert strength(70, "E") == 0.1                       # 0.25 * 0.4
-    assert strength(100, "A", "2026-11-20") == 0.4239     # 0.5 * 0.5 ** (5/21)
-    assert strength(100, "A", "2026-10-25") == 0.1797     # 31 days: 0.5 * 0.5 ** (31/21)
+        out = S.intent_to_signals([r], accounts, config, TODAY)
+        return out[0].strength if out else None
+    assert S.INTENT_MAX_STRENGTH == 0.3 and S.INTENT_UNDATED_AGE_DAYS == 21
+    assert strength(100, "A", "2026-11-25") == 0.3                # 1.0 capped at 0.3, today
+    assert strength(80, "B", "2026-11-25") == 0.3                 # 0.425 capped
+    assert strength(70, "C", "2026-11-25") == 0.175               # 0.25 * 0.7
+    assert strength(70, "E", "2026-11-25") == 0.1                 # exactly the floor is kept
+    assert strength(100, "A", "2026-11-20") == 0.2544             # 0.3 * 0.5 ** (5/21)
+    assert strength(100, "A", "2026-10-30") == 0.1272             # 26 days
+    assert strength(100, "A") == 0.15                             # undated = 21 days old: 0.3 * 0.5
+    assert strength(75, "C") == 0.1312                            # undated 0.2625 * 0.5 = 0.13125 (float rounds down)
+    assert strength(70, "E") is None                              # undated 0.05 < floor
+    assert strength(100, "A", "2026-10-25") is None               # 31 days: older than the 30-day limit
 
 
-def test_intent_never_exceeds_a_fresh_scoop_of_half_strength(intent_rows, accounts, config):
+def test_intent_undated_is_not_age_zero(accounts, config):
+    r = {"company_id": "FAKE-ZI-2001", "topic": "Digital Experience", "signal_score": 100, "audience_strength": "A"}
+    undated = S.intent_to_signals([r], accounts, config, TODAY)[0]
+    today_dated = S.intent_to_signals([{**r, "recorded_date": "2026-11-25"}], accounts, config, TODAY)[0]
+    assert undated.strength == 0.15 < today_dated.strength == 0.3 and undated.source_date is None
+
+
+def test_intent_expired_reason(accounts, config):
+    skipped = []
+    r = {"company_id": "FAKE-ZI-2001", "topic": "Digital Experience", "signal_score": 100, "audience_strength": "A",
+         "recorded_date": "2026-10-01"}
+    assert S.intent_to_signals([r], accounts, config, TODAY, skipped) == []
+    assert "expired" in skipped[0][1] and "limit 30" in skipped[0][1]
+
+
+def test_intent_evidence_says_interest_not_dated_event(intent_rows, accounts, config):
     out = S.intent_to_signals(intent_rows, accounts, config, TODAY)
-    assert out and all(s.strength <= 0.5 for s in out)
+    assert out and all("interest signal, not a dated event" in s.evidence for s in out)
+
+
+def test_intent_never_exceeds_cap_or_a_fresh_scoop(intent_rows, accounts, config):
+    out = S.intent_to_signals(intent_rows, accounts, config, TODAY)
+    assert out and all(s.strength <= 0.3 for s in out)
     assert S.signal_strength(SignalKind.EXEC_MOVE, 0) > max(s.strength for s in out)
 
 
 def test_intent_recency_decay_applies_when_dated(accounts, config):
     row = {"company_id": "FAKE-ZI-2001", "topic": "Product Onboarding", "signal_score": 100, "audience_strength": "A"}
     fresh = S.intent_to_signals([{**row, "recorded_date": "2026-11-25"}], accounts, config, TODAY)[0]
-    old = S.intent_to_signals([{**row, "recorded_date": "2026-10-25"}], accounts, config, TODAY)[0]
+    old = S.intent_to_signals([{**row, "recorded_date": "2026-11-05"}], accounts, config, TODAY)[0]
     assert old.strength < fresh.strength
 
 
 def test_intent_audience_ordering(accounts, config):
     def strength(aud):
-        r = {"company_id": "FAKE-ZI-2001", "topic": "User Onboarding", "signal_score": 75, "audience_strength": aud}
+        r = {"company_id": "FAKE-ZI-2001", "topic": "User Onboarding", "signal_score": 70, "audience_strength": aud,
+             "recorded_date": "2026-11-25"}
         return S.intent_to_signals([r], accounts, config, TODAY)[0].strength
     vals = [strength(a) for a in "ABCDE"]
     assert vals == sorted(vals, reverse=True) and vals[0] > vals[-1]
@@ -923,3 +955,287 @@ def test_scoop_company_id_whitespace_stripped(config):
     out = S.scoops_to_signals(S.filter_scoops([make_scoop(cid=" 123 ")], config, TODAY),
                               {"123": Account("SF1", "G", zoominfo_id="123")}, config, TODAY)
     assert len(out.signals) == 1 and out.unmatched == []
+
+
+# ============================================================ round 3 (second re-review)
+# ------------------------------------------------------------ (a) role fixes
+@pytest.mark.parametrize("desc", [
+    "Example Co has hired an Executive Assistant to the CTO.",
+    "Example Co hired a PA to the Head of Product.",
+    "Example Co hired an EA to the Chief Digital Officer.",
+])
+def test_assistants_are_not_the_buyer(desc):
+    assert S.relevant_role(desc) is None
+
+
+def test_the_role_holder_after_an_assistant_still_counts():
+    assert S.relevant_role("Example Co hired an Executive Assistant. A new CTO also joined.") == "CTO"
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co named a new Chief Information and Digital Officer.",
+    "Example Co has a Chief Information and Technology Officer.",
+    "Example Co has a Chief Digital and Information Officer.",
+])
+def test_combined_chief_titles_detected(desc):
+    assert S.relevant_role(desc)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co recruited a Head of Platform Engineering.",
+    "Example Co hired a Head of Digital Customer Experience.",
+    "Example Co hired a Director of Mobile Engineering.",
+])
+def test_one_free_word_between_title_and_domain(desc):
+    assert S.relevant_role(desc)
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co hires a Sales Director for product.",
+    "Example Co hires a Director of Hospital Technology.",
+    "Example Co hires a Head of Procurement Engineering.",
+])
+def test_free_word_does_not_open_the_door_to_non_buyers(desc):
+    assert S.relevant_role(desc) is None
+
+
+def test_negative_window_ends_at_to_who_will_as_after():
+    assert S.relevant_role("Example Co appointed a Chief Customer Officer to unify sales, success and support.")
+    assert S.relevant_role("Example Co hired a Head of Product who will oversee supply planning tools.")
+    assert S.relevant_role("Example Co named a Head of Digital as the legal reforms land.")
+    assert S.relevant_role("Example Co hired a Head of Product after a finance review.")
+    assert S.relevant_role("Example Co hired a Head of Product Supply to run logistics.") is None
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co hired a Product Manager, Fresh Produce.",
+    "Example Co has appointed a Product Manager, Dairy.",
+    "Example Co hired a Head of Product, Wine Portfolio.",
+    "Example Co hired a Product Manager, Frozen Foods.",
+    "Example Co hired a Head of Product Quality Assurance for its food plant.",
+    "Example Co appointed a Head of Product Assurance, Pharmaceuticals.",
+    "Example Co appointed a Head of Product Engineering, Mining Equipment.",
+])
+def test_physical_goods_product_roles_dropped(desc):
+    assert S.relevant_role(desc) is None
+
+
+def test_physical_words_only_matter_for_product_roles():
+    assert S.relevant_role("Example Co hired a Head of Digital for its food business.")
+    assert not S.role_match("Example Co hired a Head of Digital for its food business.").ambiguous
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co named a Head of Product, Footwear.",
+    "Example Co hired a Product Lead, Home Loans.",
+    "Example Co hired a Head of Product for its retail stores.",
+])
+def test_ambiguous_product_roles_kept_but_flagged(desc):
+    rm = S.role_match(desc)
+    assert rm.role and rm.ambiguous
+
+
+@pytest.mark.parametrize("desc", [
+    "Example Co hired a Head of Product.",
+    "Example Co hired a Head of Product, Digital.",
+    "Example Co hired a Head of Product, ANZ.",
+    "Example Co hired a Chief Digital Officer for its retail stores.",   # not a 'product' role
+])
+def test_clear_roles_not_flagged(desc):
+    rm = S.role_match(desc)
+    assert rm.role and not rm.ambiguous
+
+
+def test_ambiguous_verdict_reason_and_strength(config, accounts):
+    v = judge(config, desc="Example Co named a Head of Product, Footwear.", types=("Executive Move",), topics=(), days=5)
+    assert v.keep and v.ambiguous
+    assert v.reason == ("Kept: Executive Move, role 'Head of Product', 5 days ago; "
+                        "role ambiguous: check it is a digital product role")
+    by_zi = {a.zoominfo_id: a for a in accounts if a.zoominfo_id}
+    sig = S.scoops_to_signals([v], by_zi, config, TODAY).signals[0]
+    assert sig.strength == 0.5833                         # 0.9 * 0.5 ** (5/45) * 0.7
+    clear = judge(config, desc="Example Co named a Head of Product.", types=("Executive Move",), topics=(), days=5)
+    assert not clear.ambiguous and "ambiguous" not in clear.reason
+    assert S.scoops_to_signals([clear], by_zi, config, TODAY).signals[0].strength == 0.8333
+
+
+def test_marketing_roles_still_dropped_without_the_old_prefilter():
+    for d in ("Example Co hired a Product Marketing Manager.", "Example Co hired a Digital Marketing Lead."):
+        assert S.relevant_role(d) is None
+
+
+# ------------------------------------------------------------ (b) intent vs real signals
+def _isig(strength, src="zoominfo_intent:Z:digital experience", day=20):
+    return Signal("A", SignalKind.INTENT, strength, src, datetime(2026, 11, day, tzinfo=timezone.utc), "e", "Z")
+
+
+def test_intent_never_best_when_a_real_signal_exists():
+    weak_real = _sig(SignalKind.FUNDING, 0.16)
+    intent = _isig(0.3)
+    assert S.best_signal([intent, weak_real]) is weak_real
+    assert S.best_signal([weak_real, intent]) is weak_real
+
+
+def test_intent_alone_can_be_best():
+    intent = _isig(0.3)
+    assert S.best_signal([intent]) is intent
+
+
+def test_intent_counts_only_as_damped_other_in_combined():
+    # real 0.16 fully counted, intent 0.3 damped: 1 - 0.84 * (1 - 0.5 * 0.3) = 0.286
+    assert S.combined_strength([_sig(SignalKind.FUNDING, 0.16), _isig(0.3)]) == 0.286
+    assert S.combined_strength([_isig(0.3)]) == 0.3
+    # two intents, no real: best intent 0.3, the other damped
+    assert S.combined_strength([_isig(0.3), _isig(0.2, src="b")]) == 0.37
+
+
+def test_intent_cannot_lift_combined_above_real_plus_damped_intent():
+    real = _sig(SignalKind.FUNDING, 0.16)
+    with_intent = S.combined_strength([real, _isig(0.3)])
+    assert with_intent < 0.3 + 0.16     # not a straight sum
+    assert with_intent > S.combined_strength([real])
+
+
+# ------------------------------------------------------------ (c) per-kind max age and floor
+def test_max_age_table_literal():
+    assert S.KIND_MAX_AGE_DAYS == {
+        SignalKind.EXEC_MOVE: 90, SignalKind.NEW_HIRE: 90, SignalKind.FUNDING: 45, SignalKind.PRODUCT_LAUNCH: 45,
+        SignalKind.MA: 45, SignalKind.PROJECT_PAIN: 45, SignalKind.PARTNERSHIP: 30, SignalKind.HIRING_PLAN: 30,
+        SignalKind.INTENT: 30}
+    assert S.MIN_STRENGTH_FLOOR == 0.10 and S.AMBIGUOUS_ROLE_FACTOR == 0.7
+
+
+_BOUNDARY_CASES = [
+    ("Executive Move", "<P> joins as Head of Product.", (), 90),
+    ("New Hire", "<P> joins as Head of Digital.", (), 90),
+    ("Funding", "Gamma raised $5 million.", (), 45),
+    ("Product Launch", "Gamma launched a new app.", (), 45),
+    ("Mergers & Acquisitions (M&A)", "Gamma acquired Tiny Co.", (), 45),
+    ("Project", "Gamma is rebuilding its app.", ("Customer Experience",), 45),
+    ("Partnership", "Gamma partnered with a vendor.", (), 30),
+    ("Hiring Plans", "Gamma is hiring a Product Manager.", (), 30),
+]
+
+
+@pytest.mark.parametrize("typ,desc,topics,limit", _BOUNDARY_CASES, ids=[c[0] for c in _BOUNDARY_CASES])
+def test_per_kind_age_boundary(config, typ, desc, topics, limit):
+    assert judge(config, desc=desc, types=(typ,), topics=topics, days=limit).keep
+    v = judge(config, desc=desc, types=(typ,), topics=topics, days=limit + 1)
+    assert not v.keep and v.reason.startswith("Dropped: expired") and f"limit {limit}" in v.reason
+
+
+def test_exec_move_days_46_to_90_kept_with_literal_strengths(config, accounts):
+    by_zi = {a.zoominfo_id: a for a in accounts if a.zoominfo_id}
+    for days, expected in ((46, 0.4431), (90, 0.225)):
+        v = judge(config, desc="<P> joins as Head of Product.", types=("Executive Move",), topics=(), days=days)
+        assert v.keep
+        assert S.scoops_to_signals([v], by_zi, config, TODAY).signals[0].strength == expected
+    assert S.signal_strength(SignalKind.NEW_HIRE, 90) == 0.1625
+    assert S.signal_strength(SignalKind.PARTNERSHIP, 30) == 0.1672
+    assert S.signal_strength(SignalKind.HIRING_PLAN, 30) == 0.2043
+
+
+def test_all_default_kept_ages_stay_above_the_floor():
+    for kind, limit in S.KIND_MAX_AGE_DAYS.items():
+        assert S.signal_strength(kind, limit) >= S.MIN_STRENGTH_FLOOR, kind
+
+
+def test_below_floor_dropped_with_reason(config, monkeypatch):
+    monkeypatch.setattr(S, "MIN_STRENGTH_FLOOR", 0.5)
+    assert judge(config, days=5).keep                       # 0.7 * 0.5 ** (5/21) = 0.5937
+    v = judge(config, days=15)                              # 0.4267 < 0.5
+    assert not v.keep and "faded below floor" in v.reason and "0.43" in v.reason
+
+
+def test_floor_boundary_is_inclusive(config, monkeypatch):
+    monkeypatch.setattr(S, "MIN_STRENGTH_FLOOR", 0.4267)
+    assert judge(config, days=15).keep
+
+
+def test_floor_applies_to_the_ambiguous_factor(config, monkeypatch):
+    monkeypatch.setattr(S, "MIN_STRENGTH_FLOOR", 0.6)       # 0.8333 clear, 0.5833 ambiguous
+    kw = dict(types=("Executive Move",), topics=(), days=5)
+    assert judge(config, desc="Example Co named a Head of Product.", **kw).keep
+    assert not judge(config, desc="Example Co named a Head of Product, Footwear.", **kw).keep
+
+
+def test_multi_type_expired_high_kind_falls_back_to_lower(config):
+    # exec move is within 90 days; the funding half of the same scoop would be expired but exec wins anyway
+    v = judge(config, desc="<P> joins as Head of Product after Gamma raised $5 million.",
+              types=("Executive Move", "Funding"), topics=(), days=60)
+    assert v.keep and v.kind is SignalKind.EXEC_MOVE
+    # an M&A + Partnership scoop at 40 days: partnership is expired (30), M&A (45) survives
+    v = judge(config, desc="Gamma acquired Tiny Co.", types=("Partnership", "Mergers & Acquisitions (M&A)"),
+              topics=(), days=40)
+    assert v.keep and v.kind is SignalKind.MA
+
+
+# ------------------------------------------------------------ (d) verdict reasons
+def test_every_reason_is_a_kept_or_dropped_sentence(verdicts):
+    for v in verdicts.values():
+        assert v.reason.startswith("Kept: " if v.keep else "Dropped: ")
+        assert "\n" not in v.reason and len(v.reason) < 300
+
+
+def test_reason_literals(verdicts):
+    assert verdicts["SIG-07"].reason == "Kept: Executive Move, role 'VP of Product', 5 days ago"
+    assert verdicts["SIG-01"].reason == ("Dropped: generic hiring note (matches drop keyword 'medical & health', "
+                                         "no buyer-role context)")
+    assert verdicts["SIG-17"].reason == "Kept: Product Launch, 45 days ago"
+    assert verdicts["SIG-18"].reason == "Dropped: expired, 46 days old (limit 45 for product_launch)"
+    assert verdicts["SIG-23"].reason == "Kept: Product Launch, today (future-dated, treated as today)"
+    assert verdicts["SIG-13"].reason == "Kept: Project, buyer topic digital workplace, 5 days ago"
+    assert verdicts["SIG-20"].reason == "Dropped: scoop type not a Pendo trigger (types: Earnings)"
+
+
+def test_reason_age_phrases(config):
+    assert judge(config, days=0).reason == "Kept: Funding, today"
+    assert judge(config, days=1).reason == "Kept: Funding, 1 day ago"
+    assert judge(config, days=2).reason == "Kept: Funding, 2 days ago"
+
+
+def test_verdict_summary(verdicts):
+    assert S.verdict_summary(verdicts["SIG-07"]) == verdicts["SIG-07"].reason
+    v = S.ScoopVerdict(verdicts["SIG-07"].scoop, False, SignalKind.NONE, "Dropped:  two\n lines ")
+    assert S.verdict_summary(v) == "Dropped: two lines"
+
+
+def test_two_free_words_are_not_matched():
+    # known limit (docs/signals_notes.md): only ONE free word between title and domain
+    assert S.relevant_role("Example Co recruited a Head of Cloud Platform Engineering.") is None
+
+
+# ------------------------------------------------------------ (e) held-out regression
+def _heldout_metrics(config, name):
+    tp = fp = fn = tn = 0
+    misses = []
+    for r in load_fixture(name)["rows"]:
+        if r.get("judge"):
+            continue
+        sc = Scoop(r["id"], "Z", "Example Co", r["description"], TODAY - timedelta(days=r["age_days"]),
+                   tuple(r["types"]), tuple(r["topics"]))
+        keep = S.filter_scoops([sc], config, TODAY)[0].keep
+        want = r["expect"] == "keep"
+        tp += keep and want
+        fp += keep and not want
+        fn += (not keep) and want
+        tn += (not keep) and not want
+        if keep != want:
+            misses.append(r["id"])
+    return (tp / (tp + fp) if tp + fp else 1.0), (tp / (tp + fn) if tp + fn else 1.0), misses
+
+
+def test_heldout_round1_not_below_reviewer_numbers(config):
+    precision, recall, misses = _heldout_metrics(config, "signals_heldout1.json")
+    assert precision >= 1.0 and recall >= 0.96, misses
+
+
+def test_heldout_round2_improves_on_reviewer_numbers(config):
+    precision, recall, misses = _heldout_metrics(config, "signals_heldout2.json")
+    assert precision > 0.57 and recall >= 0.89, misses
+
+
+def test_heldout_files_have_expected_shape():
+    for name, n in (("signals_heldout1.json", 128), ("signals_heldout2.json", 28)):
+        rows = load_fixture(name)["rows"]
+        assert len(rows) == n and all({"id", "types", "topics", "description", "expect", "age_days"} <= set(r) for r in rows)
