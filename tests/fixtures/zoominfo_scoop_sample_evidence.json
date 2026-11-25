@@ -60,6 +60,16 @@
       "scoop": "FAKE-SCOOP-12",
       "keep": true,
       "why": "Hiring Plans with digital/engineering topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-13",
+      "keep": true,
+      "why": "Open Position, product topic"
+    },
+    {
+      "scoop": "FAKE-SCOOP-14",
+      "keep": true,
+      "why": "Management Move, digital role"
     }
   ]
 }
