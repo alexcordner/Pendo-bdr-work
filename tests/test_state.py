@@ -238,7 +238,7 @@ def test_scenario_end_to_end(config, scenario):
 def test_dnc_by_name_from_any_past_call(config):
     calls = [call("C1", pid="FAKE-P1", disp="Do Not Call", when="2025-01-01T00:00:00Z"),
              call("C2", pid="FAKE-P1", disp="Interested", dur=100, when="2026-11-01T00:00:00Z")]
-    assert S.do_not_call_prospects(calls, config) == {"FAKE-P1"}
+    assert S.do_not_call_prospects(calls, config) == {"fake-p1"}
 
 
 def test_dnc_ignores_other_dispositions_and_none_ids(config):
@@ -249,7 +249,7 @@ def test_dnc_ignores_other_dispositions_and_none_ids(config):
 
 def test_dnc_matches_by_name_not_id(config):
     c = replace(call("C1", disp="Do Not Call"), disposition_id="disp-something-else")
-    assert S.do_not_call_prospects([c], config) == {"FAKE-P1"}
+    assert S.do_not_call_prospects([c], config) == {"fake-p1"}
 
 
 def test_dnc_phones_cover_unlinked_calls(config):
@@ -262,7 +262,7 @@ def test_dnc_phones_cover_unlinked_calls(config):
 def test_dnc_is_sticky_in_state(config):
     st = rec([call("C1", disp="Do Not Call")], config=config)
     st = rec([call("C2", disp="Interested", dur=99, when="2026-11-20T00:00:00Z")], state=st, config=config)
-    assert "FAKE-P1" in st.dnc_prospect_ids
+    assert "fake-p1" in st.dnc_prospect_ids
 
 
 def test_is_blocked_dnc_id(config):
@@ -279,7 +279,7 @@ def test_is_blocked_dnc_phone_for_other_prospect(config):
 
 def test_is_blocked_dnc_on_unlinked_call_matched_by_phone(config):
     st = rec([call("C1", pid=None, disp="Do Not Call", to="+61400000011")], config=config)
-    assert "FAKE-P1" in st.dnc_prospect_ids
+    assert "fake-p1" in st.dnc_prospect_ids
 
 
 def test_is_blocked_prospect_flag(config):
@@ -517,7 +517,7 @@ def test_round_trip_save_load(config, scenario, tmp_path):
     back = S.load_state(tmp_path)
     assert _d(back) == _d(st)
     assert back.accounts["FAKE-ACC-2"].last_connect_at == st.accounts["FAKE-ACC-2"].last_connect_at
-    assert back.dnc_prospect_ids == {"FAKE-P6"} and back.dnc_phones == {"+61400000016"}
+    assert back.dnc_prospect_ids == {"fake-p6"} and back.dnc_phones == {"+61400000016"}
 
 
 def test_save_creates_missing_directory(tmp_path):
@@ -678,7 +678,7 @@ def test_rebuild_after_reset_clears_gate(config, scenario, tmp_path):
     st = S.record_calls(st, calls, prospects, config=config)
     st = S.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"], reached_last_page=True)
     S.require_healthy(st)
-    assert "FAKE-P6" in st.dnc_prospect_ids and st.dnc_rebuilt_earliest == "2026-10-01"
+    assert "fake-p6" in st.dnc_prospect_ids and st.dnc_rebuilt_earliest == "2026-10-01"
 
 
 @pytest.mark.parametrize("n", [-1, None, True, "5", 1.5])
@@ -942,8 +942,8 @@ def test_different_email_not_blocked(config):
                                    "  Do Not Call\n", "Do\u00a0Not\u00a0Call", "Do_Not_Call!!", "DO NOT CALL "])
 def test_dnc_name_variants_fail_closed(config, name):
     c = call("C1", disp=name)
-    assert S.do_not_call_prospects([c], config) == {"FAKE-P1"}
-    assert "FAKE-P1" in rec([c], config=config).dnc_prospect_ids
+    assert S.do_not_call_prospects([c], config) == {"fake-p1"}
+    assert "fake-p1" in rec([c], config=config).dnc_prospect_ids
 
 
 @pytest.mark.parametrize("name", ["Do Not Call (DNC)", "Not Do Call", "Do Not Callback", "Call", "", None])
@@ -1446,3 +1446,121 @@ def test_sent_email_without_account_counted(caplog):
         st = S.record_sent_emails(S.State(), [sent_email("M1", addr="stranger@example.com")], [pros()])
     assert st.report["record_sent_emails"]["no_account"] == 1
     assert "no recipient with a Salesforce account" in caplog.text
+
+
+# ================================================================= Do Not Call prospect ids are case-insensitive
+@pytest.mark.parametrize("stored_as,asked_as", [
+    ("FAKE-P1", "fake-p1"), ("fake-p1", "FAKE-P1"), ("Fake-P1", "fAKE-p1"),
+    ("FAKE-P1", "  FAKE-P1  "), ("fake-p1", "\tFake-P1\n"), ("FAKE-P1", "FAKE-P1")])
+def test_dnc_blocks_whatever_the_id_case_or_padding(config, stored_as, asked_as):
+    st = rec([call("C1", pid=stored_as, disp="Do Not Call")], prospects=[], config=config)
+    blocked, reason = S.is_blocked(pros(nid=asked_as, phone=None, email=None), st)
+    assert blocked and reason
+    assert S.is_blocked(pros(nid=asked_as, phone=None, email=None), st, "call")[0]
+    assert S.is_blocked(pros(nid=asked_as, phone=None, email=None), st, "email")[0]
+
+
+def test_dnc_ids_stored_stripped_and_lowercase(config):
+    st = rec([call("C1", pid="  FAKE-P1 ", disp="Do Not Call"),
+              call("C2", pid="fake-P1", disp="Do Not Call")], prospects=[], config=config)
+    assert st.dnc_prospect_ids == {"fake-p1"}
+    assert st.report["record_calls"]["dnc_added"] == 1                    # one person, counted once
+
+
+def test_do_not_call_prospects_returns_canonical_ids(config):
+    calls = [call("C1", pid="FAKE-P1", disp="Do Not Call"), call("C2", pid=" fake-p1", disp="Do Not Call"),
+             call("C3", pid="   ", disp="Do Not Call"), call("C4", pid=None, disp="Do Not Call")]
+    assert S.do_not_call_prospects(calls, config) == {"fake-p1"}
+
+
+def test_mark_do_not_call_catches_case_variants(config):
+    st = rec([call("C1", pid="FAKE-P1", disp="Do Not Call")], prospects=[], config=config)
+    out = S.mark_do_not_call([pros(nid="fake-p1", phone=None, email=None), pros(nid="FAKE-P2", phone=None, email=None)], st)
+    assert [p.do_not_call for p in out] == [True, False]
+
+
+def test_prospect_id_case_difference_still_links_call_to_prospect(config):
+    st = rec([call("C1", pid="fake-p1", disp="Do Not Call")], prospects=[pros(nid="FAKE-P1")], config=config)
+    assert S.is_blocked(pros(nid="Fake-P1", phone=None, email="pat.one@example.com"), st)[0]
+    assert st.dnc_emails                                                    # linked despite the case difference
+    assert "FAKE-P1" in st.prospects and st.accounts["FAKE-ACC-1"].last_call_at   # history under the real id
+
+
+def test_other_prospect_not_blocked_by_case_folding(config):
+    st = rec([call("C1", pid="FAKE-P1", disp="Do Not Call")], prospects=[], config=config)
+    assert not S.is_blocked(pros(nid="FAKE-P10", phone=None, email=None), st)[0]
+    assert not S.is_blocked(pros(nid="FAKE-P", phone=None, email=None), st)[0]
+
+
+def test_old_file_with_mixed_case_ids_merges_on_load(tmp_path):
+    raw = {"version": 2, "dnc_prospect_ids": ["ABC", "abc", " Abc ", "XyZ", ""]}
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert st.dnc_prospect_ids == {"abc", "xyz"} and not st.was_reset
+    assert S.is_blocked(pros(nid="aBc", phone=None, email=None), st)[0]
+    assert S.is_blocked(pros(nid="XYZ", phone=None, email=None), st)[0]
+
+
+def test_saving_a_merged_old_file_is_not_a_shrink(tmp_path):
+    raw = {"version": 2, "dnc_prospect_ids": ["ABC", "abc"], "dnc_rebuilt_at": "2026-11-25", "dnc_rebuilt_calls": 3}
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    S.save_state(st, tmp_path)                                              # 2 on disk -> 1 canonical: allowed
+    assert json.loads((tmp_path / S.STATE_FILENAME).read_text())["dnc_prospect_ids"] == ["abc"]
+    with pytest.raises(S.StateShrinkError):                                 # a real loss is still refused
+        S.save_state(S.State(dnc_rebuilt_at="2026-11-25", dnc_rebuilt_calls=3), tmp_path)
+
+
+def test_old_file_non_string_id_still_resets(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps({"version": 2, "dnc_prospect_ids": ["a", 5]}), encoding="utf-8")
+    assert S.load_state(tmp_path).was_reset
+
+
+def test_case_folding_is_casefold_not_lower():
+    assert S._pid("STRASSE") == S._pid("straße") == "strasse"               # lower() would not merge these
+    assert "straße".lower() != "STRASSE".lower()
+
+
+def test_pid_key_edge_cases():
+    assert S._pid(None) is None and S._pid("") is None and S._pid("  ") is None and S._pid(5) is None
+    assert S._pid(" Ab ") == "ab"
+
+
+def test_unicode_dnc_id_blocks_across_case_forms(config):
+    st = rec([call("C1", pid="PROSPECT-STRASSE", disp="Do Not Call")], prospects=[], config=config)
+    assert S.is_blocked(pros(nid="prospect-straße", phone=None, email=None), st)[0]
+
+
+def test_dnc_id_case_survives_save_load(config, tmp_path):
+    st = rec([call("C1", pid="FAKE-P1", disp="Do Not Call")], prospects=[], config=config)
+    S.save_state(st, tmp_path)
+    assert S.is_blocked(pros(nid="Fake-p1", phone=None, email=None), S.load_state(tmp_path))[0]
+
+
+def test_is_blocked_none_and_blank_ids_unaffected(config):
+    st = rec([call("C1", pid="FAKE-P1", disp="Do Not Call")], prospects=[], config=config)
+    assert not S.is_blocked(pros(nid=None, phone=None, email=None), st)[0]
+    assert not S.is_blocked(pros(nid="   ", phone=None, email=None), st)[0]
+
+
+def test_sfc_internal_keys_unaffected(config):
+    # accounts and sheets use Salesforce ids, not the prospect-id folding; 'sfc:' style keys pass through
+    st = S.record_sheet(S.State(), RUN, ["sfc:ABC-1", "SFC:abc-1"])
+    assert st.sheets[-1]["account_ids"] == ["sfc:ABC-1", "SFC:abc-1"]
+
+
+# ---- public is_dnc_call
+def test_is_dnc_call_public_wrapper(config):
+    assert S.is_dnc_call(call(disp="Do Not Call"), config)
+    assert S.is_dnc_call(call(disp="do-not-call."), config)
+    assert S.is_dnc_call(call(disp="DO  NOT\u00a0CALL"), config)
+    assert not S.is_dnc_call(call(disp="No Answer"), config)
+    assert not S.is_dnc_call(call(disp=None), config)
+    assert not S.is_dnc_call(call(disp=""), config)
+    assert not S.is_dnc_call(call(disp="Do Not Call (DNC)"), config)
+
+
+def test_is_dnc_call_ignores_disposition_id(config):
+    c = replace(call(disp="Do Not Call"), disposition_id="anything")
+    assert S.is_dnc_call(c, config)
+    assert not S.is_dnc_call(replace(call(disp="Interested"), disposition_id="disp-do-not-call"), config)
