@@ -55,11 +55,19 @@ this into subject and body.
   now", "I've sent", "invite"): it is a draft.
 
 ## How to run the lint
-Save the packet as `packet.json` and the draft (in the SUBJECT / BODY shape above) as `draft.txt`, then run:
+**Run the lint from the repo root** (the folder that contains `src/` and `config/`); from anywhere else it fails with
+`No module named src`. Save the packet as `packet.json` and the draft (in the SUBJECT / BODY shape above) as
+`draft.txt`, then run:
 ```text
 python -m src.textcheck email --packet packet.json --text draft.txt --voice config/voice.yaml
 ```
 Exit code 0 = no errors, 1 = errors (printed one per line), 2 = could not run (stop and report; do not skip the lint).
+`--show-diff` also lists the words that are not in the packet.
+
+### The NOT_IN_PACKET warning
+`WARNING NOT_IN_PACKET: <words>` lists content words in the subject and body that the packet does not contain. It never
+blocks, but Alex sees it. Rewrite the line using only packet words if a listed word is a claim (an adjective, a verb
+about what they did, a number); accept it only when every word is clearly scaffolding.
 
 ## Retry rule
 Regenerate **at most 3 times**, changing only what the violations name. If errors remain after the third try, output

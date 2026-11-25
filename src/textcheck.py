@@ -69,6 +69,10 @@ LINT_CODES: dict[str, str] = {
     "GATEKEEPER_PITCH": "gatekeeper line pitches or mentions the trigger",
     "GATEKEEPER_PITCH_SOFT": "gatekeeper line has a word that may be pitch (warning, INFERRED list)",
     "GATEKEEPER_NO_ROLE": "gatekeeper line does not ask for a role or person",
+    "NOT_IN_PACKET": "content words in the text that are not in the packet (warning: for Alex's skim)",
+    "COMPETITOR_NAMED": "a competitor product is named",
+    "STALE_SIGNAL_USED": "a stale, future or intent signal is restated as current news",
+    "GENDER_ASSUMED": "he/she/his/her/him used for a person (warning: the packet has no gender)",
     "RELATIVE_TIME_UNVERIFIED": "'last month' style phrase the packet has no age_days to check (warning)",
     "SIMILAR_TO_DISLIKED": "near-duplicate of an opener Alex dislikes (warning)",
     "EMAIL_SUBJECT_LENGTH": "subject is not one line of the allowed word count",
@@ -134,7 +138,8 @@ SCHEMA: dict[str, Any] = {
     "banned_phrases": _LIST, "banned_phrases_email_only": _LIST,
     "pendo_feature_phrases": _LIST, "pendo_feature_soft_words": _LIST,
     "unsupported_claim_patterns": _RX, "trigger_reaction_patterns": _RX, "trigger_event_words": _LIST,
-    "round_patterns": _RX, "event_synonym_groups": _LIST, "unsupported_unless_in_packet": _LIST, "role_assumption_patterns": _RX, "send_language_patterns": _RX,
+    "round_patterns": _RX, "event_synonym_groups": _LIST, "unsupported_unless_in_packet": _LIST,
+    "competitors": _LIST, "news_phrasing_patterns": _RX, "pronoun_words": _LIST, "scaffolding_words": _LIST, "role_assumption_patterns": _RX, "send_language_patterns": _RX,
     "history_claim_patterns": _RX, "allowed_proper_nouns": _LIST, "allowed_acronyms": _LIST,
     "title_acronyms": "map", "number_word_exempt_units": _LIST, "company_suffixes": _LIST,
     "fact_overlap_min": "float", "trigger_overlap_min": "float", "disliked_similarity_min": "float",
@@ -262,6 +267,7 @@ class _Packet:
     contact_history: str
     ages: list[int]
     corpus: str
+    stale_evidence: list[str]
 
     @property
     def ambiguous_role(self) -> bool:
@@ -379,8 +385,12 @@ def normalize_packet(packet: Mapping[str, Any]) -> _Packet:
     for it in items:
         parts += [it.text, it.date, *it.sources]
     history = _s(packet.get("contact_history"))
+    stale = [_s(x.get("evidence") or x.get("text")) for x in sigs
+             if x not in usable_sigs and _s(x.get("evidence") or x.get("text"))]
+    if trigger is None:   # a signal the packet did not promote to a trigger: usable-looking ones count too
+        stale += [_s(x.get("evidence") or x.get("text")) for x in usable_sigs]
     return _Packet(name, first, title, kind, trigger, facts, items, ambiguous, _must_not_phrases(raw_mnc), contact,
-                   history, ages, " \n".join(p for p in parts if p))
+                   history, ages, " \n".join(p for p in parts if p), [t for t in stale if t])
 
 
 # ----------------------------------------------------------------------------------------------------- text tools
@@ -539,13 +549,30 @@ def _magnitudes(corpus_l: str) -> set[str]:
     return out | {m for _, m in _digit_magnitudes(corpus_l)}
 
 
-def _derived_numbers(pk: _Packet) -> set[str]:
-    out: set[str] = set()
-    for a in pk.ages:
-        out |= {str(a), str(a // 7), str(round(a / 7)), str(math.ceil(a / 7))}
-        if a >= 30:
-            out |= {str(a // 30), str(round(a / 30))}
-    return out
+_DUR = re.compile(r"\b(\d+|an?|%s)[\s-]+(day|week|month)s?\b" % "|".join(_UNITS), re.I)
+
+
+def _check_durations(text: str, where: str, pk: _Packet, v: list[Violation]) -> str:
+    """'N days / weeks / months' must fit age_days in THAT unit (two days is not nine days; nine days is not nine
+    weeks). Returns the text with those phrases blanked so the generic number check skips them."""
+    def ok(n: int, unit: str) -> bool:
+        for a in pk.ages:
+            if unit == "day" and abs(n - a) <= 1:
+                return True
+            if unit == "week" and n in {a // 7, round(a / 7), math.ceil(a / 7)}:
+                return True
+            if unit == "month" and a >= 20 and n in {a // 30, round(a / 30)}:
+                return True
+        return False
+
+    def sub(m: re.Match[str]) -> str:
+        w = m.group(1).lower()
+        n = 1 if w in ("a", "an") else (int(w) if w.isdigit() else _UNITS[w])
+        if not ok(n, m.group(2).lower()):
+            v.append(Violation("NUMBER_UNSUPPORTED", f"{where}: '{m.group(0)}' does not fit the packet's age_days "
+                               f"{sorted(set(pk.ages)) or 'none'}", ERROR))
+        return " "
+    return _DUR.sub(sub, text)
 
 
 # ----------------------------------------------------------------------------------------------------- shared checks
@@ -575,13 +602,17 @@ def _check_contact(text: str, where: str, pk: _Packet, v: list[Violation], allow
         v.append(Violation("LINK", f"{where}: contains a link or web address", ERROR))
 
 
-def _check_words(text: str, where: str, cfg: dict[str, Any], v: list[Violation], email: bool = False) -> None:
+def _check_words(text: str, where: str, cfg: dict[str, Any], v: list[Violation], email: bool = False,
+                 pk_corpus: str = "") -> None:
     banned = list(cfg["banned_phrases"]) + (list(cfg["banned_phrases_email_only"]) if email else [])
     for p in _find_phrases(text, banned):
         v.append(Violation("BANNED_PHRASE", f"{where}: banned phrase '{p}'", ERROR))
     for m in _find_patterns(text, cfg["unsupported_claim_patterns"]):
         v.append(Violation("UNSUPPORTED_CLAIM", f"{where}: unsupported claim '{m}' (nothing in the packet backs it)",
                            ERROR))
+    for c in _find_phrases(text, cfg["competitors"]):
+        if not _phrase_re(c).search(pk_corpus.lower()):
+            v.append(Violation("COMPETITOR_NAMED", f"{where}: names a competitor ('{c}')", ERROR))
     for m in _find_patterns(text, cfg["send_language_patterns"]):
         v.append(Violation("EMAIL_SEND_LANGUAGE", f"{where}: send/attach/invite language ('{m}'); drafts only", ERROR))
 
@@ -670,7 +701,8 @@ def _check_supported(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v:
     mid-sentence capitalised tokens are always checked; a sentence-initial word is checked only when it looks like a
     company (followed by another capitalised word, or a possessive)."""
     exempt = cfg["number_word_exempt_units"]
-    have = _numbers(pk.corpus) | _derived_numbers(pk)
+    text = _check_durations(text, where, pk, v)
+    have = _numbers(pk.corpus)
     for n in sorted(_numbers(text) - have):
         v.append(Violation("NUMBER_UNSUPPORTED", f"{where}: number/date '{n}' is not in the packet", ERROR))
     corpus_l = pk.corpus.lower()
@@ -706,6 +738,8 @@ def _check_supported(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v:
         for i, m in enumerate(toks):
             w = m.group(0)
             if not any(ch.isupper() for ch in w) or len(w) < 2 or not (w[0].isupper() or w[0].isdigit()):
+                continue
+            if re.fullmatch(r"Q[1-4]", w):
                 continue
             base = re.sub(r"'s$", "", w.lower())
             if base in allowed or base.split("'")[0] in allowed:
@@ -812,6 +846,49 @@ def _check_history(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v: l
                                ERROR))
 
 
+def _check_pronouns(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v: list[Violation]) -> None:
+    """The packet has no gender: he/she/his/her/him for a named person is a guess (warning)."""
+    words = [w for w in cfg["pronoun_words"] if re.search(r"\b%s\b" % re.escape(w), text, re.I)
+             and not re.search(r"\b%s\b" % re.escape(w), pk.corpus, re.I)]
+    if words:
+        v.append(Violation("GENDER_ASSUMED", f"{where}: '{words[0]}' assumes a gender the packet does not give "
+                           "(say the name or 'they')", WARNING))
+
+
+def _check_stale_news(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v: list[Violation]) -> None:
+    """No real trigger, but the packet holds a stale, future or intent signal: restating it in present-progressive
+    news phrasing ('is migrating its platform') presents old or private data as current news."""
+    if pk.trigger is not None or not pk.stale_evidence:
+        return
+    names = set(_tokens(pk.account_name))
+    for sent in re.split(r"(?<=[.?!])\s+|\n+", text):
+        if not _find_patterns(sent, cfg["news_phrasing_patterns"]):
+            continue
+        st = set(_tokens(sent)) - names
+        for ev in pk.stale_evidence:
+            if len(st & (set(_tokens(ev)) - names)) >= 2:
+                v.append(Violation("STALE_SIGNAL_USED", f"{where}: restates a stale or intent signal as current news "
+                                   f"('{sent.strip()[:70]}')", ERROR))
+                return
+
+
+_PERSON = [re.compile(r"\b(?:appointed|named|hired|promoted|welcomed|appoints|names|hires|promotes|welcomes)\s+"
+                      r"((?:[A-Z][\w'\-]+\s?){1,3})"),
+           re.compile(r"((?:[A-Z][\w'\-]+\s){1,2}[A-Z][\w'\-]+)\s+(?:has joined|joined|was appointed|was named|starts)")]
+
+
+def _trigger_person_tokens(pk: _Packet) -> set[str]:
+    """Capitalised words naming the person in the trigger evidence (Callum Reyes), minus the account's own words."""
+    if pk.trigger is None:
+        return set()
+    own = {w.lower() for w in re.findall(r"[A-Za-z][\w'\-]*", pk.account_name + " " + pk.title + " " + pk.first_name)}
+    out: set[str] = set()
+    for rx in _PERSON:
+        for m in rx.finditer(pk.trigger.text):
+            out |= {w for w in re.findall(r"[A-Z][\w'\-]+", m.group(1)) if w.lower() not in own}
+    return out
+
+
 def _check_must_not(texts: list[tuple[str, str]], pk: _Packet, v: list[Violation]) -> None:
     for where, text in texts:
         for claim in pk.must_not_phrases:
@@ -863,7 +940,7 @@ def _unicode_issue(issues: list[str], v: list[Violation]) -> None:
 def _check_common(text: str, where: str, pk: _Packet, cfg: dict[str, Any], v: list[Violation],
                   email: bool = False) -> None:
     _check_surface(text, where, v)
-    _check_words(text, where, cfg, v, email=email)
+    _check_words(text, where, cfg, v, email=email, pk_corpus=pk.corpus)
     _check_rounds(text, where, pk, cfg, v)
     _check_currency(text, where, pk, v)
     _check_relative_time(text, where, pk, v)
@@ -998,6 +1075,8 @@ def check_opener_block(text: str, packet_dict: Mapping[str, Any], voice_cfg: Map
                 v.append(Violation("OPENER_PENDO_FEATURE_SOFT", f"OPENER may be feature talk ('{w}')", WARNING))
         _check_common(o, "OPENER", pk, cfg, v)
         _check_trigger_claims(o, "OPENER", pk, cfg, v)
+        _check_stale_news(o, "OPENER", pk, cfg, v)
+        _check_pronouns(o, "OPENER", pk, cfg, v)
         _check_titles(o, "OPENER", pk, cfg, v)
         _check_role(o, "OPENER", pk, cfg, v)
         _check_history(o, "OPENER", pk, cfg, v, opener=True)
@@ -1054,6 +1133,13 @@ def check_opener_block(text: str, packet_dict: Mapping[str, Any], voice_cfg: Map
         if cfg["gatekeeper"]["role_cues"] and not _find_phrases(g, cfg["gatekeeper"]["role_cues"]):
             v.append(Violation("GATEKEEPER_NO_ROLE", "GATEKEEPER must ask for a role or person", ERROR))
         _check_common(g, "GATEKEEPER", pk, cfg, v)
+        for w in _find_phrases(g, cfg["pendo_feature_phrases"]):
+            if not _phrase_re(w).search(pk.corpus.lower()):
+                v.append(Violation("GATEKEEPER_PITCH", f"GATEKEEPER names a Pendo feature ('{w}')", ERROR))
+        for nm in sorted(_trigger_person_tokens(pk)):
+            if re.search(r"\b%s\b" % re.escape(nm), g):
+                v.append(Violation("GATEKEEPER_PITCH", f"GATEKEEPER repeats the trigger person's name ('{nm}')", ERROR))
+                break
         if _find_patterns(g, cfg["trigger_reaction_patterns"]) or _find_phrases(g, cfg["trigger_event_words"]):
             v.append(Violation("GATEKEEPER_PITCH", "GATEKEEPER must not mention the trigger", ERROR))
         _check_history(g, "GATEKEEPER", pk, cfg, v, opener=True)
@@ -1081,6 +1167,10 @@ def check_opener_block(text: str, packet_dict: Mapping[str, Any], voice_cfg: Map
             _check_rounds(ttext, "TRIGGER", pk, cfg, v)
             _check_currency(ttext, "TRIGGER", pk, v)
             _check_supported(ttext, "TRIGGER", pk, cfg, v)
+    spoken = "\n".join(sec[k] for k in ("OPENER", "FACT 1", "FACT 2", "GATEKEEPER") if k in sec)
+    miss = claims_not_in_packet(spoken, packet_dict, cfg)
+    if miss:
+        v.append(Violation("NOT_IN_PACKET", ", ".join(miss), WARNING))
     return v
 
 
@@ -1169,11 +1259,116 @@ def check_email_draft(subject: str, body: str, packet_dict: Mapping[str, Any],
         _check_contact(t, where, pk, v, allow_links=bool(em["allow_links"]))
         _check_common(t, where, pk, cfg, v, email=True)
         _check_trigger_claims(t, where, pk, cfg, v)
+        _check_stale_news(t, where, pk, cfg, v)
+        _check_pronouns(t, where, pk, cfg, v)
         _check_titles(t, where, pk, cfg, v)
         _check_role(t, where, pk, cfg, v)
         _check_history(t, where, pk, cfg, v, opener=False)
     _check_must_not([("subject", subject), ("body", text)], pk, v)
+    miss = claims_not_in_packet(subject + "\n" + "\n".join(content), packet_dict, cfg)
+    if miss:
+        v.append(Violation("NOT_IN_PACKET", ", ".join(miss), WARNING))
     return v
+
+
+# ----------------------------------------------------------------------------------------------------- skim aids
+
+_FUNCTION_WORDS = frozenset("""about above after again all also although always among and any are around because been before
+being between both but can could did does doing done down during each either else even ever every for from had has have
+having her here hers him his how however into its just may might more most much must neither nor not now off once only
+other our out over own same shall she should since some such than that the their them then there these they this those
+through too under until upon very was were what when where whether which while who whom whose why will with within
+without would yet you your yours""".split())
+
+
+def claims_not_in_packet(text: str, packet_dict: Mapping[str, Any], voice_cfg: Mapping[str, Any] | None = None
+                         ) -> list[str]:
+    """Content words (verbs, adjectives, nouns, numbers) in ``text`` that are not in the packet, in order, without
+    repeats. Inflections count as the same word (launch, launched, launching). Function words, the contact's own
+    greeting and the opener scaffolding in ``voice_cfg['scaffolding_words']`` are ignored. A deterministic aid for
+    the human skim: it finds what the packet does not say, not what is false. Source tails are ignored."""
+    if not isinstance(packet_dict, Mapping) or not isinstance(text, str):
+        return []
+    pk = normalize_packet(packet_dict)
+    scaff = {w.lower() for w in (voice_cfg or {}).get("scaffolding_words", [])} | {"alex", "pendo"}
+    allowed = {w.lower() for w in (voice_cfg or {}).get("allowed_proper_nouns", [])}
+    corpus_words = _WORD.findall(unicodedata.normalize("NFKC", pk.corpus).lower())
+    have = {w.split("'")[0] for w in corpus_words} | {_stem(w.split("'")[0]) for w in corpus_words}
+    have_nums = _numbers(pk.corpus)
+    clean, _ = normalize_text(text)
+    out: list[str] = []
+    for ln in clean.splitlines():
+        ln = re.sub(r"^(OPENER|FACT [12]|GATEKEEPER|TRIGGER|SUBJECT|BODY):\s*", "", ln.strip())
+        ln = _split_src(ln)[0]
+        if ln.lower().startswith(("none verified", "draft style")):
+            continue
+        ln = _DUR.sub(" ", ln)   # durations are checked by their own rule against age_days
+        for m in re.finditer(r"\d+(?:[.,]\d+)*|[A-Za-z][A-Za-z\-]*(?:'[a-z]+)?", ln):
+            tok = m.group(0)
+            if tok[0].isdigit():
+                n = tok.replace(",", "").lstrip("0") or "0"
+                if n not in have_nums and n not in out:
+                    out.append(n)
+                continue
+            w = tok.lower().split("'")[0]
+            if "'" in tok and not tok.lower().endswith("'s"):
+                continue                      # contractions (I'll, it's) are scaffolding
+            for part in w.split("-"):
+                if len(part) < 3 or part in _FUNCTION_WORDS or part in scaff or part in allowed:
+                    continue
+                if part in have or _stem(part) in have or part.rstrip("s") in have:
+                    continue
+                if part not in out:
+                    out.append(part)
+    return out
+
+
+def _closest(text: str, pool: list[_Item]) -> _Item | None:
+    best, score = None, 0.0
+    for it in pool:
+        sc = _containment(text, it.text)
+        if sc > score:
+            best, score = it, sc
+    return best
+
+
+def _scrub(s: str) -> str:
+    return _PHONE.sub("[removed]", _EMAIL.sub("[removed]", s))
+
+
+def format_diff(text: str, packet_dict: Mapping[str, Any], voice_cfg: Mapping[str, Any] | None = None) -> str:
+    """Plain text for Alex's skim: the opener beside what the packet says. Opener, the packet's trigger evidence, each
+    FACT line with its closest packet fact, and the words that are not in the packet. No email or phone."""
+    if not isinstance(packet_dict, Mapping) or not isinstance(text, str):
+        return ""
+    pk = normalize_packet(packet_dict)
+    clean, _ = normalize_text(text)
+    body = clean.splitlines()
+    if body and body[0].startswith("DRAFT STYLE:"):
+        body = body[1:]
+    sec, _order, _extra = parse_block("\n".join(body))
+    L = ["--- skim: written text beside the packet ---"]
+    if "OPENER" in sec:
+        L.append(f"OPENER        : {sec['OPENER']}")
+        miss = claims_not_in_packet(sec["OPENER"], packet_dict, voice_cfg)
+        L.append(f"  not in packet: {', '.join(miss) if miss else '(none)'}")
+    if pk.trigger is not None:
+        d = f", {pk.trigger.date}" if pk.trigger.date else ""
+        L.append(f"TRIGGER (pkt) : {pk.trigger.text} ({pk.trigger.sources[0] if pk.trigger.sources else 'no source'}{d})")
+    else:
+        L.append("TRIGGER (pkt) : none: cold call on ICP fit only" + (" (a stale or intent signal exists: not news)"
+                                                                      if pk.stale_evidence else ""))
+    for k in ("FACT 1", "FACT 2"):
+        if k not in sec:
+            continue
+        L.append(f"{k:<14}: {sec[k]}")
+        if not sec[k].lower().startswith("none"):
+            it = _closest(_split_src(sec[k])[0], pk.items)
+            L.append(f"  packet says  : {it.text if it else '(no matching packet fact)'}")
+    if "GATEKEEPER" in sec:
+        L.append(f"GATEKEEPER    : {sec['GATEKEEPER']}")
+    L.append("PACKET FACTS  : " + (" | ".join(f.text for f in pk.facts) if pk.facts else "(none)"))
+    return _scrub("\n".join(L))
 
 
 # ----------------------------------------------------------------------------------------------------- CLI
@@ -1187,6 +1382,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--packet", required=True, help="research packet JSON (ResearchPacket.to_dict())")
     ap.add_argument("--text", required=True, help="file with the generated block ('-' for stdin)")
     ap.add_argument("--voice", default="config/voice.yaml")
+    ap.add_argument("--show-diff", action="store_true",
+                    help="also print the opener beside the packet's trigger evidence and facts, with the words "
+                         "that are not in the packet (for Alex's skim)")
     args = ap.parse_args(argv)
     try:
         packet = json.loads(Path(args.packet).read_text(encoding="utf-8"))
@@ -1201,6 +1399,14 @@ def main(argv: list[str] | None = None) -> int:
         subject, body = parse_email_block(text)
         vs = check_email_draft(subject, body, packet, cfg)
     print(format_violations(vs))
+    if args.show_diff:
+        print()
+        if args.kind == "opener":
+            print(format_diff(text, packet, cfg))
+        else:
+            sub, body = parse_email_block(text)
+            miss = claims_not_in_packet(sub + "\n" + body, packet, cfg)
+            print("--- skim: email words not in the packet ---\n" + (", ".join(miss) if miss else "(none)"))
     return 1 if has_errors(vs) else 0
 
 

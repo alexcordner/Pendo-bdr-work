@@ -76,13 +76,23 @@ facts, the missing line is exactly `FACT 2: none verified` (`FACT 1: none verifi
   such as analytics.
 
 ## How to run the lint
-Save the packet JSON as `packet.json` and your block as `block.txt`, then run:
+**Run the lint from the repo root** (the folder that contains `src/` and `config/`); from anywhere else it fails with
+`No module named src`. Save the packet JSON as `packet.json` and your block as `block.txt`, then run:
 ```text
 python -m src.textcheck opener --packet packet.json --text block.txt --voice config/voice.yaml
 ```
 It prints one line per problem (`ERROR CODE: message`) or `OK: no violations`. Exit code 0 = no errors, 1 = errors,
 2 = could not run (bad file or bad config: stop and report it, do not skip the lint). Warnings do not block: put them in
-the run log.
+the run log. Add `--show-diff` to also print the opener beside the packet's trigger evidence and facts (for Alex's skim).
+
+### The NOT_IN_PACKET warning
+`WARNING NOT_IN_PACKET: completed, renewable, biggest` lists content words (verbs, adjectives, nouns, numbers) in your
+OPENER, FACT and GATEKEEPER lines that the packet does not contain, ignoring inflections and ordinary opener
+scaffolding. It never blocks, but Alex sees it next to the opener, so respond to it:
+- **Rewrite using only packet words** if a listed word is a claim (an adjective about the company, a verb about what it
+  did, a number). Then run the lint again. This does not count against the 3 retries unless an error is also present.
+- **Accept it** only if every listed word is clearly scaffolding (a greeting, "upfront", "curious"): leave the line as is.
+- Never accept a listed word that states something about the company, the contact or the news. When unsure, rewrite.
 
 ## Retry rule
 If there are errors, regenerate **at most 3 times**, changing only what the reported violations name. If errors remain

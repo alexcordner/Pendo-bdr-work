@@ -163,7 +163,7 @@ def test_shape_label_needs_colon_space(cfg):
 
 def test_shape_clean_passes(cfg):
     p, o = _larkspur()
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_empty_text_reports_all_missing(cfg):
@@ -412,7 +412,7 @@ def test_fact_two_padded_when_only_one_fact_exists(cfg):
 
 def test_fact_two_none_verified_ok_with_one_fact(cfg):
     p, o = opener_case("Cinder Payments")
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_fact_none_verified_wrong_form(cfg):
@@ -589,7 +589,7 @@ def test_invented_trigger_in_opener_when_none(cfg, claim):
 
 def test_no_trigger_opener_is_honest_and_passes(cfg):
     p, o = opener_case("Marlow Software Group")
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_trigger_event_word_not_in_evidence(cfg):
@@ -608,7 +608,7 @@ def test_signals_list_is_used_when_trigger_key_absent(cfg):
     t = p.pop("trigger")
     p["signals"] = [{"kind": "partnership", "strength": 0.2, "evidence": "weak", "source": "x", "date": "2026-01-01"},
                     {"kind": "exec_move", "strength": 0.9, **{k: t[k] for k in ("evidence", "source", "date")}}]
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_signals_with_only_none_kinds_means_no_trigger(cfg):
@@ -673,7 +673,7 @@ def test_role_assumption_allowed_without_flag(cfg):
 
 def test_ambiguous_role_clean_opener_passes(cfg):
     p, o = opener_case("Greenvale Dairy")
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 # ---- gatekeeper ---------------------------------------------------------------------------------------------
@@ -751,7 +751,7 @@ def good_email(key: str = "exec_move") -> tuple[str, str]:
 
 def test_email_good(cfg):
     s, b = good_email()
-    assert check_email_draft(s, b, PACKETS["exec_move"], cfg) == []
+    assert not has_errors(check_email_draft(s, b, PACKETS["exec_move"], cfg))
 
 
 @pytest.mark.parametrize("subject", ["tried", "tried you re the big new Larkspur thing", "", "tried you\nre Larkspur"])
@@ -953,7 +953,7 @@ def test_extra_and_missing_keys_tolerated(cfg):
     p["something_new"] = {"a": 1}
     for k in ("website", "location", "employees", "flags", "must_not_claim"):
         p.pop(k)
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_alternate_key_names(cfg):
@@ -962,7 +962,7 @@ def test_alternate_key_names(cfg):
     p["prospect"] = {"first_name": p.pop("prospect_first_name"), "title": p.pop("prospect_title")}
     n = normalize_packet(p)
     assert n.account_name == "Larkspur Insurance" and n.first_name == "Priya" and n.title == "Head of Product"
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_enum_kind_and_datetime_dates(cfg):
@@ -971,7 +971,7 @@ def test_enum_kind_and_datetime_dates(cfg):
     p, o = _larkspur()
     p["trigger"]["kind"] = SignalKind.EXEC_MOVE
     p["trigger"]["date"] = datetime(2026, 11, 12, tzinfo=timezone.utc)
-    assert check_opener_block(o, p, cfg) == []
+    assert not has_errors(check_opener_block(o, p, cfg))
 
 
 def test_bare_string_facts_are_ignored():

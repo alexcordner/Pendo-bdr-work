@@ -1,18 +1,11 @@
 {
-  "_comment": "FAKE packets. Invented companies and people. No real data.",
+  "_comment": "FAKE packets in the real ResearchPacket.to_dict() dialect (signals[], has_real_trigger, ambiguity_flags, city/state). Facts keep an optional date. Invented companies and people.",
   "exec_move": {
     "account_name": "Larkspur Insurance",
     "website": "larkspur-insurance.example.com",
-    "location": "Melbourne, Victoria",
     "employees": 620,
     "prospect_first_name": "Priya",
     "prospect_title": "Head of Product",
-    "trigger": {
-      "kind": "exec_move",
-      "evidence": "Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.",
-      "source": "zoominfo_scoop:FAKE-101",
-      "date": "2026-11-12"
-    },
     "available_facts": [
       {
         "text": "Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer",
@@ -25,26 +18,36 @@
         "date": "2026-11-20"
       }
     ],
-    "flags": [],
     "must_not_claim": [
       "existing customer",
       "case study"
-    ]
+    ],
+    "city": "Melbourne",
+    "state": "Victoria",
+    "signals": [
+      {
+        "kind": "exec_move",
+        "label": "Exec Move",
+        "evidence": "Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.",
+        "source": "zoominfo_scoop:FAKE-101",
+        "source_label": "ZoomInfo scoop 2026-11-12",
+        "date": "2026-11-12",
+        "age_days": null,
+        "status": "ok",
+        "ambiguous": false
+      }
+    ],
+    "has_real_trigger": true,
+    "ambiguity_flags": [],
+    "contact_history": null,
+    "contact_history_source": null
   },
   "funding": {
     "account_name": "Bellbird Fitness",
     "website": "bellbird-fitness.example.com",
-    "location": "Auckland, New Zealand",
     "employees": 140,
     "prospect_first_name": "Jonas",
     "prospect_title": "Product Owner",
-    "trigger": {
-      "kind": "funding",
-      "evidence": "Bellbird Fitness raised NZ$18 million in a Series B round.",
-      "source": "zoominfo_scoop:FAKE-202",
-      "date": "2026-11-03",
-      "age_days": 14
-    },
     "available_facts": [
       {
         "text": "Bellbird Fitness raised NZ$18 million in a Series B round",
@@ -57,24 +60,35 @@
         "date": "2026-11-17"
       }
     ],
-    "flags": [],
     "must_not_claim": [
       "existing customer"
-    ]
+    ],
+    "city": "Auckland",
+    "state": "New Zealand",
+    "signals": [
+      {
+        "kind": "funding",
+        "label": "Funding",
+        "evidence": "Bellbird Fitness raised NZ$18 million in a Series B round.",
+        "source": "zoominfo_scoop:FAKE-202",
+        "source_label": "ZoomInfo scoop 2026-11-03",
+        "date": "2026-11-03",
+        "age_days": 14,
+        "status": "ok",
+        "ambiguous": false
+      }
+    ],
+    "has_real_trigger": true,
+    "ambiguity_flags": [],
+    "contact_history": null,
+    "contact_history_source": null
   },
   "product_launch": {
     "account_name": "Tidewater Credit Union",
     "website": "tidewater-cu.example.com",
-    "location": "Brisbane, Queensland",
     "employees": 310,
     "prospect_first_name": "Marcus",
     "prospect_title": "Digital Product Lead",
-    "trigger": {
-      "kind": "product_launch",
-      "evidence": "Tidewater Credit Union launched a new mobile banking app for members.",
-      "source": "zoominfo_scoop:FAKE-301",
-      "date": "2026-11-18"
-    },
     "available_facts": [
       {
         "text": "Tidewater Credit Union launched a new mobile banking app for members",
@@ -87,17 +101,33 @@
         "date": "2026-11-01"
       }
     ],
-    "flags": [],
-    "must_not_claim": []
+    "must_not_claim": [],
+    "city": "Brisbane",
+    "state": "Queensland",
+    "signals": [
+      {
+        "kind": "product_launch",
+        "label": "Product Launch",
+        "evidence": "Tidewater Credit Union launched a new mobile banking app for members.",
+        "source": "zoominfo_scoop:FAKE-301",
+        "source_label": "ZoomInfo scoop 2026-11-18",
+        "date": "2026-11-18",
+        "age_days": null,
+        "status": "ok",
+        "ambiguous": false
+      }
+    ],
+    "has_real_trigger": true,
+    "ambiguity_flags": [],
+    "contact_history": null,
+    "contact_history_source": null
   },
   "none_cold": {
     "account_name": "Marlow Software Group",
     "website": "marlow-software.example.com",
-    "location": "Perth, Western Australia",
     "employees": 85,
     "prospect_first_name": "Ellie",
     "prospect_title": "Engineering Manager",
-    "trigger": null,
     "available_facts": [
       {
         "text": "Marlow Software Group builds project software for builders",
@@ -110,24 +140,23 @@
         "date": "2026-11-01"
       }
     ],
-    "flags": [],
     "must_not_claim": [
       "existing customer"
-    ]
+    ],
+    "city": "Perth",
+    "state": "Western Australia",
+    "signals": [],
+    "has_real_trigger": false,
+    "ambiguity_flags": [],
+    "contact_history": null,
+    "contact_history_source": null
   },
   "ambiguous_role": {
     "account_name": "Greenvale Dairy",
     "website": "greenvale-dairy.example.com",
-    "location": "Hamilton, New Zealand",
     "employees": 450,
     "prospect_first_name": "Tane",
     "prospect_title": "Product Manager",
-    "trigger": {
-      "kind": "hiring_plan",
-      "evidence": "Greenvale Dairy is hiring a Head of Digital.",
-      "source": "zoominfo_scoop:FAKE-501",
-      "date": "2026-11-09"
-    },
     "available_facts": [
       {
         "text": "Greenvale Dairy is hiring a Head of Digital",
@@ -140,24 +169,35 @@
         "date": "2026-11-15"
       }
     ],
-    "flags": [
+    "must_not_claim": [],
+    "city": "Hamilton",
+    "state": "New Zealand",
+    "signals": [
+      {
+        "kind": "hiring_plan",
+        "label": "Hiring Plan",
+        "evidence": "Greenvale Dairy is hiring a Head of Digital.",
+        "source": "zoominfo_scoop:FAKE-501",
+        "source_label": "ZoomInfo scoop 2026-11-09",
+        "date": "2026-11-09",
+        "age_days": null,
+        "status": "ok",
+        "ambiguous": true
+      }
+    ],
+    "has_real_trigger": true,
+    "ambiguity_flags": [
       "ambiguous_role: 'product' may mean physical goods here"
     ],
-    "must_not_claim": []
+    "contact_history": null,
+    "contact_history_source": null
   },
   "one_fact": {
     "account_name": "Cinder Payments",
     "website": "cinder-payments.example.com",
-    "location": "Sydney, New South Wales",
     "employees": 220,
     "prospect_first_name": "Wei",
     "prospect_title": "Director of Engineering",
-    "trigger": {
-      "kind": "partnership",
-      "evidence": "Cinder Payments announced a partnership with Orbis Bank.",
-      "source": "zoominfo_scoop:FAKE-601",
-      "date": "2026-10-29"
-    },
     "available_facts": [
       {
         "text": "Cinder Payments announced a partnership with Orbis Bank",
@@ -165,7 +205,25 @@
         "date": "2026-10-29"
       }
     ],
-    "flags": [],
-    "must_not_claim": []
+    "must_not_claim": [],
+    "city": "Sydney",
+    "state": "New South Wales",
+    "signals": [
+      {
+        "kind": "partnership",
+        "label": "Partnership",
+        "evidence": "Cinder Payments announced a partnership with Orbis Bank.",
+        "source": "zoominfo_scoop:FAKE-601",
+        "source_label": "ZoomInfo scoop 2026-10-29",
+        "date": "2026-10-29",
+        "age_days": null,
+        "status": "ok",
+        "ambiguous": false
+      }
+    ],
+    "has_real_trigger": true,
+    "ambiguity_flags": [],
+    "contact_history": null,
+    "contact_history_source": null
   }
 }

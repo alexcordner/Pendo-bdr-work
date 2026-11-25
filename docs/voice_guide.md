@@ -11,7 +11,8 @@ Round 2 answers `docs/review_2d.md` (blockers B1 to B6). That review and its lab
 | `src/textcheck.py` | The lint: `check_opener_block`, `check_email_draft`, `format_violations`, `has_errors`, `normalize_packet`, `parse_block`, `parse_email_block`, `load_voice_config`, `validate_voice_config`, CLI `main` |
 | `skills/opener/SKILL.md`, `skills/email-draft/SKILL.md` | Instructions for the Claude session that writes the text (shape, rules, how to run the lint, retry rule) |
 | `tests/test_textcheck.py`, `tests/test_textcheck_review.py` | Unit tests, the labelled-corpus gate, fresh adversarial batches, real 2c packets, CLI |
-| `tests/fixtures/text_packets.json`, `text_good_blocks.json` | FAKE packets and good blocks (old packet shape) |
+| `tests/fixtures/text_packets.json` | FAKE packets in the real `ResearchPacket.to_dict()` dialect (`signals[]`, `has_real_trigger`, `ambiguity_flags`, `city`/`state`; facts may carry an optional `date`) |
+| `tests/fixtures/text_good_blocks.json` | FAKE good blocks with LEGACY-dialect packets (`trigger`, `flags`, `location`): they keep the old dialect covered |
 
 The LLM writes the text. Python only checks it (CLAUDE.md design rule). Nothing here can send or write anything.
 
@@ -27,7 +28,7 @@ print(format_violations(violations)); has_errors(violations)
 python -m src.textcheck opener --packet packet.json --text block.txt [--voice config/voice.yaml]
 python -m src.textcheck email  --packet packet.json --text draft.txt [--voice config/voice.yaml]
 ```
-`--text -` reads stdin. The email text file is `SUBJECT: ...` / `BODY:` / lines (a leading DRAFT STYLE line is fine).
+`--text -` reads stdin. `--show-diff` also prints the skim view (see Skim aids). **Run from the repo root** (`python -m src.textcheck` fails with `No module named src` elsewhere). The email text file is `SUBJECT: ...` / `BODY:` / lines (a leading DRAFT STYLE line is fine).
 Exit code **0** no errors, **1** errors (printed one per line, errors first), **2** could not run (bad file or bad
 config). The check functions **raise `VoiceConfigError`** when `voice_cfg` is `None`, `{}`, has a missing or unknown key,
 has a wrong type (`calibrated: "false"` is rejected), or has an invalid regex: they never silently weaken the rules.
@@ -152,6 +153,10 @@ are passed to the model but cannot be enforced by string match. (2) Stop adding 
 | `GATEKEEPER_PITCH` | gatekeeper line pitches or mentions the trigger |
 | `GATEKEEPER_PITCH_SOFT` | gatekeeper line has a word that may be pitch (warning, INFERRED list) |
 | `GATEKEEPER_NO_ROLE` | gatekeeper line does not ask for a role or person |
+| `NOT_IN_PACKET` | content words in the text that are not in the packet (warning: for Alex's skim) |
+| `COMPETITOR_NAMED` | a competitor product is named |
+| `STALE_SIGNAL_USED` | a stale, future or intent signal is restated as current news |
+| `GENDER_ASSUMED` | he/she/his/her/him used for a person (warning: the packet has no gender) |
 | `RELATIVE_TIME_UNVERIFIED` | 'last month' style phrase the packet has no age_days to check (warning) |
 | `SIMILAR_TO_DISLIKED` | near-duplicate of an opener Alex dislikes (warning) |
 | `EMAIL_SUBJECT_LENGTH` | subject is not one line of the allowed word count |
@@ -182,6 +187,8 @@ All on FAKE blocks written by models, so a real run will differ (UNVERIFIED on r
 The 14 blocks caught for a different but correct reason: series letters, "growth" claims, store ranking, career claims
 and promotions (now `UNSUPPORTED_CLAIM`), a wrong citation date (`FACT_DATE_INVENTED` instead of `_MISSING`), a
 paraphrased duplicate (`FACT_UNSUPPORTED` instead of `FACT_DUPLICATE`), an invented voicemail (`HISTORY_CLAIM`).
+**Round 3 (held-out set, not tuned on by me):** the reviewer's second, unbiased set (`docs/review_2d_heldout2.json`, 148 bad / 62 good, real `build_packet` packets) scored recall **83.8%** and **0** false positives on the round-2 code. After the mechanical N2 to N8 fixes above it scores 136 / 148 (91.9%) with 0 / 62 false positives, but those fixes were written looking at that set, so **the 75% to 85% planning number for a genuinely new content error stands**. The set is now a regression gate, not an estimate.
+
 **Overfitting warning:** the rules were tuned while looking at that set, so those numbers are optimistic. Fresh cases
 written by me, run **before** changing any rule for them:
 
@@ -194,6 +201,30 @@ written by me, run **before** changing any rule for them:
 After each batch the generalisable gaps were closed (event verbs and synonyms, currency and magnitude, relative time
 against `age_days`, quality claims, "we <verb>", hearsay, filler). **Batch 3 is the best estimate of what a new,
 different bad block faces: about 60%.** The after-fix tests for all three batches are regression tests, not estimates.
+
+## Skim aids (round 3)
+The lint cannot read meaning, so the human skim is a designed control and the tool helps with it:
+- `claims_not_in_packet(text, packet, voice_cfg=None) -> list[str]`: the content words (verbs, adjectives, nouns,
+  numbers) in the text that the packet does not contain, in order, no repeats. Inflections count as the same word
+  (launch, launched, launching). Function words, `scaffolding_words` in `voice.yaml` (greetings, "upfront", asking for
+  a role), contractions and durations checked against `age_days` are ignored. Source tails are ignored.
+- Every block gets **one** warning: `WARNING NOT_IN_PACKET: completed, renewable, biggest` (openers: OPENER, FACT and
+  GATEKEEPER lines; emails: subject and body). It never blocks. The session either rewrites with packet words only or
+  accepts it when every word is clearly scaffolding (both SKILL.md files say so).
+- `format_diff(text, packet, cfg)` and the CLI flag `--show-diff` print, as plain text with any email or phone
+  removed: the OPENER with its not-in-packet words, the packet's trigger evidence (or "none: cold call", noting a stale
+  or intent signal), each FACT line with the closest packet fact, the gatekeeper line and all packet facts, so Alex
+  compares sentences instead of recalling the news.
+
+Round-3 mechanical rules (all from `docs/review_2d.md` round 2, N2 to N8): a stale, future or intent signal restated in
+present-progressive news phrasing ("is migrating", "just announced") when there is no real trigger is
+`STALE_SIGNAL_USED`; "N days / weeks / months ago" is checked against `age_days` in its own unit (two days is not nine
+days); he/she/his/her/him for a named person is `GENDER_ASSUMED` (a warning: the packet has no gender); competitor
+names (Gainsight, WalkMe, Whatfix, Appcues, Userpilot, Amplitude ...) anywhere, including the start of a sentence, are
+`COMPETITOR_NAMED`; "Pendo helps/is the leading ..." is an unsupported claim; a calendar or "N minutes" ask counts as a
+second ask; in the gatekeeper line `analytics` and Pendo feature phrases, "free report", "send them" and the trigger
+person's name are errors; `Q1` to `Q4` are not names; completed / finalised / previously / formerly / "one of the
+biggest" / "market leader" are claims unless the packet says them.
 
 ## What the lint CANNOT catch (read this)
 - **A meaning-changing paraphrase in the spoken opener.** The opener is checked for names, numbers, event words,

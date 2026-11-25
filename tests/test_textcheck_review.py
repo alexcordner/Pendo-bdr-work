@@ -320,7 +320,7 @@ def test_role_title_not_in_packet(cfg):
 
 def test_role_title_acronym_for_the_packet_title_is_fine(cfg):
     pk = copy.deepcopy(PACKETS["exec_move"])
-    pk["trigger"]["evidence"] = "Larkspur Insurance appointed Dana Whitfield as Chief Technology Officer."
+    pk["signals"][0]["evidence"] = "Larkspur Insurance appointed Dana Whitfield as Chief Technology Officer."
     pk["available_facts"][0]["text"] = "Larkspur Insurance appointed Dana Whitfield as Chief Technology Officer"
     o = block(pk, "Hi Priya, Alex from Pendo. Larkspur appointed a new CTO. Who owns the app?")
     assert not has_errors(check_opener_block(o, pk, cfg))
@@ -526,8 +526,19 @@ def test_real_packet_signal_ambiguous_true_alone_turns_it_on(cfg, real_packets):
 
 def test_legacy_flags_key_still_works(cfg):
     pk = copy.deepcopy(PACKETS["ambiguous_role"])
-    pk["ambiguity_flags"] = pk.pop("flags")
-    assert tc.normalize_packet(pk).ambiguous
+    assert tc.normalize_packet(pk).ambiguous                       # new dialect: ambiguity_flags + signals[].ambiguous
+    legacy = {k: v for k, v in pk.items() if k not in ("ambiguity_flags", "signals")}
+    legacy["flags"] = ["ambiguous_role: 'product' may mean physical goods here"]
+    assert tc.normalize_packet(legacy).ambiguous                   # legacy dialect still works
+
+
+def test_legacy_trigger_key_dialect_gives_the_same_verdicts(cfg):
+    new = PACKETS["exec_move"]
+    s = new["signals"][0]
+    legacy = {k: v for k, v in new.items() if k not in ("signals", "has_real_trigger")}
+    legacy["trigger"] = {"kind": s["kind"], "evidence": s["evidence"], "source": s["source"], "date": s["date"]}
+    o = block(new, "Hi Priya, Alex from Pendo. Who owns the app? Harbourline Group acquired it.")
+    assert {v.code for v in check_opener_block(o, new, cfg)} == {v.code for v in check_opener_block(o, legacy, cfg)}
 
 
 def test_intent_only_packet_is_not_a_trigger(cfg):
@@ -925,6 +936,14 @@ def test_event_synonyms_are_accepted_but_opposites_are_not(cfg):
 # ============================================================================== every code has a minimal trigger
 
 LARK = PACKETS["exec_move"]
+_STALE_PK = {"account_name": "Gumnut Retail", "prospect_first_name": "Olivia", "has_real_trigger": False,
+             "signals": [{"kind": "project_pain", "evidence": "Gumnut Retail is migrating its ecommerce platform.",
+                          "source": "zoominfo_scoop:FAKE-G-1", "source_label": "ZoomInfo scoop 2026-09-20",
+                          "date": "2026-09-20", "age_days": 66, "status": "stale", "ambiguous": False}],
+             "available_facts": [{"text": "About 200 employees", "source": "Salesforce account record"}]}
+_STALE_BLOCK = "\n".join(["OPENER: Hi Olivia, Alex from Pendo. Gumnut is migrating its ecommerce platform. Who owns the online side?",
+                          "FACT 1: About 200 employees (source: Salesforce account record)", "FACT 2: none verified",
+                          "GATEKEEPER: Who looks after the online side there, please?", "TRIGGER: " + tc.NO_TRIGGER_LINE])
 GOOD_OP = block(LARK, "Hi Priya, Alex from Pendo. Who owns the customer app?")
 
 
@@ -1005,6 +1024,10 @@ CODE_CASES = {
     "GATEKEEPER_NO_ROLE": lambda: _o("Who looks after the product side there, please?", "Is this Larkspur Insurance?"),
     "SIMILAR_TO_DISLIKED": lambda: check_opener_block(GOOD_OP, LARK, {**_CAL, "alex_examples": {"liked_openers": [], "proud_emails": [], "disliked_openers": ["Hi Priya, Alex from Pendo. Who owns the customer app?"]}}),
     "RELATIVE_TIME_UNVERIFIED": lambda: _o("Who owns the customer app?", "Who owns it since last week?"),
+    "NOT_IN_PACKET": lambda: _o("Who owns the customer app?", "Who owns the renewable app?"),
+    "COMPETITOR_NAMED": lambda: _o("Who owns the customer app?", "Gainsight users switch. Who owns it?"),
+    "STALE_SIGNAL_USED": lambda: check_opener_block(_STALE_BLOCK, _STALE_PK, _CAL),
+    "GENDER_ASSUMED": lambda: _o("Who owns the customer app?", "Dana starts her new role. Who owns the app?"),
     "EMAIL_SUBJECT_LENGTH": lambda: _e(subject="tried"),
     "EMAIL_SUBJECT_CAPS": lambda: _e(subject="TRIED YOU"),
     "SUBJECT_FAKE_THREAD": lambda: _e(subject="Re: our chat"),
@@ -1114,3 +1137,212 @@ def test_call_history_fact_is_not_citable(cfg):
                        "FACT 2: Previous contact: last call 2026-11-20, outcome No Answer (source: Nooks call log)")
     assert bad != text
     assert "FACT_UNSUPPORTED" in errs(check_opener_block(bad, pk, cfg))
+
+
+# ============================================================================== round 3: skim aids and mechanical misses
+
+def test_claims_not_in_packet_lists_content_words_in_order(cfg):
+    pk = PACKETS["exec_move"]
+    got = tc.claims_not_in_packet("Hi Priya, Alex from Pendo. Larkspur completed a renewable biggest merger. Who owns it?", pk, cfg)
+    assert got == ["completed", "renewable", "biggest", "merger"]
+
+
+def test_claims_not_in_packet_allows_inflections_and_scaffolding(cfg):
+    pk = PACKETS["exec_move"]   # appointed / appoint, runs a customer app
+    assert tc.claims_not_in_packet("Hi Priya, Alex from Pendo. Cold call, I'll be upfront. Who owns this?", pk, cfg) == []
+    assert tc.claims_not_in_packet("Larkspur appoints a Chief Digital Officer and runs apps", pk, cfg) == []
+
+
+def test_claims_not_in_packet_ignores_source_tails_labels_and_none_verified(cfg):
+    pk = PACKETS["exec_move"]
+    block_text = "FACT 1: Larkspur Insurance runs a customer app (source: website:zebra.example.com)\nFACT 2: none verified"
+    assert tc.claims_not_in_packet(block_text, pk, cfg) == []
+
+
+def test_claims_not_in_packet_numbers_and_durations(cfg):
+    pk = copy.deepcopy(PACKETS["funding"])    # age_days 14, NZ$18 million
+    assert tc.claims_not_in_packet("It raised 18 million 14 days ago", pk, cfg) == []
+    assert tc.claims_not_in_packet("It raised 25 million", pk, cfg) == ["25"]
+
+
+def test_claims_not_in_packet_without_cfg_and_bad_input():
+    assert tc.claims_not_in_packet("Larkspur completed it", PACKETS["exec_move"]) == ["completed"]
+    assert tc.claims_not_in_packet(None, PACKETS["exec_move"]) == []      # type: ignore[arg-type]
+    assert tc.claims_not_in_packet("x", None) == []                        # type: ignore[arg-type]
+
+
+def test_not_in_packet_is_one_warning_per_block(cfg):
+    vs = _op(cfg, "Hi Priya, Alex from Pendo. Larkspur completed the renewable merger. Who owns it?")
+    n = [v for v in vs if v.code == "NOT_IN_PACKET"]
+    assert len(n) == 1 and n[0].severity == WARNING
+    assert n[0].message.startswith("completed, renewable") and "completed" in n[0].message and "renewable" in n[0].message
+
+
+def test_not_in_packet_never_blocks(cfg):
+    vs = check_opener_block(block(PACKETS["exec_move"], "Hi Priya, Alex from Pendo. Who owns the claims roadmap?"), PACKETS["exec_move"], cfg)
+    assert "NOT_IN_PACKET" not in errs(vs)
+
+
+def test_not_in_packet_on_email(cfg):
+    body = "Hi Priya,\nJust tried you. Larkspur Insurance appointed a new Chief Digital Officer.\nA renewable idea.\nWho owns it?\nAlex"
+    vs = check_email_draft("tried you re Larkspur", body, PACKETS["exec_move"], cfg)
+    assert any(v.code == "NOT_IN_PACKET" and "renewable" in v.message for v in vs)
+
+
+def test_format_diff_is_plain_and_scrubbed(cfg):
+    pk = PACKETS["exec_move"]
+    txt = block(pk, "Hi Priya, Alex from Pendo. Larkspur completed a merger. Who owns it? Call 0412 345 678 or a@b.com")
+    out = tc.format_diff(txt, pk, cfg)
+    assert "OPENER" in out and "completed, merger" in out and "TRIGGER (pkt)" in out
+    assert "appointed Dana Whitfield" in out and "FACT 1" in out and "packet says" in out
+    assert "0412" not in out and "a@b.com" not in out and "[removed]" in out
+
+
+def test_format_diff_no_trigger_and_stale_note(cfg):
+    out = tc.format_diff(_STALE_BLOCK, _STALE_PK, cfg)
+    assert "none: cold call on ICP fit only" in out and "stale or intent signal exists" in out
+    assert tc.format_diff(None, {}, cfg) == ""     # type: ignore[arg-type]
+
+
+def test_cli_show_diff(tmp_path):
+    pk = PACKETS["exec_move"]
+    r = _run_cli(tmp_path, "opener", pk, block(pk, "Hi Priya, Alex from Pendo. Who owns the renewable app?", label=True), "--show-diff")
+    assert r.returncode == 0 and "--- skim" in r.stdout and "WARNING NOT_IN_PACKET: renewable" in r.stdout
+    text = "SUBJECT: tried you re Larkspur\nBODY:\n" + LABEL + "\nHi Priya,\nJust tried you. Larkspur Insurance appointed a new Chief Digital Officer.\nA renewable idea.\nWho owns it?\nAlex\n"
+    r2 = _run_cli(tmp_path, "email", pk, text, "--show-diff")
+    assert r2.returncode == 0 and "renewable" in r2.stdout.split("--- skim")[1]
+
+
+# ---- N2 stale / intent signal as news
+def test_stale_signal_restated_as_news_is_an_error(cfg):
+    assert "STALE_SIGNAL_USED" in errs(check_opener_block(_STALE_BLOCK, _STALE_PK, cfg))
+
+
+def test_stale_signal_not_news_phrasing_is_fine(cfg):
+    ok = _STALE_BLOCK.replace("Gumnut is migrating its ecommerce platform. Who owns the online side?", "Cold call, I'll be upfront. Who owns the online side?")
+    assert "STALE_SIGNAL_USED" not in errs(check_opener_block(ok, _STALE_PK, cfg))
+
+
+def test_intent_signal_as_present_progressive_news_is_an_error(cfg):
+    pk = {"account_name": "Delta Health Pty Ltd", "prospect_first_name": "Sam", "has_real_trigger": False,
+          "signals": [{"kind": "intent", "status": "intent", "evidence": "researching customer experience",
+                       "source": "zoominfo_intent:FAKE-I-1", "source_label": "ZoomInfo intent signal", "date": None}],
+          "available_facts": [{"text": "Intent signal (interest, not a dated event): researching customer experience", "source": "ZoomInfo intent signal"}]}
+    bad = block(pk, "Hi Sam, Alex from Pendo. Delta is researching customer experience. Who owns it?")
+    assert "STALE_SIGNAL_USED" in errs(check_opener_block(bad, pk, cfg))
+    ok = block(pk, "Hi Sam, Alex from Pendo. Cold call, I'll be upfront. Who looks after customer experience at Delta?")
+    assert "STALE_SIGNAL_USED" not in errs(check_opener_block(ok, pk, cfg))
+
+
+def test_real_trigger_may_use_news_phrasing(cfg):
+    assert "STALE_SIGNAL_USED" not in errs(_op(cfg, "Hi Priya, Alex from Pendo. Larkspur just appointed a new Chief Digital Officer. Who owns the app?"))
+
+
+# ---- N4 pronouns
+@pytest.mark.parametrize("w", ["his", "her", "him", "she", "he"])
+def test_gendered_pronoun_is_a_warning(cfg, w):
+    vs = _op(cfg, f"Hi Priya, Alex from Pendo. Dana Whitfield starts {w} job. Who owns the app?")
+    assert "GENDER_ASSUMED" in errs(vs, WARNING) and "GENDER_ASSUMED" not in errs(vs)
+
+
+def test_they_is_fine(cfg):
+    assert "GENDER_ASSUMED" not in errs(_op(cfg, "Hi Priya, Alex from Pendo. Dana Whitfield starts their job. Who owns the app?"))
+
+
+# ---- N5 competitors and sales-speak
+@pytest.mark.parametrize("line", ["Gainsight users often switch.", "WalkMe is popular.", "Are you on Amplitude?", "Appcues or Whatfix?",
+                                  "Userpilot customers love it."])
+def test_competitors_anywhere(cfg, line):
+    assert "COMPETITOR_NAMED" in errs(_op(cfg, f"Hi Priya, Alex from Pendo. {line} Who owns the app?"))
+
+
+def test_competitor_in_email_and_gatekeeper(cfg):
+    body = "Hi Priya,\nJust tried you. Larkspur Insurance appointed a new Chief Digital Officer.\nAre you on Heap?\nAlex"
+    assert "COMPETITOR_NAMED" in errs(check_email_draft("tried you re Larkspur", body, PACKETS["exec_move"], cfg))
+    assert "COMPETITOR_NAMED" in errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk="Who owns Gainsight there?"))
+
+
+def test_competitor_named_in_the_packet_is_not_flagged(cfg):
+    pk = copy.deepcopy(PACKETS["exec_move"])
+    pk["available_facts"][1]["text"] = "Larkspur Insurance uses Amplitude"
+    o = block(pk, "Hi Priya, Alex from Pendo. Who owns Amplitude at Larkspur?")
+    assert "COMPETITOR_NAMED" not in errs(check_opener_block(o, pk, cfg))
+
+
+@pytest.mark.parametrize("line", ["Pendo is the leading digital adoption platform.", "Pendo helps teams see where users struggle.",
+                                  "We are the best platform for it.", "Pendo gives you answers."])
+def test_pendo_sales_speak(cfg, line):
+    assert "UNSUPPORTED_CLAIM" in errs(_op(cfg, f"Hi Priya, Alex from Pendo. {line} Who owns the app?"))
+
+
+# ---- N6 calendar asks
+@pytest.mark.parametrize("line", ["Would love to get twenty minutes on your calendar.", "Can we grab time on your diary?",
+                                  "Could I book fifteen minutes next week?"])
+def test_calendar_ask_counts_as_a_second_ask(cfg, line):
+    assert "OPENER_MULTIPLE_QUESTIONS" in errs(_op(cfg, f"Hi Priya, Alex from Pendo. {line} Who owns the app?"))
+
+
+# ---- N7 gatekeeper
+def test_gatekeeper_product_analytics_is_an_error(cfg):
+    assert "GATEKEEPER_PITCH" in errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk="Could I speak to whoever looks after your product analytics?"))
+    assert "GATEKEEPER_PITCH" in errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk="Who looks after your session replay?"))
+
+
+def test_gatekeeper_repeating_the_trigger_person_is_an_error(cfg):
+    assert "GATEKEEPER_PITCH" in errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk="Who works with Dana Whitfield, please?"))
+
+
+def test_gatekeeper_naming_the_account_or_title_is_fine(cfg):
+    assert "GATEKEEPER_PITCH" not in errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk="Is the Head of Product at Larkspur available?"))
+
+
+@pytest.mark.parametrize("gk", ["Who is your head of product? I'd like to send them a free report.", "Please pass this to the team, I'll send them details."])
+def test_gatekeeper_send_them_a_report(cfg, gk):
+    assert errs(_op(cfg, "Hi Priya, Alex from Pendo. Who owns the app?", gk=gk)) & {"EMAIL_SEND_LANGUAGE", "GATEKEEPER_PITCH"}
+
+
+# ---- N8 durations by unit
+@pytest.mark.parametrize("phrase,ok", [("14 days ago", True), ("two weeks ago", True), ("13 days ago", True),
+                                       ("two days ago", False), ("14 weeks ago", False), ("a month ago", False),
+                                       ("three weeks ago", False), ("2 weeks", True), ("a week ago", False)])
+def test_durations_are_checked_in_their_own_unit(cfg, phrase, ok):
+    pk = PACKETS["funding"]    # age_days 14
+    vs = _op(cfg, f"Hi Jonas, Alex from Pendo. The Series B was {phrase}. Who owns product?", key="funding",
+             gk="Who looks after the product team there, please?")
+    assert ("NUMBER_UNSUPPORTED" not in errs(vs)) is ok, phrase
+
+
+def test_nine_day_age_two_days_ago_is_wrong(cfg):
+    pk = copy.deepcopy(PACKETS["funding"])
+    pk["signals"][0]["age_days"] = 9
+    vs = check_opener_block(block(pk, "Hi Jonas, Alex from Pendo. Bellbird raised two days ago. Who owns product?",
+                                  gk="Who looks after the product team there, please?"), pk, cfg)
+    assert "NUMBER_UNSUPPORTED" in errs(vs)
+
+
+# ---- N1 / N3 / N9
+@pytest.mark.parametrize("w", ["completed the deal", "finalised it", "previously led digital", "formerly at a bank",
+                               "one of the biggest insurers", "a market leader"])
+def test_plain_word_meaning_changes_are_flagged(cfg, w):
+    assert "UNSUPPORTED_CLAIM" in errs(_op(cfg, f"Hi Priya, Alex from Pendo. Larkspur {w}. Who owns the app?"))
+
+
+def test_quarters_are_not_names(cfg):
+    vs = _op(cfg, "Hi Priya, Alex from Pendo. Is Q4 busy for the app team? Who owns it?")
+    assert "PROPER_NOUN_UNSUPPORTED" not in errs(vs) and "NUMBER_UNSUPPORTED" not in errs(vs)
+
+
+# ---- config keys are required (fail closed) for the new lists
+@pytest.mark.parametrize("key", ["competitors", "news_phrasing_patterns", "pronoun_words", "scaffolding_words"])
+def test_new_config_keys_are_required(real_cfg, key):
+    bad = copy.deepcopy(real_cfg)
+    bad.pop(key)
+    with pytest.raises(VoiceConfigError):
+        check_opener_block("OPENER: x", {}, bad)
+
+
+# ---- import allowlist is scoped to textcheck.py only
+def test_import_allowlist_scoped_to_textcheck():
+    src = (ROOT / "tests/test_integration_pipeline.py").read_text(encoding="utf-8")
+    assert '{"textcheck.py": {"argparse", "sys"}' in src and "FORBIDDEN_IMPORTS" in src
+    assert '"argparse", "sys"}\n' not in src.split("allowed = {")[1].split("allowed |=")[0]

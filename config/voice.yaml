@@ -32,6 +32,8 @@ opener:
     - '\bare you free\b'
     - '\bdo you have a (minute|second|moment)\b'
     - '\bor (should|shall|can|could|would|do|will) (i|we|you)\b'
+    - '\bon your (calendar|diary)\b|\b(book|grab|get|find|carve out|set aside) [^.?!]{0,20}\b(time|minutes?|a slot|a call|a chat|a meeting)\b'
+    - '\b(minutes?|mins?)\b[^.?!]{0,25}\b(this week|next week|tomorrow|today)\b'
 gatekeeper:
   max_words: 14            # skill: "under 15 words"
   role_cues:               # it must ask for a role / person, not a name
@@ -57,10 +59,11 @@ gatekeeper:
     - '\b(demo|pitch)\b'
     - '\b(analytics|feedback|adoption|engagement|onboarding|survey|nps)[ -](tool|tooling|platform|software|solution)'
     - '\btooling\b'
+    - '\banalytics\b'
+    - '\bfree (report|guide|trial|demo|audit|assessment|ebook|whitepaper)\b'
     - '\babout (product |user |customer )?(analytics|adoption|engagement|feedback|onboarding|churn|retention)\b'
     - '\b(save|saves|saving|increase|increases|improve|improves|reduce|reduces) (them|you|your|time|costs?|churn|adoption)\b'
   soft_pitch_words:        # INFERRED: may be pitch, may be ordinary English (warning only)
-    - analytics
     - adoption
     - platform
     - solution
@@ -153,6 +156,8 @@ pendo_feature_soft_words:
 # Claims about Pendo's results, customers or the account's growth that the packet can never support.
 unsupported_claim_patterns:
   - '\bwe help\b'
+  - '\bpendo (is|helps|gives|lets|makes|shows|tells|enables|provides)\b'
+  - '\b(the |a )?(leading|number one|best|top)\b[^.?!]{0,30}\b(platform|tool|solution|vendor|provider)\b'
   - '\bwe (make|build|offer|provide|sell|solve|fix|work with|specialise|specialize|power|enable|improve|increase|reduce|cut|boost|grow|lift|drive|speed up|save|simplify|streamline|deliver|measure|track|analyse|analyze)\b'
   - '\bcompanies like (yours|you)\b'
   - '\b(customers|clients|insurers|banks|teams|businesses|companies) (like|such as)\b'
@@ -300,6 +305,174 @@ unsupported_unless_in_packet:
   - "outdated"
   - "struggling"
   - "falling behind"
+  - "completed"
+  - "finalised"
+  - "finalized"
+  - "signed off"
+  - "previously"
+  - "formerly"
+  - "joined from"
+  - "used to"
+  - "one of the biggest"
+  - "one of the largest"
+  - "one of the leading"
+  - "one of australia's"
+  - "market leader"
+
+# Competitor products: named anywhere (including at the start of a sentence), an error unless the packet names them.
+competitors:
+  - gainsight
+  - walkme
+  - whatfix
+  - appcues
+  - userpilot
+  - amplitude
+  - mixpanel
+  - heap
+  - fullstory
+  - hotjar
+  - qualtrics
+  - medallia
+  - intercom
+  - pendo competitor
+
+# Present-progressive or just-happened news phrasing. With NO real trigger, a sentence that uses it AND shares two or
+# more content words with a stale, future or intent signal in the packet is presenting old or private data as news.
+news_phrasing_patterns:
+  - '\b(is|are|was|were|has been|have been) (migrating|launching|rolling|rebuilding|acquiring|hiring|expanding|raising|replacing|moving|building|researching|investing|planning|looking|exploring|buying)\b'
+  - '\bjust (announced|launched|raised|appointed|hired|acquired|signed|started|released|opened)\b'
+  - '\b(announced|announces|announcing|unveiled|unveils)\b'
+
+# A packet has no gender: these words for a named person are a guess (a warning).
+pronoun_words:
+  - he
+  - she
+  - his
+  - her
+  - hers
+  - him
+  - himself
+  - herself
+
+# Words that may appear in an opener, fact or gatekeeper line without being in the packet (greetings, asking for a
+# role, permission scaffolding). Anything else is listed in the NOT_IN_PACKET warning for Alex's skim. Extend freely:
+# it only controls how noisy the warning is, it never blocks anything.
+scaffolding_words:
+  - tried
+  - hello
+  - there
+  - cold
+  - call
+  - calling
+  - ring
+  - ringing
+  - upfront
+  - straight
+  - curious
+  - congrats
+  - congratulations
+  - saw
+  - noticed
+  - fit
+  - looks
+  - look
+  - looking
+  - like
+  - right
+  - person
+  - people
+  - who
+  - whoever
+  - someone
+  - anyone
+  - owns
+  - own
+  - owner
+  - owners
+  - handles
+  - handle
+  - handling
+  - after
+  - runs
+  - run
+  - side
+  - area
+  - business
+  - team
+  - teams
+  - role
+  - lead
+  - head
+  - manager
+  - product
+  - digital
+  - across
+  - speak
+  - speaking
+  - put
+  - point
+  - through
+  - please
+  - sorry
+  - interrupt
+  - question
+  - ask
+  - minute
+  - minutes
+  - second
+  - seconds
+  - bad
+  - time
+  - fair
+  - warning
+  - news
+  - hook
+  - going
+  - goes
+  - next
+  - first
+  - now
+  - new
+  - today
+  - week
+  - weeks
+  - last
+  - ago
+  - day
+  - days
+  - month
+  - months
+  - one
+  - two
+  - three
+  - bigger
+  - more
+  - load
+  - mind
+  - quick
+  - know
+  - sure
+  - think
+  - wondering
+  - pitch
+  - sales
+  - just
+  - really
+  - roadmap
+  - busy
+  - recent
+  - recently
+  - big
+  - good
+  - great
+  - nice
+  - well
+  - thanks
+  - thank
+  - back
+  - later
+  - right
+  - okay
 
 # Round / stage details that must appear verbatim in the packet (Series A is not Series B, seed is not Series A).
 round_patterns:
@@ -321,7 +494,7 @@ role_assumption_patterns:
 # Send / attach / invite language is banned in ALL generated text (openers, gatekeeper lines, emails): drafts only.
 send_language_patterns:
   - '\b(i|we)(?:\x27ve| have|\x27ll| will|\x27m| am)? ?(just )?(sent|send|sending|emailed|emailing|forwarded)\b'
-  - '\bsend(ing)? (you|over|through|across)\b'
+  - '\bsend(ing)? (you|over|through|across|them|him|her)\b'
   - '\bsent (you|this|from|via|by|over)\b'
   - '\b(i|we)(\x27ll| will)? ?forward\b'
   - '\battach(ed|ment|ments|ing)\b'
