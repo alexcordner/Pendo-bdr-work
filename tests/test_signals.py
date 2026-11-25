@@ -1575,9 +1575,9 @@ def test_ma_target_weight_and_reason(config, accounts):
     ("Gamma Group to take a stake in Other Co.", 0.25, S.MA_MINORITY_NOTE),
     ("Gamma Group to acquire a minority interest in Other Co.", 0.25, S.MA_MINORITY_NOTE),
     ("Gamma Group to acquire a 30% stake in a software company.", 0.25, S.MA_MINORITY_NOTE),
-    ("Gamma Group to acquire a majority stake in an energy company.", 0.25, S.MA_MINORITY_NOTE),
-    ("Gamma Group to acquire an energy company.", 0.25, S.MA_MINORITY_NOTE),
-    ("Gamma Group to acquire a gold mine.", 0.25, S.MA_MINORITY_NOTE),
+    ("Gamma Group to acquire a majority stake in an energy company.", 0.25, S.MA_UNRELATED_NOTE),
+    ("Gamma Group to acquire an energy company.", 0.25, S.MA_UNRELATED_NOTE),
+    ("Gamma Group to acquire a gold mine.", 0.25, S.MA_UNRELATED_NOTE),
     ("Gamma Group to acquire a 60% stake in a software company.", 0.5, S.MA_ACQUIRER_FULL_NOTE),
     ("Gamma Group to acquire Tiny Analytics, a data platform business.", 0.5, S.MA_ACQUIRER_FULL_NOTE),
     ("Gamma Group to acquire a customer experience software firm.", 0.5, S.MA_ACQUIRER_FULL_NOTE),
@@ -2879,3 +2879,193 @@ def test_lifts_holding_in_a_possessive_is_not_the_company():
 def test_filler_words_do_not_count_as_another_company():
     assert S.ma_role("Acme is a listed firm. Meanwhile it will acquire Zeta.", "Acme Holdings") == "acquirer"
     assert S.ma_role("Acme is a listed firm. However Bigco will acquire Zeta.", "Acme Holdings") == "unclear"
+
+
+# ============================================================ fix-triggers5: ARR partnership rescue, unrelated-acquirer flag
+ACME_ARR = ("Acme has signed agreements totaling $4 billion of Annual Recurring Revenue (ARR) with marquee customers "
+            "including Bigco, Zeta, Orion and Gamma for AI cloud services.")
+
+
+def test_arr_contract_with_customers_and_ai_cloud_services_is_dropped(config):
+    v = one(config, "Partnership", ACME_ARR, name="Acme Holdings")
+    assert not v.keep and v.reason.startswith("Dropped: infrastructure or capacity contract")
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme signs $2bn ARR contracts with customers for AI cloud services.",
+    "Acme signs capacity agreements with marquee customers.",
+    "Acme signs a compute deal with customers for AI cloud.",
+    "Acme signs a data-centre contract for AI cloud services with customers.",
+    "Acme signs $1bn of ARR contracts with Bigco for digital services.",
+    "Acme signs a GPU hosting contract with products customers.",
+    "Acme signs a power purchase agreement for its cloud services customers.",
+])
+def test_customers_cloud_services_and_ai_cloud_do_not_rescue_infrastructure_deals(config, desc):
+    assert not one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme partners with Bigco to launch a new mobile banking app.",
+    "Acme and Bigco announce a partnership to deliver a cloud-based customer portal.",
+    "Acme signs a capacity partnership with Bigco for a customer support platform.",
+    "Acme signs cloud hosting for its new mobile app.",
+    "Acme signs ARR analytics software to customers.",
+    "Acme signs website hosting for customers.",
+    "Acme signs digital banking; capacity to serve 1m customers.",
+    "Acme partners with Fin Co to build a customer mobile app on GPU compute.",
+    "Acme signs a data-centre deal to host its digital platform for customers.",
+    "Acme signs a software partnership with a cloud provider.",
+    "Acme signs a hosting deal for its e-commerce store.",
+    "Acme signs a capacity deal to launch an online store.",
+    "Acme signs a compute deal for a customer experience programme.",
+    "Acme signs a hosting agreement for its payments platform.",
+    "Acme signs a colocation deal for its SaaS product.",
+])
+def test_real_product_words_keep_an_infrastructure_worded_partnership(config, desc):
+    assert one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+def test_rescued_infrastructure_partnership_keeps_full_partnership_weight(config):
+    v = one(config, "Partnership", "Acme partners with Bigco to launch a new mobile banking app on GPU compute.", name="Acme Holdings")
+    assert v.keep and v.factor == 1.0 and v.notes == ()
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme partners with customers.", "Acme signs a partnership for cloud services.", "Acme partners on a digital initiative.",
+])
+def test_without_infrastructure_words_the_old_rule_is_unchanged(config, desc):
+    v = one(config, "Partnership", desc, name="Acme Holdings")
+    assert v.keep
+
+
+def test_product_rescue_words_are_whole_words_and_generic_words_do_not_count():
+    assert not S._PRODUCT_RESCUE.search("customers, cloud services, AI cloud, digital, platform, products")
+    assert not S._PRODUCT_RESCUE.search("a snapshot of mobiles and freeapplicationx") and not S._PRODUCT_RESCUE.search("the supportive platform")
+    assert S._PRODUCT_RESCUE.search("a customer support platform") and S._PRODUCT_RESCUE.search("a mobile app")
+    assert not S._PRODUCT_RESCUE.search("the platform")
+
+
+# ------------------------------------------------------------ (2) unrelated acquirer flag
+@pytest.mark.parametrize("desc", [
+    "Acme has entered into an agreement to acquire a majority stake in Redball Energy.",
+    "Acme to acquire Redball Energy.", "Acme to acquire a 60% stake in Redball Mining.",
+    "Acme agrees to buy a controlling stake in a gold mine.",
+])
+def test_majority_or_full_unrelated_acquirer_gets_its_own_flag_at_the_same_weight(config, desc):
+    v = one(config, "Mergers & Acquisitions (M&A)", desc, name="Acme Holdings")
+    assert v.keep and v.factor == 0.5 and v.notes == (S.MA_UNRELATED_NOTE,)
+    assert "minority" not in v.reason and S.MA_UNRELATED_NOTE in v.reason
+    assert S.classify_ma(desc, "Acme Holdings") == ("acquirer", 0.25, S.MA_UNRELATED_NOTE)
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme to acquire a 9.9% stake in Redball Energy.", "Acme to acquire a minority interest in Redball Energy.",
+    "Acme takes a 30% stake in Redball Mining.", "Acme to take a stake in Redball.",
+])
+def test_real_minority_stakes_keep_the_minority_wording(desc):
+    assert S.classify_ma(desc, "Acme Holdings") == ("acquirer", 0.25, S.MA_MINORITY_NOTE)
+
+
+def test_unrelated_flag_reaches_the_signal_and_reads_back(config, accounts):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme has entered into an agreement to acquire a majority stake in Redball Energy.",
+            name="Acme Holdings")
+    sig = sig_for(config, v, accounts)
+    assert S.signal_notes(sig) == [S.MA_UNRELATED_NOTE] and sig.strength == 0.2119          # unchanged score
+    assert S.MA_UNRELATED_NOTE in S.KNOWN_NOTES and S.MA_UNRELATED_NOTE == "acquirer of an unrelated business"
+
+
+def test_digital_and_full_acquisitions_are_unaffected():
+    assert S.classify_ma("Acme to acquire Tiny Analytics, a data platform business.", "Acme Holdings") == (
+        "acquirer", 0.5, S.MA_ACQUIRER_FULL_NOTE)
+    assert S.classify_ma("Acme to acquire a 60% stake in a software company.", "Acme Holdings")[:2] == ("acquirer", 0.5)
+    assert S.classify_ma("Acme acquires Tiny Co.", "Acme Holdings")[:2] == ("acquirer", 0.5)
+
+
+def test_unrelated_acquirer_banned_phrases_in_callsheet():
+    from src import callsheet as cs
+    banned = cs._banned_for([S.MA_UNRELATED_NOTE], "Acme to acquire Redball Energy.")
+    assert "digital acquisition" in banned and "software acquisition" in banned
+    assert cs._banned_for([S.MA_UNRELATED_NOTE], "Acme to acquire Redball Energy, a software acquisition.") != banned
+    assert "takeover" not in banned       # a majority stake IS an acquisition, unlike the minority wording
+
+
+def test_minority_banned_phrases_do_not_apply_to_the_unrelated_note():
+    from src import callsheet as cs
+    assert "acquired" not in cs._banned_for([S.MA_UNRELATED_NOTE], "Plain text.")
+    assert "acquired" in cs._banned_for([S.MA_MINORITY_NOTE], "Plain text.")
+
+
+def test_launch_alone_rescues_and_customer_word_platform_rescues(config):
+    assert one(config, "Partnership", "Acme signs a capacity deal to launch a new service.", name="Acme Holdings").keep
+    assert one(config, "Partnership", "Acme signs a compute deal for a customer loyalty platform.", name="Acme Holdings").keep
+    assert not one(config, "Partnership", "Acme signs a compute deal for a loyalty.", name="Acme Holdings").keep
+
+
+# ============================================================ fix-triggers5 review: onboarding / experience words rescue
+@pytest.mark.parametrize("desc", [
+    "Acme and Bigco partner to bring a new digital onboarding experience, hosted on cloud capacity.",
+    "Acme partners with Bigco on onboarding hosted on cloud capacity.",
+    "Acme will bring digital onboarding to customers on new hosting.",
+    "Acme and Bigco build a digital employee experience hosted in the cloud with capacity.",
+    "Acme partners with Bigco on a patient experience hosted on GPU compute.",
+    "Acme partners with Bigco on member experience with colocation capacity.",
+    "Acme partners with Bigco for user experience research on hosting.",
+    "Acme partners with Bigco on in-app guidance hosted on cloud capacity.",
+    "Acme partners with Bigco on customer experience hosted on cloud capacity.",
+    "Acme partners with Bigco on student experience hosted on cloud capacity.",
+])
+def test_onboarding_and_experience_wording_keeps_an_infrastructure_worded_partnership(config, desc):
+    v = one(config, "Partnership", desc, name="Acme Holdings")
+    assert v.keep and v.factor == 1.0 and v.notes == ()
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme signs $4bn ARR contracts for AI compute.", "Acme signs a 200MW power purchase agreement.",
+    "Acme signs a 45MW deal with customers.", "Acme signs a 200MW data centre contract with customers.",
+    "Acme signs GPU compute hosting for customers.", "Acme signs a colocation contract.", "Acme wins an offtake deal.",
+    ACME_ARR, "Acme signs a hyperscaler capacity deal for AI cloud services.",
+    "Acme signs a take-or-pay hosting contract with customers for cloud services.",
+])
+def test_existing_infrastructure_drop_cases_are_still_dropped(config, desc):
+    assert not one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+@pytest.mark.parametrize("d", ["45MW", "a 200 MW campus", "50 megawatts of power", "the 45MW deal", "1.5 MW"])
+def test_megawatt_units_match_with_or_without_a_space(d):
+    assert S._INFRASTRUCTURE_DEAL.search(d)
+
+
+def test_mw_inside_other_words_does_not_match():
+    assert not S._INFRASTRUCTURE_DEAL.search("a hallmw or a Smwx")
+    assert not S._INFRASTRUCTURE_DEAL.search("the mwanza office")
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme to launch a 200MW data centre campus.", "Acme partners with Bigco to launch a 45MW facility.",
+    "Acme signs a deal to launch new GPU compute capacity.", "Acme signs hosting to launch a data centre.",
+    "Acme and Bigco launch colocation space with ARR contracts.",
+])
+def test_launching_infrastructure_does_not_rescue(config, desc):
+    assert not one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+@pytest.mark.parametrize("desc", [
+    "Acme signs a capacity deal to launch a new service.", "Acme partners with Bigco to launch a new mobile banking app.",
+    "Acme and Bigco launch a customer app hosted on cloud capacity.", "Acme launches onboarding software on GPU compute.",
+    "Acme signs capacity to launch an online store.",
+])
+def test_launch_of_a_non_infrastructure_thing_still_rescues(config, desc):
+    assert one(config, "Partnership", desc, name="Acme Holdings").keep
+
+
+def test_launch_infrastructure_lookahead_stops_at_the_sentence_end():
+    assert S._PRODUCT_RESCUE.search("Acme will launch a new service. Separately it signed capacity deals.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new data centre.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a very large new GPU hall.")            # 4 words before 'GPU': blocked
+    assert S._PRODUCT_RESCUE.search("Acme will launch a very large brand new GPU hall.")        # 5 words: known limit, still rescues
+
+
+def test_launch_lookahead_object_words_campus_and_facility_and_sentence_bound():
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new campus.")
+    assert not S._PRODUCT_RESCUE.search("Acme will launch a new facility.")
+    assert S._PRODUCT_RESCUE.search("Acme will launch it. GPU deals followed.")          # the '.' ends the launched phrase
