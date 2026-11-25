@@ -746,7 +746,7 @@ def test_b_dnc_contacts_never_chosen_even_on_best_account(world, tmp_path):
     echo = got[name_of(world, 5)][1]
     assert r.ranked[0] is echo and echo.score >= 99                    # best score on the sheet...
     assert [p.nooks_id for p in r.prospects[ranker.account_key(echo.account)]] == ["FAKE-NK-P-0005-2"]   # ...but not Dana
-    assert "Pat Callable" in " ".join(echo.reasons)
+    assert "Prospect: Pat (" in " ".join(echo.reasons) and "Callable" not in " ".join(echo.reasons)   # first name only (2f: no surnames in logs)
     # duplicate-email prospect: every prospect on the account is blocked -> skipped with the reason
     fox = got[name_of(world, 6)]
     assert fox[0] == "skipped" and fox[1].skipped_reason.startswith("all prospects blocked")
@@ -1467,8 +1467,8 @@ def test_l_no_network_or_process_imports(path):
     allowed = {"__future__", "collections", "copy", "dataclasses", "datetime", "enum", "functools", "hashlib",
                "json", "logging", "math", "os", "pathlib", "re", "tempfile", "typing", "unicodedata", "yaml",
                "zoneinfo", "src", "itertools", "operator", "string"}
-    if path.name == "pipeline.py":      # 2a: only the command line entry point may use argparse / sys
-        allowed = allowed | {"argparse", "sys"}
+    # Narrow per-module exceptions (argv, stdin, exit code for a CLI entry point). Every other module keeps the strict list.
+    allowed |= {"textcheck.py": {"argparse", "sys"}, "pipeline.py": {"argparse", "sys"}}.get(path.name, set())
     assert mods <= allowed, (path.name, sorted(mods - allowed))
 
 

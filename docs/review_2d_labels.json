@@ -1,0 +1,2629 @@
+{
+ "note": "FAKE data only. Labels (expect/category/intended_code) were written BEFORE the lint was run on these cases. intended_code = the code(s) a good lint should raise (| = any of); null for pass cases.",
+ "label_line": "DRAFT STYLE: not yet calibrated to Alex",
+ "extra_packets": {
+  "kestrel": {
+   "account_name": "Kestrel Labs",
+   "website": "kestrel-labs.example.com",
+   "location": "Wellington, New Zealand",
+   "employees": 45,
+   "prospect_first_name": "Hana",
+   "prospect_title": "Head of Product",
+   "trigger": {
+    "kind": "funding",
+    "evidence": "Kestrel Labs raised US$3 million in a seed round.",
+    "source": "zoominfo_scoop:FAKE-701",
+    "date": "2026-11-10"
+   },
+   "available_facts": [
+    {
+     "text": "Kestrel Labs raised US$3 million in a seed round",
+     "source": "zoominfo_scoop:FAKE-701",
+     "date": "2026-11-10"
+    },
+    {
+     "text": "Kestrel Labs is hiring a Head of Customer Experience",
+     "source": "zoominfo_scoop:FAKE-702",
+     "date": "2026-11-14"
+    }
+   ],
+   "flags": [],
+   "must_not_claim": [
+    "existing customer"
+   ]
+  }
+ },
+ "default_lines": {
+  "exec_move": {
+   "f1": "Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "f2": "Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)",
+   "gk": "Could you point me to whoever looks after your customer app?",
+   "tr": "Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)"
+  },
+  "funding": {
+   "f1": "Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "f2": "Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)",
+   "gk": "Who looks after the product team there, please?",
+   "tr": "Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)"
+  },
+  "product_launch": {
+   "f1": "Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "f2": "Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)",
+   "gk": "Who is the right person for the member app, please?",
+   "tr": "Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)"
+  },
+  "none_cold": {
+   "f1": "Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)",
+   "f2": "Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)",
+   "gk": "Could I speak to whoever owns the product side, please?",
+   "tr": "None found: cold call on ICP fit only"
+  },
+  "ambiguous_role": {
+   "f1": "Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "f2": "Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)",
+   "gk": "Who looks after your digital projects, please?",
+   "tr": "Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)"
+  },
+  "one_fact": {
+   "f1": "Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "f2": "none verified",
+   "gk": "Who runs engineering there, please?",
+   "tr": "Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)"
+  },
+  "kestrel": {
+   "f1": "Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "f2": "Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)",
+   "gk": "Who looks after the product side there, please?",
+   "tr": "Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)"
+  }
+ },
+ "opener_cases": [
+  {
+   "id": "O-G01",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. I saw Larkspur appointed Dana Whitfield as Chief Digital Officer. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G02",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Congrats on the Series B. Is the product team growing with it?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G03",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird raised NZ$18 million recently. Who runs product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G04",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater's new app launched last week. How are members finding it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G05",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. I'll be upfront, this is a cold call. Do you have thirty seconds?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_number_word",
+   "intended_code": null
+  },
+  {
+   "id": "O-G06",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Marlow builds software for builders. Who looks after the product side?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G07",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex at Pendo. No special reason for the call, Marlow just fits who I talk to. Mind if I ask one thing?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G08",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, it's Alex from Pendo. This is a cold call. Can I borrow 20 seconds?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "good_benign_number",
+   "intended_code": null
+  },
+  {
+   "id": "O-G09",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Greenvale is hiring a Head of Digital. Who looks after that side of the business there?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G10",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Saw Cinder announced a partnership with Orbis Bank. Who handles the platform side there?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G11",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. New Chief Digital Officer at Larkspur. Who looks after the customer app these days?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G12",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Congratulations on the mobile banking app. Mind if I ask who owns it day to day?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G13",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Series B for Bellbird, nice. Who looks after the product roadmap?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good_sentence_start",
+   "intended_code": null
+  },
+  {
+   "id": "O-G14",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird's raise on 3 November caught my eye. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good_date",
+   "intended_code": null
+  },
+  {
+   "id": "O-G15",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird's raise on 3 Nov caught my eye. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good_date_abbrev",
+   "intended_code": null
+  },
+  {
+   "id": "O-G16",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. The Series B was about two weeks ago. Who owns product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good_relative_words",
+   "intended_code": null
+  },
+  {
+   "id": "O-G17",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. The Series B was 14 days ago. Who owns product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "good_derived_number",
+   "intended_code": null
+  },
+  {
+   "id": "O-G18",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: G'day Priya, Alex at Pendo. Cold-ish call, I noticed the new Chief Digital Officer at Larkspur. Got a minute?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "good_hyphen_start",
+   "intended_code": null
+  },
+  {
+   "id": "O-G19",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel raised US$3 million in a seed round. Who looks after product there?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-G20",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Mind if I ask a quick question about Kestrel's hiring for customer experience?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "good_quick_opener_ok",
+   "intended_code": null
+  },
+  {
+   "id": "O-G21",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Greenvale is hiring a Head of Digital. Do you own that area?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "good_you_own_question",
+   "intended_code": null
+  },
+  {
+   "id": "O-G22",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur has about 620 employees. Who looks after the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "O-B01",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Congrats on the NZ$80 million raise. Who runs product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "invented_number_changed",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B02",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Congrats on raising NZ$18 million in a Series C. Who runs product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "paraphrase_changes_meaning_series",
+   "intended_code": "NUMBER_UNSUPPORTED|TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B03",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Who runs product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series A round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "fact_series_letter_changed",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B04",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Congrats on the US$30 million raise. Who runs product there?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "fail",
+   "category": "invented_number_10x",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B05",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Who runs product there?\nFACT 1: Kestrel Labs raised US$30 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "fail",
+   "category": "fact_amount_changed",
+   "intended_code": "NUMBER_UNSUPPORTED|FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B06",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Sorry to see Cinder's partnership with Orbis Bank ended. Who handles the platform side?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "fail",
+   "category": "meaning_flip_ended",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B07",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Who handles the platform side?\nFACT 1: Cinder Payments ended a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "fail",
+   "category": "fact_meaning_flip",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B08",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur appointed a new chief executive. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "wrong_role_lowercase",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B09",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur appointed Dana Whitfield as CEO. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "wrong_title_caps",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "O-B10",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims and travel quotes (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_adds_claim",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B11",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur has around 700 staff. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "invented_headcount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B12",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur has about 600 staff. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "rounded_headcount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B13",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. The Larkspur claims app went live in March. How is it going?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "invented_date_month_only",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B14",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur's app has 4.5 stars in the store. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "invented_rating",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B15",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird is growing 40% a year. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "invented_percentage",
+   "intended_code": "NUMBER_UNSUPPORTED|UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B16",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur has about six hundred staff. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "number_word_headcount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B17",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Congrats on raising twenty million. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "number_word_amount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B18",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater launched its app three weeks ago. Who owns it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "fail",
+   "category": "number_word_date_wrong",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B19",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Marlow is a thirty-person team, right? Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "number_word_headcount_none",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B20",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We work with Acme Insurance. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "customer_name",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "O-B21",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Acme Bank uses us for this. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "customer_name_sentence_start",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "O-B22",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Other insurers such as acme and zenith use us. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "customer_name_lowercase",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B23",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Customers like Zenith Bank rely on us. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "customers_like",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B24",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. We help builders like Marlow. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "we_help",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B25",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Saw Marlow just launched a new release. How is the rollout going?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_launch",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B26",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Marlow has been growing fast lately. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_growth_no_event_word",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B27",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Congrats to the team. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_congrats",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B28",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Big week at Marlow? Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "implied_event",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B29",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: Marlow Software Group is expanding its product team (source: website:marlow-software.example.com, 2026-11-20)",
+   "expect": "fail",
+   "category": "trigger_line_invented",
+   "intended_code": "TRIGGER_LINE_CLAIMED"
+  },
+  {
+   "id": "O-B30",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. I noticed Marlow is hiring product people. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "invented_trigger_hiring",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B31",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "trigger_from_other_company",
+   "intended_code": "TRIGGER_LINE_CLAIMED"
+  },
+  {
+   "id": "O-B32",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Congrats on the Series B. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "trigger_event_from_other_company",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B33",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Who owns the app?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "fail",
+   "category": "fact_from_other_company",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B34",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Who owns the app?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "trigger_line_other_company",
+   "intended_code": "TRIGGER_LINE_UNSUPPORTED"
+  },
+  {
+   "id": "O-B35",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Saw Larkspur just launched a new claims portal. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unsupported_launch",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B36",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Saw you just shipped a new claims portal. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unsupported_shipped_synonym",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B37",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Saw Bellbird opened a new studio in Wellington. Who owns the app?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "fail",
+   "category": "unsupported_expansion_place",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "O-B38",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Saw the app is already at the top of the store. Who owns it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "fail",
+   "category": "unsupported_store_ranking",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B39",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Noticed you spent six years at Zenith Bank before Larkspur. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "career_claim_named",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "O-B40",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Noticed you moved over from banking. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "career_claim_lowercase",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B41",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Noticed you have been at Larkspur since 2019. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "career_claim_year",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B42",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Congrats on the promotion. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "promotion_none",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B43",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Congrats on the promotion. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "promotion_with_other_trigger",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B44",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Customers see 40% higher adoption with us. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "pendo_stat_number",
+   "intended_code": "UNSUPPORTED_CLAIM|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B45",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Teams using Pendo see much higher adoption. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "pendo_stat_no_number",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B46",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Pendo customers typically cut support tickets in half. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "pendo_stat_cut_half",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B47",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We have helped 500 companies. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "pendo_stat_helped",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "O-B48",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We do in-app guides for apps like yours. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "feature_pitch_guides",
+   "intended_code": "OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "O-B49",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Our product analytics shows where users drop off. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "feature_pitch_analytics",
+   "intended_code": "OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "O-B50",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We let teams watch recordings of user sessions. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "feature_pitch_unlisted_wording",
+   "intended_code": "OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "O-B51",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We build onboarding checklists inside apps. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "feature_pitch_checklists",
+   "intended_code": "OPENER_PENDO_FEATURE"
+  },
+  {
+   "id": "O-B52",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Our game-changing platform fixes adoption. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "hype_listed",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B53",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Our revolutionary approach is amazing. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "hype_unlisted_revolutionary",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B54",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. We are cutting edge and best in class. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "hype_unhyphenated",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B55",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Unlocking value from apps is what we do. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "hype_inflected_unlocking",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B56",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Hope you're well. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_hope",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B57",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. I hope you're having a great week. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_hope_variant",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B58",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Just checking in on the customer app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_checking_in",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B59",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Wanted to touch base on the customer app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_touch_base",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B60",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Just touching base about the customer app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_touching_base",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B61",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. I wanted to reach out about the customer app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_reach_out",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B62",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Can I grab a quick call about the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_quick_call",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B63",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Hope you’re well. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "filler_smart_apostrophe",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B64",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo! Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "exclamation",
+   "intended_code": "EXCLAMATION"
+  },
+  {
+   "id": "O-B65",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo！ Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "exclamation_fullwidth",
+   "intended_code": "EXCLAMATION"
+  },
+  {
+   "id": "O-B66",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo 😀. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "emoji",
+   "intended_code": "EMOJI"
+  },
+  {
+   "id": "O-B67",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo :) Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "emoticon",
+   "intended_code": "EMOJI"
+  },
+  {
+   "id": "O-B68",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. See pendo.io for more. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "link_domain",
+   "intended_code": "LINK"
+  },
+  {
+   "id": "O-B69",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. See bit.ly/xyz for more. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "link_shortener",
+   "intended_code": "LINK"
+  },
+  {
+   "id": "O-B70",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. See pendo dot com for more. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "link_spelled_out",
+   "intended_code": "LINK"
+  },
+  {
+   "id": "O-B71",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Email me at alex.cordner@pendo.io. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "email_leak",
+   "intended_code": "EMAIL_ADDRESS"
+  },
+  {
+   "id": "O-B72",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Call me on 0412 345 678. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "phone_leak",
+   "intended_code": "PHONE_NUMBER"
+  },
+  {
+   "id": "O-B73",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Call me on four one two three four five six seven eight. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "phone_leak_words",
+   "intended_code": "PHONE_NUMBER"
+  },
+  {
+   "id": "O-B74",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Is now a bad time? Who owns the app? Can we book 15 minutes?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "multiple_asks_question_marks",
+   "intended_code": "OPENER_MULTIPLE_QUESTIONS|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B75",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app, and can I send you a calendar invite?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "multiple_asks_single_question_mark",
+   "intended_code": "OPENER_MULTIPLE_QUESTIONS"
+  },
+  {
+   "id": "O-B76",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app? Is it fine if I email you after?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "multiple_asks_two",
+   "intended_code": "OPENER_MULTIPLE_QUESTIONS"
+  },
+  {
+   "id": "O-B77",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. I've sent you an email and a calendar invite. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "send_language_opener",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "O-B78",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. I'll send over a calendar invite now. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "send_language_opener_2",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "O-B79",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Who looks after the app? I'm sending them an email now.\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "send_language_gatekeeper",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "O-B80",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. As Product Manager, you must care about the ordering portal. Who owns it?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "fail",
+   "category": "role_assumed_title",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "O-B81",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. You look after the product, right? Greenvale is hiring a Head of Digital.\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "fail",
+   "category": "role_assumed_you_look_after",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "O-B82",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Your team must be busy with the digital hire. Who owns the portal?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "fail",
+   "category": "role_assumed_your_team",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "O-B83",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Since you run the ordering portal, who is the digital owner?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "fail",
+   "category": "role_assumed_you_run",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "O-B84",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Being responsible for the portal, you will like this. Who owns it?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "fail",
+   "category": "role_assumed_responsible",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "O-B85",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur appointed a new Chief Digital Officer and I wanted to ask a bit about how the customer app is owned and who looks after it day to day now. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "over_length_31",
+   "intended_code": "OPENER_TOO_LONG"
+  },
+  {
+   "id": "O-B86",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur appointed a new Chief Digital Officer, so I am curious who looks after the customer app. Who owns it today, please?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "over_length_26",
+   "intended_code": "OPENER_TOO_LONG"
+  },
+  {
+   "id": "O-B87",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could I speak to your head of product about analytics?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_pitch_analytics",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "O-B88",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Can you put me through to the head of product? It could save them time.\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_pitch_save_time",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "O-B89",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Who handles product feedback tooling there, please?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_pitch_tools_unlisted",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "O-B90",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Tell Priya her colleague referred me.\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_fake_referral",
+   "intended_code": "GATEKEEPER_NO_ROLE"
+  },
+  {
+   "id": "O-B91",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you put me through to Priya, please? She is expecting my call.\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_fake_expected",
+   "intended_code": "GATEKEEPER_NO_ROLE"
+  },
+  {
+   "id": "O-B92",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Hi there, could you please tell me who the right person would be to speak to about the customer app today?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_too_long",
+   "intended_code": "GATEKEEPER_TOO_LONG"
+  },
+  {
+   "id": "O-B93",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Who looks after the app since the new appointment?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "gk_mentions_trigger",
+   "intended_code": "GATEKEEPER_PITCH"
+  },
+  {
+   "id": "O-B94",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "OPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "label_missing",
+   "intended_code": "DRAFT_STYLE_LABEL_MISSING"
+  },
+  {
+   "id": "O-B95",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: calibrated\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "label_reworded",
+   "intended_code": "DRAFT_STYLE_LABEL_MISSING"
+  },
+  {
+   "id": "O-B96",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nLet me know if you want changes.",
+   "expect": "fail",
+   "category": "shape_extra_commentary",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B97",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "Here is the block:\nDRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_preamble",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B98",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\n**OPENER:** Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_markdown_bold",
+   "intended_code": "SHAPE_MISSING"
+  },
+  {
+   "id": "O-B99",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "```text\nDRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\n```",
+   "expect": "fail",
+   "category": "shape_code_fence",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B100",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: \"Hi Priya, Alex from Pendo. Who owns the customer app now?\"\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_quotes_around_opener",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B101",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_reordered",
+   "intended_code": "SHAPE_ORDER"
+  },
+  {
+   "id": "O-B102",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\n\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_blank_line",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B103",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOpener: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_lowercase_labels",
+   "intended_code": "SHAPE_MISSING"
+  },
+  {
+   "id": "O-B104",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nOPENER: Hi Priya, Alex here. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "shape_two_openers",
+   "intended_code": "SHAPE_EXTRA"
+  },
+  {
+   "id": "O-B105",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_no_source",
+   "intended_code": "FACT_NO_SOURCE"
+  },
+  {
+   "id": "O-B106",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_wrong_source",
+   "intended_code": "FACT_SOURCE_MISMATCH"
+  },
+  {
+   "id": "O-B107",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-05)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_wrong_date",
+   "intended_code": "FACT_DATE_MISSING"
+  },
+  {
+   "id": "O-B108",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance appointed a new Chief Digital Officer, Dana Whitfield (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_padding_duplicate",
+   "intended_code": "FACT_DUPLICATE"
+  },
+  {
+   "id": "O-B109",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance serves more customers than any other regional insurer (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_invented_wholesale",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B110",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: None verified\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_none_wrong_form",
+   "intended_code": "FACT_NONE_FORMAT"
+  },
+  {
+   "id": "O-B111",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Who handles the platform side?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: Cinder Payments is a payments company in Sydney (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "fail",
+   "category": "fact2_padded_when_one_fact",
+   "intended_code": "FACT_UNSUPPORTED"
+  },
+  {
+   "id": "O-B112",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: linkedin:larkspur, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "fact_unknown_source",
+   "intended_code": "FACT_SOURCE_UNKNOWN"
+  },
+  {
+   "id": "O-B113",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Our gаme-changing tool fixes adoption. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_cyrillic_banned",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B114",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Wanted to touch​ base on the app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_zero_width_banned",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B115",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Can I grab a quick call? Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_nbsp_banned",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B117",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur has about ７００ staff. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_fullwidth_digits_false_value",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "O-B118",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Hope you’re well. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_smart_quote_hope",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "O-B119",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Saw Larkspur just lаunched a new claims portal. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_cyrillic_event_word",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "O-B120",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Congrаts on the news. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "fail",
+   "category": "unicode_cyrillic_congrats_no_trigger",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "O-B121",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Email me at alex​@pendo.io. Who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_zero_width_email",
+   "intended_code": "EMAIL_ADDRESS"
+  },
+  {
+   "id": "O-B122",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Who owns the app? We help teams⁠ like yours.\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "fail",
+   "category": "unicode_word_joiner_claim",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  }
+ ],
+ "email_cases": [
+  {
+   "id": "E-G01",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nNew leaders often look at the customer app first.\nWho is the right person to speak to about it?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G02",
+   "kind": "email",
+   "packet": "funding",
+   "subject": "tried you re Series B",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nG'day Jonas,\nJust tried you. Bellbird Fitness raised NZ$18 million in a Series B round.\nRounds like that tend to make the product roadmap busier.\nWho should I speak to about it?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G03",
+   "kind": "email",
+   "packet": "product_launch",
+   "subject": "tried you re Tidewater app",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Marcus,\nJust tried you. Tidewater Credit Union launched a new mobile banking app for members.\nThe weeks after a launch are when teams learn what members get stuck on.\nWho owns the app day to day?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G04",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you. I'm Alex at Pendo, and I'm calling engineering managers at software companies.\nI don't have a specific reason for today. Marlow just looks like a fit.\nAre you the right person for product tooling?\nAlex",
+   "expect": "pass",
+   "category": "good_note_tooling",
+   "intended_code": null
+  },
+  {
+   "id": "E-G05",
+   "kind": "email",
+   "packet": "ambiguous_role",
+   "subject": "tried you re Greenvale",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Tane,\nJust tried you. Greenvale Dairy is hiring a Head of Digital.\nI'm not sure who looks after digital there.\nWho would be the right person to speak to?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G06",
+   "kind": "email",
+   "packet": "one_fact",
+   "subject": "tried you re Orbis Bank",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Wei,\nJust tried you. Cinder Payments announced a partnership with Orbis Bank.\nI'd like to learn who looks after the platform side.\nWho is the right person to talk to?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G07",
+   "kind": "email",
+   "packet": "kestrel",
+   "subject": "tried you re seed round",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Hana,\nJust tried you. Kestrel Labs raised US$3 million in a seed round.\nYou are also hiring a Head of Customer Experience.\nWho should I talk to about the product side?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G08",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. I'm calling about the Larkspur customer app.\nI don't have anything urgent, just a question.\nAre you the right person for the app?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G09",
+   "kind": "email",
+   "packet": "funding",
+   "subject": "tried you re Bellbird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jonas,\nJust tried you. Bellbird is hiring a Product Designer.\nTeams that hire for product design are usually busy with the roadmap.\nWho looks after the roadmap there?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-G10",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you. No specific reason for the call.\nMarlow builds project software for builders, which is who I talk to.\nIs product tooling something you look after?\nAlex",
+   "expect": "pass",
+   "category": "good",
+   "intended_code": null
+  },
+  {
+   "id": "E-B01",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nDetails are at pendo.com/apac.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "link",
+   "intended_code": "LINK"
+  },
+  {
+   "id": "E-B02",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer. A change at that level often puts the customer app under a closer look, and teams in that position usually want a clear picture of how their customers actually use the app before they decide on priorities for the next quarter or two.\nWho is the right person to speak to about it?\nAlex",
+   "expect": "fail",
+   "category": "over_length",
+   "intended_code": "EMAIL_TOO_LONG"
+  },
+  {
+   "id": "E-B03",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you.\nLarkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nTeams then look at usage.\nWho owns that?\nIs it you?\nAlex",
+   "expect": "fail",
+   "category": "too_many_lines",
+   "intended_code": "EMAIL_LINE_COUNT"
+  },
+  {
+   "id": "E-B04",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nLarkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho is the right person to speak to?\nAlex",
+   "expect": "fail",
+   "category": "no_just_tried_you",
+   "intended_code": "EMAIL_OPENING"
+  },
+  {
+   "id": "E-B05",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it? Can we talk Friday?\nAlex",
+   "expect": "fail",
+   "category": "two_asks_questions",
+   "intended_code": "EMAIL_MULTIPLE_ASKS"
+  },
+  {
+   "id": "E-B06",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nLet me know if Thursday works. Who owns it?\nAlex",
+   "expect": "fail",
+   "category": "two_asks_cue_plus_question",
+   "intended_code": "EMAIL_MULTIPLE_ASKS"
+  },
+  {
+   "id": "E-B07",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWould you be open to a chat, or should I try your colleague?\nAlex",
+   "expect": "fail",
+   "category": "two_asks_one_question_mark",
+   "intended_code": "EMAIL_MULTIPLE_ASKS"
+  },
+  {
+   "id": "E-B08",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you. Congrats on the new funding round.\nA raise like that busies the product team.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "invented_trigger_funding",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "E-B09",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you. I saw Marlow is expanding.\nThat often means a busier product team.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "invented_trigger_saw",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "E-B10",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you. Marlow is growing quickly at the moment.\nThat often means a busier product team.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "invented_growth_no_event_word",
+   "intended_code": "INVENTED_TRIGGER"
+  },
+  {
+   "id": "E-B11",
+   "kind": "email",
+   "packet": "none_cold",
+   "subject": "tried you today",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Ellie,\nJust tried you and left you a voicemail.\nMarlow builds project software for builders.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "invented_voicemail_no_history",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "E-B12",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nI've sent you a calendar invite for Friday.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "send_language_sent_you",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "E-B13",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nI am sending you an invite now.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "send_language_sending_you",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "E-B14",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nI'll send over a calendar invite.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "send_language_send_over",
+   "intended_code": "EMAIL_SEND_LANGUAGE"
+  },
+  {
+   "id": "E-B15",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nInvite attached.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "attachment",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B16",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA quick note on the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "quick_in_email",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B17",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "subject_one_word",
+   "intended_code": "EMAIL_SUBJECT_LENGTH"
+  },
+  {
+   "id": "E-B18",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re the new Larkspur Chief Digital Officer appointment",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "subject_too_long",
+   "intended_code": "EMAIL_SUBJECT_LENGTH"
+  },
+  {
+   "id": "E-B19",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur!",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "subject_exclamation",
+   "intended_code": "EXCLAMATION"
+  },
+  {
+   "id": "E-B20",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "Re: our chat",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "subject_fake_thread",
+   "intended_code": "SUBJECT_FAKE_THREAD"
+  },
+  {
+   "id": "E-B21",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nPendo customers typically see 30% fewer support tickets.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "pendo_stat_number",
+   "intended_code": "UNSUPPORTED_CLAIM|NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "E-B22",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nPendo customers get dramatically fewer support tickets.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "pendo_stat_no_number",
+   "intended_code": "UNSUPPORTED_CLAIM"
+  },
+  {
+   "id": "E-B23",
+   "kind": "email",
+   "packet": "ambiguous_role",
+   "subject": "tried you re Greenvale",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Tane,\nJust tried you. Greenvale Dairy is hiring a Head of Digital.\nAs the Product Manager, you will care about the ordering portal.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "role_assumed_as_the",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "E-B24",
+   "kind": "email",
+   "packet": "ambiguous_role",
+   "subject": "tried you re Greenvale",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Tane,\nJust tried you. Greenvale Dairy is hiring a Head of Digital.\nYour team will be busy with the portal.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "role_assumed_your_team",
+   "intended_code": "ROLE_ASSUMED"
+  },
+  {
+   "id": "E-B25",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nReply to priya@larkspur-insurance.example.com if easier.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "email_leak",
+   "intended_code": "EMAIL_ADDRESS"
+  },
+  {
+   "id": "E-B26",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya Sharma,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "invented_surname",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "E-B27",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Pria,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "misspelled_first_name",
+   "intended_code": "PROPER_NOUN_UNSUPPORTED"
+  },
+  {
+   "id": "E-B28",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nCheers, Alex",
+   "expect": "fail",
+   "category": "bad_signoff",
+   "intended_code": "EMAIL_SIGNOFF"
+  },
+  {
+   "id": "E-B29",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "Hi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nA new leader often reviews the app.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "label_missing",
+   "intended_code": "DRAFT_STYLE_LABEL_MISSING"
+  },
+  {
+   "id": "E-B30",
+   "kind": "email",
+   "packet": "funding",
+   "subject": "tried you re Bellbird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jonas,\nJust tried you. Bellbird Fitness raised NZ$80 million in a Series B round.\nA new round often means a busier roadmap.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "invented_amount",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "E-B31",
+   "kind": "email",
+   "packet": "funding",
+   "subject": "tried you re Bellbird",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Jonas,\nJust tried you. Bellbird Fitness raised NZ$18 million in a Series C round.\nA new round often means a busier roadmap.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "series_letter_changed",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "E-B32",
+   "kind": "email",
+   "packet": "kestrel",
+   "subject": "tried you re Kestrel",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Hana,\nJust tried you. Kestrel Labs raised US$30 million in a seed round.\nA new round often means a busier roadmap.\nWho owns product?\nAlex",
+   "expect": "fail",
+   "category": "amount_10x",
+   "intended_code": "NUMBER_UNSUPPORTED"
+  },
+  {
+   "id": "E-B33",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nHope you're well, and hope this finds you well.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "filler_hope",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B34",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nJust circling back on this.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "filler_circling_back",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B35",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nCongrats on the promotion.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "congrats_promotion_other_trigger",
+   "intended_code": "TRIGGER_MISMATCH"
+  },
+  {
+   "id": "E-B36",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nCall me on 0412 345 678.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "phone_leak",
+   "intended_code": "PHONE_NUMBER"
+  },
+  {
+   "id": "E-B37",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\n- A new leader reviews the app\n- Teams then look at usage\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "markdown_bullets",
+   "intended_code": "EMAIL_BULLETS"
+  },
+  {
+   "id": "E-B38",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nHope you’re well.\nWho owns the app?\nAlex",
+   "expect": "fail",
+   "category": "smart_quote_hope",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B39",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nCan we grab a quick call?\nAlex",
+   "expect": "fail",
+   "category": "nbsp_quick",
+   "intended_code": "BANNED_PHRASE"
+  },
+  {
+   "id": "E-B40",
+   "kind": "email",
+   "packet": "exec_move",
+   "subject": "tried you re Larkspur",
+   "body": "DRAFT STYLE: not yet calibrated to Alex\nHi Priya,\nJust tried you. Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer.\nSaw you just shipped a new claims portal.\nWho owns it?\nAlex",
+   "expect": "fail",
+   "category": "unsupported_shipped",
+   "intended_code": "TRIGGER_MISMATCH"
+  }
+ ],
+ "natural_openers": [
+  {
+   "id": "N001",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Look, I'll be straight. Who owns the Larkspur customer app these days?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N002",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Honestly, I just have one question about the customer app. Got a second?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N003",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Apologies for the cold call. Who looks after the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N004",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Interested in who owns the customer app since the new Chief Digital Officer. Can you point me?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N005",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Wanted to ask who owns the Larkspur customer app. Is that you?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N006",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Know who looks after the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N007",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Good timing? I have one question about the customer app.\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N008",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Wonder who owns the customer app after the Chief Digital Officer appointment?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N009",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Imagine the new Chief Digital Officer wants a view on the customer app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N010",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Maybe you're not the right person. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N011",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Perhaps you can point me to who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N012",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Obviously a cold call. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N013",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Nothing urgent, just a question. Who looks after the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N014",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Everything I read says a new Chief Digital Officer reviews the app. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N015",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Between us, am I speaking to the right person for the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N016",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Over to you: who looks after the customer app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N017",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Planning anything for the customer app after the appointment?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N018",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Building on the Chief Digital Officer news, who owns the app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N019",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Rather than guess, who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N020",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Totally cold call. Who looks after the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N021",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Appreciate you picking up. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N022",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Understand you are busy. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N023",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Morning. Who looks after the Larkspur customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N024",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Afternoon. Who looks after the Larkspur customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N025",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur's new Chief Digital Officer is Dana Whitfield. Who owns the customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N026",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Larkspur Insurance has a customer app for policy claims. Who owns it?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N027",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Policy claims in the app. Who owns that at Larkspur?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N028",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Chief Digital Officer change at Larkspur. Who owns the app now?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N029",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. CX or product, who owns the Larkspur customer app?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N030",
+   "kind": "opener",
+   "packet": "exec_move",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Priya, Alex from Pendo. Is the customer app a product or CX thing at Larkspur?\nFACT 1: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)\nFACT 2: Larkspur Insurance runs a customer app for policy claims (source: website:larkspur-insurance.example.com/app, 2026-11-20)\nGATEKEEPER: Could you point me to whoever looks after your customer app?\nTRIGGER: Larkspur Insurance appointed Dana Whitfield as Chief Digital Officer (source: zoominfo_scoop:FAKE-101, 2026-11-12)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N031",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Straight up, congrats on the Series B. Who looks after product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N032",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Fresh from the Series B, who owns the product roadmap?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N033",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird's Series B is big news. Who runs the product team?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N034",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird Fitness raised NZ$18 million in a Series B round. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N035",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Auckland team, right? Bellbird raised a Series B. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N036",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Bellbird is hiring a Product Designer. Who owns product there?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N037",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Hiring a Product Designer and a Series B. Who owns product?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N038",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Money in, product designer hired. Who owns the roadmap?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N039",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Series B in November, nice. Who owns the roadmap?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N040",
+   "kind": "opener",
+   "packet": "funding",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Jonas, Alex from Pendo. Early days after the raise. Who owns the product roadmap?\nFACT 1: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)\nFACT 2: Bellbird Fitness is hiring a Product Designer (source: zoominfo_scoop:FAKE-203, 2026-11-17)\nGATEKEEPER: Who looks after the product team there, please?\nTRIGGER: Bellbird Fitness raised NZ$18 million in a Series B round (source: zoominfo_scoop:FAKE-202, 2026-11-03)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N041",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater's new mobile banking app is out. How are members finding it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N042",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater launched a mobile banking app. Who owns it day to day?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N043",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. New app for Tidewater members. Who looks after it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N044",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Brisbane's Tidewater Credit Union launched a new app. Who owns it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N045",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater's app launched on 18 November. Who owns it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N046",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater has about 310 employees and a new app. Who owns it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N047",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Members now have a mobile banking app. Who looks after it?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N048",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Credit union app launches are busy. Who owns Tidewater's?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N049",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Tidewater Credit Union's launch is recent. Who owns the app?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N050",
+   "kind": "opener",
+   "packet": "product_launch",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Marcus, Alex from Pendo. Mobile banking app for members. Who owns it at Tidewater?\nFACT 1: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)\nFACT 2: Tidewater Credit Union has about 310 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Who is the right person for the member app, please?\nTRIGGER: Tidewater Credit Union launched a new mobile banking app for members (source: zoominfo_scoop:FAKE-301, 2026-11-18)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N051",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Cold call, I'll be upfront. Who looks after the product side at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N052",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Honestly no reason beyond fit. Who owns product at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N053",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Marlow Software Group builds project software. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N054",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Perth software company, cold call. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N055",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Software for builders is a niche. Who owns product at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N056",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Marlow's about 85 people. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N057",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Engineering manager at Marlow, right? Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N058",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Apologies, cold call. Who owns the product side?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N059",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Not a sales pitch, just one question. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N060",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Fair warning, cold call. Who owns product at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N061",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Rolling through a few WA software companies. Who owns product at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N062",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Ringing software teams across Australia and New Zealand. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N063",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Ringing software teams across APAC. Who owns product at Marlow?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N064",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Ringing a few Melbourne and Sydney software teams today. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N065",
+   "kind": "opener",
+   "packet": "none_cold",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Ellie, Alex from Pendo. Ringing a few Auckland software teams today. Who owns product?\nFACT 1: Marlow Software Group builds project software for builders (source: website:marlow-software.example.com, 2026-11-20)\nFACT 2: Marlow Software Group has about 85 employees (source: salesforce:Account.ZoomInfo_Employee_Count__c, 2026-11-01)\nGATEKEEPER: Could I speak to whoever owns the product side, please?\nTRIGGER: None found: cold call on ICP fit only",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N066",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Greenvale is hiring a Head of Digital. Who handles digital there?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N067",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Head of Digital hire at Greenvale Dairy. Who owns the ordering portal?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N068",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Greenvale has a customer ordering portal. Who looks after it?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N069",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Hamilton's Greenvale Dairy is hiring a Head of Digital. Who looks after digital?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N070",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Not sure who handles digital at Greenvale. Can you point me?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N071",
+   "kind": "opener",
+   "packet": "ambiguous_role",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Tane, Alex from Pendo. Wanted to find who looks after the portal. Is that you?\nFACT 1: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)\nFACT 2: Greenvale Dairy has a customer ordering portal (source: website:greenvale-dairy.example.com, 2026-11-15)\nGATEKEEPER: Who looks after your digital projects, please?\nTRIGGER: Greenvale Dairy is hiring a Head of Digital (source: zoominfo_scoop:FAKE-501, 2026-11-09)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N072",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Cinder Payments announced a partnership with Orbis Bank. Who owns the platform side?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N073",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Orbis Bank partnership for Cinder, nice. Who handles the platform?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N074",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Partnership with Orbis Bank in October. Who owns the platform side?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N075",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Cinder's partnership with Orbis Bank is news. Who handles engineering there?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N076",
+   "kind": "opener",
+   "packet": "one_fact",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Wei, Alex from Pendo. Is engineering at Cinder busy with the Orbis Bank partnership?\nFACT 1: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)\nFACT 2: none verified\nGATEKEEPER: Who runs engineering there, please?\nTRIGGER: Cinder Payments announced a partnership with Orbis Bank (source: zoominfo_scoop:FAKE-601, 2026-10-29)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N077",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel's seed round, congrats. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N078",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Wellington's Kestrel Labs raised a seed round. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N079",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel is hiring a Head of Customer Experience. Who owns CX?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N080",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Seed round and a CX hire at Kestrel. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N081",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel has about 45 staff. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N082",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel Labs raised US$3 million. Who owns product there?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N083",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Seed funding at Kestrel is new. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  },
+  {
+   "id": "N084",
+   "kind": "opener",
+   "packet": "kestrel",
+   "text": "DRAFT STYLE: not yet calibrated to Alex\nOPENER: Hi Hana, Alex from Pendo. Kestrel's seed round was 10 November. Who owns product?\nFACT 1: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)\nFACT 2: Kestrel Labs is hiring a Head of Customer Experience (source: zoominfo_scoop:FAKE-702, 2026-11-14)\nGATEKEEPER: Who looks after the product side there, please?\nTRIGGER: Kestrel Labs raised US$3 million in a seed round (source: zoominfo_scoop:FAKE-701, 2026-11-10)",
+   "expect": "pass",
+   "category": "natural",
+   "intended_code": null
+  }
+ ]
+}

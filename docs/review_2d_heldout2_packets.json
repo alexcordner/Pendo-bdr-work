@@ -1,0 +1,855 @@
+{
+ "_comment": "Real ResearchPacket.to_dict() from src/callsheet.build_sheet over a FAKE world (reviewer, held-out round 2).",
+ "packets": {
+  "wattle": {
+   "account_key": "001FAKE00000001",
+   "account_name": "Wattlebird Energy Pty Ltd",
+   "website": "www.wattle.example.com",
+   "industry": "Utilities",
+   "state": "Western Australia",
+   "city": "Perth",
+   "employees": 780,
+   "tier": "tier1",
+   "prospect_first_name": "Imogen",
+   "prospect_title": "Chief Product Officer",
+   "prospect_sf_contact_id": "003FAKE0001",
+   "local_time": "2026-11-25T11:01:00+08:00",
+   "window": "morning",
+   "timezone": "Australia/Perth",
+   "signals": [
+    {
+     "kind": "funding",
+     "label": "Funding",
+     "evidence": "Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital.",
+     "source": "zoominfo_scoop:FAKE-H-10",
+     "source_label": "ZoomInfo scoop 2026-11-16",
+     "date": "2026-11-16",
+     "age_days": 9,
+     "status": "ok",
+     "verdict_reason": "kept: Funding within 45 day limit (9 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "funding",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Wattlebird Energy raised A$22 million in a Series C round led by Southgate Capital.",
+     "source": "ZoomInfo scoop 2026-11-16"
+    },
+    {
+     "text": "About 780 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Perth, Western Australia",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Utilities",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "currawong": {
+   "account_key": "001FAKE00000010",
+   "account_name": "Currawong Bank Ltd",
+   "website": "www.currawong.example.com",
+   "industry": "Banking",
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 1800,
+   "tier": "tier1",
+   "prospect_first_name": "Jack",
+   "prospect_title": "Head of CX",
+   "prospect_sf_contact_id": "003FAKE0010",
+   "local_time": "2026-11-25T14:01:00+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "new_hire",
+     "label": "New Hire",
+     "evidence": "Currawong Bank hired Priya Nair as Chief Experience Officer.",
+     "source": "zoominfo_scoop:FAKE-H-100",
+     "source_label": "ZoomInfo scoop 2026-11-22",
+     "date": "2026-11-22",
+     "age_days": 3,
+     "status": "ok",
+     "verdict_reason": "kept: New Hire within 90 day limit (3 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "new_hire",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Currawong Bank hired Priya Nair as Chief Experience Officer.",
+     "source": "ZoomInfo scoop 2026-11-22"
+    },
+    {
+     "text": "About 1800 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Banking",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "wombat": {
+   "account_key": "001FAKE00000013",
+   "account_name": "Wombat Media Pty Ltd",
+   "website": "www.wombat.example.com",
+   "industry": "Media",
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 130,
+   "tier": "tier2",
+   "prospect_first_name": "Zara",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0013",
+   "local_time": "2026-11-25T14:30:48+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "funding",
+     "label": "Funding",
+     "evidence": "Wombat Media raised US$4 million in a seed round.",
+     "source": "zoominfo_scoop:FAKE-H-130",
+     "source_label": "ZoomInfo scoop 2026-11-23",
+     "date": "2026-11-23",
+     "age_days": 2,
+     "status": "ok",
+     "verdict_reason": "kept: Funding within 45 day limit (2 days old)",
+     "ambiguous": false
+    },
+    {
+     "kind": "hiring_plan",
+     "label": "Hiring Plan",
+     "evidence": "Wombat Media is hiring a Head of Customer Experience.",
+     "source": "zoominfo_scoop:FAKE-H-131",
+     "source_label": "ZoomInfo scoop 2026-11-19",
+     "date": "2026-11-19",
+     "age_days": 6,
+     "status": "ok",
+     "verdict_reason": "kept: Hiring Plan within 30 day limit (6 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "funding",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Wombat Media raised US$4 million in a seed round.",
+     "source": "ZoomInfo scoop 2026-11-23"
+    },
+    {
+     "text": "Wombat Media is hiring a Head of Customer Experience.",
+     "source": "ZoomInfo scoop 2026-11-19"
+    },
+    {
+     "text": "About 130 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Media",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 5,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "quokka": {
+   "account_key": "001FAKE00000003",
+   "account_name": "Quokka Pay Pty Ltd",
+   "website": "www.quokka.example.com",
+   "industry": "Financial Services",
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 95,
+   "tier": "tier2",
+   "prospect_first_name": "Mei",
+   "prospect_title": "Head of Digital",
+   "prospect_sf_contact_id": "003FAKE0003",
+   "local_time": "2026-11-25T15:00:36+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "product_launch",
+     "label": "Product Launch",
+     "evidence": "Quokka Pay launched a buy now pay later app for small retailers.",
+     "source": "zoominfo_scoop:FAKE-H-30",
+     "source_label": "ZoomInfo scoop 2026-11-20",
+     "date": "2026-11-20",
+     "age_days": 5,
+     "status": "ok",
+     "verdict_reason": "kept: Product Launch within 45 day limit (5 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "product_launch",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Quokka Pay launched a buy now pay later app for small retailers.",
+     "source": "ZoomInfo scoop 2026-11-20"
+    },
+    {
+     "text": "About 95 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Financial Services",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "saltbush": {
+   "account_key": "001FAKE00000004",
+   "account_name": "Saltbush Health Ltd",
+   "website": "www.saltbush.example.com",
+   "industry": "Healthcare",
+   "state": "Australian Capital Territory",
+   "city": "Canberra",
+   "employees": 1200,
+   "tier": "tier1",
+   "prospect_first_name": "Rahul",
+   "prospect_title": "Product Manager",
+   "prospect_sf_contact_id": "003FAKE0004",
+   "local_time": "2026-11-25T15:30:24+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "hiring_plan",
+     "label": "Hiring Plan",
+     "evidence": "Saltbush Health is hiring a Product Manager and a UX Researcher.",
+     "source": "zoominfo_scoop:FAKE-H-40",
+     "source_label": "ZoomInfo scoop 2026-10-16",
+     "date": "2026-10-16",
+     "age_days": 40,
+     "status": "stale",
+     "verdict_reason": "older than its 30 day limit (40 days old): check before quoting; role ambiguous: check it is a digital product role",
+     "ambiguous": true
+    }
+   ],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [
+    "role ambiguous: check it is a digital product role"
+   ],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 1200 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Canberra, Australian Capital Territory",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Healthcare",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "1 signal left out of the facts (future-dated or older than its limit): do not quote it.",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "bilby": {
+   "account_key": "001FAKE00000012",
+   "account_name": "Bilby Insurance Pty Ltd",
+   "website": "www.bilby.example.com",
+   "industry": "Insurance",
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 700,
+   "tier": "tier1",
+   "prospect_first_name": "Ethan",
+   "prospect_title": "Head of Customer Experience",
+   "prospect_sf_contact_id": "003FAKE0012",
+   "local_time": "2026-11-25T16:00:12+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "intent",
+     "label": "Intent (interest signal, not a dated event)",
+     "evidence": "Bilby Insurance is researching customer experience tools.",
+     "source": "zoominfo_intent:FAKE-I-12",
+     "source_label": "ZoomInfo intent date unknown (unverified connector shape)",
+     "date": null,
+     "age_days": null,
+     "status": "intent",
+     "verdict_reason": "interest signal, not a dated event",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Intent signal (interest, not a dated event): Bilby Insurance is researching customer experience tools.",
+     "source": "ZoomInfo intent date unknown (unverified connector shape)"
+    },
+    {
+     "text": "About 700 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Insurance",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "ironbark": {
+   "account_key": "001FAKE00000002",
+   "account_name": "Ironbark Freight Pty Ltd",
+   "website": "www.ironbark.example.com",
+   "industry": "Transportation",
+   "state": "South Australia",
+   "city": "Adelaide",
+   "employees": 340,
+   "tier": "tier1",
+   "prospect_first_name": "Declan",
+   "prospect_title": "Head of Engineering",
+   "prospect_sf_contact_id": "003FAKE0002",
+   "local_time": "2026-11-25T13:31:00+10:30",
+   "window": "afternoon",
+   "timezone": "Australia/Adelaide",
+   "signals": [
+    {
+     "kind": "exec_move",
+     "label": "Executive Move",
+     "evidence": "Ironbark Freight appointed Callum Reyes as Head of Product.",
+     "source": "zoominfo_scoop:FAKE-H-20",
+     "source_label": "ZoomInfo scoop 2026-11-11",
+     "date": "2026-11-11",
+     "age_days": 14,
+     "status": "ok",
+     "verdict_reason": "kept: Executive Move within 90 day limit (14 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "exec_move",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Ironbark Freight appointed Callum Reyes as Head of Product.",
+     "source": "ZoomInfo scoop 2026-11-11"
+    },
+    {
+     "text": "About 340 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Adelaide, South Australia",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Transportation",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "banksia": {
+   "account_key": "001FAKE00000006",
+   "account_name": "Banksia Mutual Ltd",
+   "website": "www.banksia.example.com",
+   "industry": "Insurance",
+   "state": "Victoria",
+   "city": "Melbourne",
+   "employees": 560,
+   "tier": "tier1",
+   "prospect_first_name": "Tom",
+   "prospect_title": "CTO",
+   "prospect_sf_contact_id": "003FAKE0006",
+   "local_time": "2026-11-25T14:01:00+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Melbourne",
+   "signals": [
+    {
+     "kind": "ma",
+     "label": "M&A",
+     "evidence": "Banksia Mutual agreed to acquire Heron Wealth.",
+     "source": "zoominfo_scoop:FAKE-H-60",
+     "source_label": "ZoomInfo scoop 2026-10-26",
+     "date": "2026-10-26",
+     "age_days": 30,
+     "status": "ok",
+     "verdict_reason": "kept: M&A within 45 day limit (30 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "ma",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Banksia Mutual agreed to acquire Heron Wealth.",
+     "source": "ZoomInfo scoop 2026-10-26"
+    },
+    {
+     "text": "About 560 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Melbourne, Victoria",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Insurance",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "gumnut": {
+   "account_key": "001FAKE00000011",
+   "account_name": "Gumnut Retail Pty Ltd",
+   "website": "www.gumnut.example.com",
+   "industry": "Retail",
+   "state": "Victoria",
+   "city": "Melbourne",
+   "employees": 450,
+   "tier": "tier1",
+   "prospect_first_name": "Olivia",
+   "prospect_title": "Head of Digital",
+   "prospect_sf_contact_id": "003FAKE0011",
+   "local_time": "2026-11-25T15:15:30+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Melbourne",
+   "signals": [
+    {
+     "kind": "project_pain",
+     "label": "Project / Pain Point",
+     "evidence": "Gumnut Retail is migrating its ecommerce platform to a new provider.",
+     "source": "zoominfo_scoop:FAKE-H-110",
+     "source_label": "ZoomInfo scoop 2026-09-26",
+     "date": "2026-09-26",
+     "age_days": 60,
+     "status": "stale",
+     "verdict_reason": "older than its 45 day limit (60 days old): check before quoting",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 450 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Melbourne, Victoria",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Retail",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "1 signal left out of the facts (future-dated or older than its limit): do not quote it.",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "pohutukawa": {
+   "account_key": "001FAKE00000005",
+   "account_name": "Pohutukawa Travel Ltd",
+   "website": "www.pohutukawa.example.com",
+   "industry": "Travel",
+   "state": null,
+   "city": "Auckland",
+   "employees": 210,
+   "tier": "tier1",
+   "prospect_first_name": "Aroha",
+   "prospect_title": "Head of IT",
+   "prospect_sf_contact_id": "003FAKE0005",
+   "local_time": "2026-11-25T16:01:00+13:00",
+   "window": "afternoon",
+   "timezone": "Pacific/Auckland",
+   "signals": [
+    {
+     "kind": "partnership",
+     "label": "Partnership",
+     "evidence": "Pohutukawa Travel announced a partnership with Southern Rail.",
+     "source": "zoominfo_scoop:FAKE-H-50",
+     "source_label": "ZoomInfo scoop 2026-11-05",
+     "date": "2026-11-05",
+     "age_days": 20,
+     "status": "ok",
+     "verdict_reason": "kept: Partnership within 30 day limit (20 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "partnership",
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Pohutukawa Travel announced a partnership with Southern Rail.",
+     "source": "ZoomInfo scoop 2026-11-05"
+    },
+    {
+     "text": "About 210 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Auckland",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Travel",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "tuatara": {
+   "account_key": "001FAKE00000009",
+   "account_name": "Tuatara Systems Ltd",
+   "website": "www.tuatara.example.com",
+   "industry": null,
+   "state": null,
+   "city": null,
+   "employees": null,
+   "tier": null,
+   "prospect_first_name": "Sione",
+   "prospect_title": "Head of Engineering",
+   "prospect_sf_contact_id": "003FAKE0009",
+   "local_time": "2026-11-25T16:15:30+13:00",
+   "window": "afternoon",
+   "timezone": "Pacific/Auckland",
+   "signals": [],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [],
+   "fact_count": 0,
+   "facts_note": "Only 0 verified fact(s) available. Write the missing fact as 'none verified'. Do not pad.",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "kookaburra": {
+   "account_key": "001FAKE00000008",
+   "account_name": "Kookaburra Logistics Pty Ltd",
+   "website": "www.kookaburra.example.com",
+   "industry": null,
+   "state": "Tasmania",
+   "city": "Hobart",
+   "employees": null,
+   "tier": null,
+   "prospect_first_name": null,
+   "prospect_title": "Product Manager",
+   "prospect_sf_contact_id": "003FAKE0008",
+   "local_time": "2026-11-25T14:01:00+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Hobart",
+   "signals": [],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Based in Hobart, Tasmania",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 1,
+   "facts_note": "Only 1 verified fact(s) available. Write the missing fact as 'none verified'. Do not pad.",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "lorikeet": {
+   "account_key": "001FAKE00000007",
+   "account_name": "Lorikeet Learning Pty Ltd",
+   "website": "www.lorikeet.example.com",
+   "industry": "Education software",
+   "state": "Queensland",
+   "city": "Brisbane",
+   "employees": 60,
+   "tier": "tier2",
+   "prospect_first_name": "Niamh",
+   "prospect_title": "Director of Product",
+   "prospect_sf_contact_id": "003FAKE0007",
+   "local_time": "2026-11-25T13:30:00+10:00",
+   "window": "afternoon",
+   "timezone": "Australia/Brisbane",
+   "signals": [],
+   "has_real_trigger": false,
+   "trigger_kind": null,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 60 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Brisbane, Queensland",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Education software",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "numbat": {
+   "account_key": "001FAKE00000014",
+   "account_name": "Numbat Mining Tech Pty Ltd",
+   "website": "www.numbat.example.com",
+   "industry": "Mining",
+   "state": "Western Australia",
+   "city": "Perth",
+   "employees": 300,
+   "tier": "tier1",
+   "prospect_first_name": "Lisa",
+   "prospect_title": "Product Manager",
+   "prospect_sf_contact_id": "003FAKE0014",
+   "local_time": "2026-11-25T14:45:30+08:00",
+   "window": "afternoon",
+   "timezone": "Australia/Perth",
+   "signals": [
+    {
+     "kind": "exec_move",
+     "label": "Executive Move",
+     "evidence": "Numbat Mining Tech named Hugo Ferris as Head of Digital Operations.",
+     "source": "zoominfo_scoop:FAKE-H-140",
+     "source_label": "ZoomInfo scoop 2026-11-14",
+     "date": "2026-11-14",
+     "age_days": 11,
+     "status": "ok",
+     "verdict_reason": "kept: Executive Move within 90 day limit (11 days old); role ambiguous: check it is a digital product role",
+     "ambiguous": true
+    }
+   ],
+   "has_real_trigger": true,
+   "trigger_kind": "exec_move",
+   "ambiguity_flags": [
+    "role ambiguous: check it is a digital product role"
+   ],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Numbat Mining Tech named Hugo Ferris as Head of Digital Operations.",
+     "source": "ZoomInfo scoop 2026-11-14"
+    },
+    {
+     "text": "About 300 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Perth, Western Australia",
+     "source": "Salesforce account record"
+    },
+    {
+     "text": "Industry: Mining",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 4,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not say you saw their website, LinkedIn or any page unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  }
+ }
+}

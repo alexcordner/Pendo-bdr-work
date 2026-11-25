@@ -15,8 +15,8 @@ Pipeline:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from dataclasses import dataclass, replace
+from datetime import date, datetime, timedelta, timezone
 from typing import Mapping, NamedTuple, Sequence
 
 from src.config import Config
@@ -29,14 +29,27 @@ KIND_BASE_WEIGHT: dict[SignalKind, float] = {
     SignalKind.EXEC_MOVE: 0.90,       # new product / digital / CX / tech leader: the classic buying window
     SignalKind.PRODUCT_LAUNCH: 0.80,  # a new app or product needs adoption and analytics
     SignalKind.PROJECT_PAIN: 0.80,    # explicit CX / product / digital-workplace project or pain
-    SignalKind.FUNDING: 0.70,         # money to invest in the product
+    SignalKind.FUNDING: 0.60,         # money to invest in the product (phase 2 dry run: lowered from 0.70)
     SignalKind.NEW_HIRE: 0.65,        # relevant hire that is not framed as an exec move
-    SignalKind.MA: 0.60,              # integration brings platform consolidation
+    SignalKind.MA: 0.50,              # being acquired (integration, leadership change) or a full acquisition; variants below
     SignalKind.HIRING_PLAN: 0.55,     # hiring product / CX / engineering roles
-    SignalKind.PARTNERSHIP: 0.45,     # often marketing noise
+    SignalKind.PARTNERSHIP: 0.30,     # often marketing noise; 0.20 without product / digital / customer words
     SignalKind.INTENT: 0.30,          # UNVERIFIED connector shape: interest, not a dated event; capped low
     SignalKind.NONE: 0.0,
 }
+
+#: Variant weights inside a kind (the SignalKind enum is shared and has no sub-kinds). A variant is a multiplier on the
+#: kind's base weight, applied in the verdict (``ScoopVerdict.factor``) and shown to the sheet as a note on the evidence.
+#: Product launch: 0.80 for a digital product, 0.40 for a physical or unclear one.
+#: M&A: 0.50 target, 0.50 acquirer of a digital business or a full acquisition, 0.25 acquirer of a minority stake or an
+#: unrelated business, 0.25 direction unclear. Partnership: 0.30, or 0.20 without product / digital / customer words.
+LAUNCH_NON_DIGITAL_WEIGHT = 0.40
+LAUNCH_FINANCIAL_WEIGHT = 0.20      # property / fund / financial product launch (0.25 x 0.8)
+FUNDING_DEBT_WEIGHT = 0.25          # debt facility, loan, bond, credit line: not a growth round
+MA_RUMOUR_FACTOR = 0.5              # 'reportedly in talks to acquire': x0.5 of the acquirer weight
+MA_MINORITY_OR_UNRELATED_WEIGHT = 0.25
+MA_UNCLEAR_WEIGHT = 0.25
+PARTNERSHIP_NO_PRODUCT_WEIGHT = 0.20
 
 #: Recency decay is exponential: factor = 0.5 ** (age_days / half_life). Default half-life 21 days:
 #: 1.0 today, 0.5 at 3 weeks, ~0.23 at the 45-day config cut-off.
@@ -366,9 +379,23 @@ class ScoopVerdict:
     kind: SignalKind
     reason: str
     ambiguous: bool = False
+    factor: float = 1.0                       # variant multiplier on the kind's base weight (launch / M&A / partnership)
+    notes: tuple[str, ...] = ()               # warnings that travel on Signal.evidence as ' (note)' suffixes
+    event_date: datetime | None = None        # incoming leader's start date, when the description gives one
+    same_deal_as: tuple[str, ...] = ()        # other companies in the batch on the same M&A deal
 
 
 AMBIGUOUS_NOTE = "role ambiguous: check it is a digital product role"
+LAUNCH_NOTE = "physical or unclear product launch: check it is digital"
+MA_TARGET_NOTE = "being acquired: leadership/platform change likely"
+MA_ACQUIRER_FULL_NOTE = "acquirer of a digital business or a full acquisition"
+MA_MINORITY_NOTE = "acquirer of a minority stake or unrelated business"
+MA_UNCLEAR_NOTE = "M&A direction unclear: check the deal"
+PARTNERSHIP_NOTE = "partnership without product, digital or customer words: check relevance"
+DEBT_NOTE = "debt facility, not an equity round"
+FINANCIAL_LAUNCH_NOTE = "financial or property product launch, not a digital product"
+RUMOUR_NOTE = "reported talks, not a confirmed deal"
+SAME_DEAL_PREFIX = "same deal as "
 
 
 def verdict_summary(v: ScoopVerdict) -> str:
@@ -391,13 +418,236 @@ def max_age_for(kind: SignalKind, config: Config) -> int:
     return KIND_MAX_AGE_DAYS.get(kind, config.signals.max_age_days)
 
 
-def _strength(kind: SignalKind, days: float, ambiguous: bool = False) -> float:
-    s = signal_strength(kind, days)
-    return round(s * AMBIGUOUS_ROLE_FACTOR, 4) if ambiguous else s
+def _strength(kind: SignalKind, days: float, ambiguous: bool = False, factor: float = 1.0) -> float:
+    """signal_strength x the variant factor x (ambiguous role: AMBIGUOUS_ROLE_FACTOR), rounded to 4 dp."""
+    s = signal_strength(kind, days) * factor
+    if ambiguous:
+        s *= AMBIGUOUS_ROLE_FACTOR
+    return round(min(1.0, max(0.0, s)), 4)
 
 
-def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, str, bool]:
-    """Apply the per-kind keep rules. Returns (keep, detail, ambiguous); the detail is a phrase, not a full sentence."""
+# ---------------------------------------------------------------- relevance classifiers (phase 2 dry-run fixes)
+class _J(NamedTuple):
+    """Result of judging one kind: keep?, a detail phrase, role-ambiguous?, variant factor, evidence notes, event date."""
+
+    ok: bool
+    detail: str = ""
+    ambiguous: bool = False
+    factor: float = 1.0
+    notes: tuple[str, ...] = ()
+    event_date: datetime | None = None
+
+
+# Product launch: the full weight needs a DIGITAL product. "Lab consumables", "a new range of cleaning products"
+# are physical or unclear: kept at LAUNCH_NON_DIGITAL_WEIGHT with a visible note.
+_DIGITAL_PRODUCT = re.compile(
+    r"(?<!\w)(?:apps?|platforms?|software|digital|mobile|portal|online|website|web|saas|ai|artificial\s+intelligence|"
+    r"cloud|api|apis|customer\s+experience|cx|ux|e-?commerce|banking\s+app|internet\s+banking|self-service|"
+    r"dashboard|chatbot|login|subscription\s+service|solutions?|technology)(?!\w)", _FLAGS)
+_CAMEL_AI = re.compile(r"[a-z]AI(?!\w)")            # product names such as 'SignalAI' (case-sensitive on purpose)
+# Financial or property products are not digital products: fund, REIT, trust, portfolio, ETF, property, mortgage...
+# A bank / insurer / super fund launching an APP or platform still matches _DIGITAL_PRODUCT first and counts as digital.
+_FINANCIAL_PRODUCT = re.compile(
+    r"(?<!\w)(?:funds?|reits?|trusts?|portfolios?|etfs?|propert(?:y|ies)|mortgages?|insurance\s+(?:policy|policies|product)|"
+    r"loan\s+products?|home\s+loans?|term\s+deposits?|superannuation\s+product|annuit(?:y|ies))(?!\w)", _FLAGS)
+# Funding: debt wording means a facility, not a growth round, unless equity wording is also present.
+_DEBT = re.compile(
+    r"(?<!\w)(?:debt|loans?|credit\s+(?:facilit\w+|lines?)|credit|(?:senior\s+|convertible\s+|secured\s+)?notes|bonds?|"
+    r"debentures?|revolving|refinanc\w+|borrowing|facilit(?:y|ies)|mortgage)(?!\w)", _FLAGS)
+_EQUITY = re.compile(r"(?<!\w)(?:equity|series\s+[a-f]|seed|venture|ipo|private\s+placement|pre-ipo|growth\s+round)(?!\w)", _FLAGS)
+# Rumour wording on an M&A scoop.
+_RUMOUR = re.compile(r"(?<!\w)(?:reportedly|in\s+talks|rumou?r\w*|understood\s+to|said\s+to|considering|exploring|eyeing|weighing|approach\w*)(?!\w)", _FLAGS)
+
+# Partnership: product / digital / customer wording makes it worth 0.30, otherwise 0.20. Deliberately narrow:
+# 'AI', 'data', 'cloud', 'infrastructure' alone do not count (an AI data-centre capacity deal is not a Pendo trigger).
+_PARTNERSHIP_WORDS = re.compile(
+    r"(?<!\w)(?:products?|digital|customers?|customer\s+experience|apps?|platforms?|software|mobile|portal|online|"
+    r"e-?commerce|website|ux|cx)(?!\w)", _FLAGS)
+
+# ---- M&A direction. SignalKind has one MA kind, so direction is a variant weight, not a new kind.
+_DEAL_PASSIVE = re.compile(
+    r"(?<!\w)(?:(?:agreed\s+|set\s+|expected\s+|poised\s+|likely\s+)?to\s+be\s+(?:acquired|bought|purchased|taken\s+over)\s+by"
+    r"|(?:has|have|had|is|was)\s+(?:been\s+)?(?:acquired|bought|taken\s+over)\s+by"
+    r"|(?:acquired|bought|taken\s+over)\s+by|sold\s+to|merg(?:er|e|ing)\s+with"
+    r"|takeover\s+(?:bid|offer|approach|proposal)\s+(?:from|by))(?!\w)", _FLAGS)
+_DEAL_ACTIVE = re.compile(
+    r"(?<!\w)(?:(?:to\s+)?acquire|acquires|acquired|acquiring|(?:to\s+)?buy|buys|bought|(?:to\s+)?purchase|purchases|"
+    r"(?:to\s+)?take\s+over|takes\s+over|snaps?\s+up|"
+    r"(?:(?:to\s+)?takes?|taking|(?:has\s+)?taken|took)\s+(?:an?\s+)?(?:\S+\s+)?stake\s+in|"
+    r"(?:takeover|acquisition|buyout)\s+(?:bid\s+|offer\s+)?(?:of|for))(?!\w)", _FLAGS)
+# Funding scoops that are really "X is being acquired" (ZoomInfo types them Funding): reclassified as M&A.
+_TARGET_WORDING = _DEAL_PASSIVE
+_MONEY_RECEIVED = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes|series\s+[a-z]|seed)(?!\w)", _FLAGS)
+_PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?%")
+_STAKE = re.compile(r"(?<!\w)(?:stake|shareholding|minority\s+interest)(?!\w)", _FLAGS)
+_MAJORITY = re.compile(r"(?<!\w)(?:majority|controlling|100\s?%|full|all\s+of|outright|wholly|remaining)(?!\w)", _FLAGS)
+_DIGITAL_BUSINESS = re.compile(
+    r"(?<!\w)(?:software|digital|data|platform|cloud|technology|tech|saas|apps?|analytics|ai|product|customer\s+experience|"
+    r"cx|fintech|online|e-?commerce|mobile|cyber\w*)(?!\w)", _FLAGS)
+_NON_DIGITAL_SECTOR = re.compile(
+    r"(?<!\w)(?:energy|mining|oil|gas|property|real\s+estate|resources|agricultur\w*|farm\w*|construction|utilit\w+|"
+    r"pharma\w*|food|beverage|hotels?|hospitality|shipping|freight|steel|cement|coal|lithium|gold)(?!\w)", _FLAGS)
+
+
+def _name_token(company_name: str) -> str:
+    cleaned = re.sub(r"[^\w&' -]", "", company_name or "").strip()
+    return cleaned.split(" ")[0] if cleaned else ""
+
+
+def _mentions(text: str, name: str) -> bool:
+    return bool(name) and bool(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", text, _FLAGS))
+
+
+def ma_role(description: str, company_name: str) -> str:
+    """'target', 'acquirer' or 'unclear': the scoop company's role in an M&A description. Deterministic text rules.
+    Passive wording ('to be acquired by', 'acquired by', 'merger with', 'sold to') makes the company the target unless
+    it is named AFTER the phrase (then it is the buyer). Active wording ('to acquire', 'acquisition of', 'takes a stake
+    in') makes the company the acquirer if it is named before the verb, the target if only after it. If the company is
+    not named in the text, or no wording is found: 'unclear'."""
+    text = description or ""
+    name = _name_token(company_name)
+    if not _mentions(text, name):
+        return "unclear"
+    pas, act = _DEAL_PASSIVE.search(text), _DEAL_ACTIVE.search(text)
+    m = pas if pas and (not act or pas.start() <= act.start()) else act
+    if m is None:
+        return "unclear"
+    before, after = text[:m.start()], text[m.end():]
+    if m is pas:
+        return "acquirer" if _mentions(after, name) and not _mentions(before, name) else "target"
+    if _mentions(before, name):
+        return "acquirer"
+    return "target" if _mentions(after, name) else "unclear"
+
+
+def _acquirer_variant(description: str) -> tuple[float, str]:
+    """(weight, note) for an acquirer: 0.25 for a minority stake or an unrelated (non-digital) business, else 0.50."""
+    m = _DEAL_ACTIVE.search(description or "")
+    after = (description or "")[m.start():] if m else (description or "")
+    pct = _PERCENT.search(after)
+    pct_val = float(pct.group(1)) if pct else None
+    stake = bool(_STAKE.search(after))
+    majority = bool(_MAJORITY.search(after))        # 'majority', 'controlling', 'full', '100%'...
+    minority = (pct_val is not None and pct_val < 50) or bool(re.search(r"(?<!\w)minority(?!\w)", after, _FLAGS)) \
+        or (stake and not majority and pct_val is None)
+    digital = bool(_DIGITAL_BUSINESS.search(after))
+    unrelated = bool(_NON_DIGITAL_SECTOR.search(after)) and not digital
+    if minority or unrelated or (stake and not digital):
+        return MA_MINORITY_OR_UNRELATED_WEIGHT, MA_MINORITY_NOTE
+    return KIND_BASE_WEIGHT[SignalKind.MA], MA_ACQUIRER_FULL_NOTE
+
+
+def classify_ma(description: str, company_name: str) -> tuple[str, float, str]:
+    """(role, weight, note) for an M&A scoop. Weights: target 0.50, acquirer of a digital business or a full
+    acquisition 0.50, acquirer of a minority stake or unrelated business 0.25, unclear 0.25."""
+    role = ma_role(description, company_name)
+    if role == "target":
+        return role, KIND_BASE_WEIGHT[SignalKind.MA], MA_TARGET_NOTE
+    if role == "acquirer":
+        w, note = _acquirer_variant(description)
+        return role, w, note
+    return role, MA_UNCLEAR_WEIGHT, MA_UNCLEAR_NOTE
+
+
+def looks_like_acquisition_of_company(description: str) -> bool:
+    """True for funding-typed scoops that are really 'to be acquired by ...' with no money received."""
+    return bool(_TARGET_WORDING.search(description or "")) and not _MONEY_RECEIVED.search(description or "")
+
+
+# ---- same-deal detection (two companies, one deal)
+_DEAL_STOP = frozenset({"the", "this", "that", "with", "for", "and", "pty", "ltd", "limited", "inc", "group",
+                        "holdings", "company", "corp", "has", "will", "its", "per", "cent"})
+_FIGURE = re.compile(r"\d+(?:\.\d+)?\s?%|\$\s?\d[\d.,]*\s?(?:m|bn|b|million|billion)?", _FLAGS)
+
+
+def _deal_tokens(text: str) -> set[str]:
+    toks = {w.lower() for w in re.findall(r"\b[A-Z][A-Za-z0-9&]{2,}\b", text or "")} - _DEAL_STOP
+    toks |= {re.sub(r"\s", "", f).lower() for f in _FIGURE.findall(text or "")}
+    return toks
+
+
+def _same_deal_text(a: str, b: str) -> bool:
+    ta, tb = _deal_tokens(a), _deal_tokens(b)
+    common = ta & tb
+    return len(common) >= 2 and len(common) / max(1, min(len(ta), len(tb))) >= 0.6
+
+
+def _same_deal_scoops(a: Scoop, b: Scoop) -> bool:
+    """Two scoops on different companies describe the same M&A deal: each mentions the other's company, or
+    one mentions the other's company and they share most of their names and figures."""
+    na, nb = _name_token(a.company_name), _name_token(b.company_name)
+    a_has_b, b_has_a = _mentions(a.description, nb), _mentions(b.description, na)
+    if a_has_b and b_has_a:
+        return True
+    return (a_has_b or b_has_a) and _same_deal_text(a.description, b.description)
+
+
+# ---- exec move extras: vacated roles and an incoming leader's start date
+_DEPARTURE = re.compile(
+    r"(?<!\w)(?:has\s+)?(?:left|leaves|leaving|departs|departed|departing|resign\w*|steps?\s+down|stepping\s+down|"
+    r"stepped\s+down|exits?|exiting|exited|moves?\s+on|to\s+leave)(?!\w)", _FLAGS)
+_LEFT_TO_JOIN = re.compile(r"(?:left|leaves|leaving|departs|departed|departing|to\s+leave)\s+to\s+join\b[^.;]*", _FLAGS)
+_INCOMING = re.compile(
+    r"(?<!\w)(?:joins?|joined|appoint\w*|named|hires?|hired|welcomes?|promot\w+|takes?\s+over|will\s+lead|succeed\w*|"
+    r"replac\w*|incoming|successor|will\s+start|starts?)(?!\w)", _FLAGS)
+_MONTHS = {m: i for i, m in enumerate(
+    ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
+     "november", "december"], 1)}
+_MONTH_RX = "|".join(_MONTHS)
+_START_TRIGGER = r"(?:effective|starting|starts?|start\s+date|commenc\w+|begin\w*|from|on|by)"
+_START_DATE = re.compile(
+    rf"(?<!\w){_START_TRIGGER}\s+(?:the\s+)?(?:"
+    rf"(?P<d1>\d{{1,2}})(?:st|nd|rd|th)?\s+(?P<m1>{_MONTH_RX})(?:,?\s+(?P<y1>\d{{4}}))?"
+    rf"|(?P<m2>{_MONTH_RX})\s+(?P<d2>\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(?P<y2>\d{{4}}))?"
+    rf"|(?P<iso>\d{{4}}-\d{{2}}-\d{{2}}))(?!\w)", _FLAGS)
+_START_HINT = re.compile(r"(?<!\w)(?:join\w*|start\w*|commenc\w+|effective|begin\w*|assum\w+|take\s+up|incoming|successor|"
+                         r"appointment|appointed)(?!\w)", _FLAGS)
+
+
+def incoming_start_date(description: str, published: datetime) -> datetime | None:
+    """Start date of an incoming leader ('effective 1 February', 'will start on 3 March 2027', 'starts 2026-12-01'),
+    as an aware UTC datetime, else None. Needs a hint word (joins, starts, effective, appointed...) in the same
+    sentence. A date without a year takes the scoop's publish year, or the next year when that would be more than
+    60 days before the publish date."""
+    for sentence in re.split(r"(?<=[.;])\s+", description or ""):
+        if not _START_HINT.search(sentence):
+            continue
+        m = _START_DATE.search(sentence)
+        if not m:
+            continue
+        try:
+            if m.group("iso"):
+                y, mo, d = (int(x) for x in m.group("iso").split("-"))
+            else:
+                d = int(m.group("d1") or m.group("d2"))
+                mo = _MONTHS[(m.group("m1") or m.group("m2")).lower()]
+                y_raw = m.group("y1") or m.group("y2")
+                y = int(y_raw) if y_raw else published.year
+            dt = datetime(y, mo, d, tzinfo=timezone.utc)
+            if not (m.group("iso") or m.group("y1") or m.group("y2")) and dt < published - timedelta(days=60):
+                dt = datetime(y + 1, mo, d, tzinfo=timezone.utc)
+            return dt
+        except ValueError:
+            continue
+    return None
+
+
+# 'promoted from Chief Financial Officer to the role of CEO', 'moves from CTO to CEO'
+_TRANSITION = re.compile(
+    r"(?<!\w)(?:promoted|moves?|moved|moving|elevated|appointed|transitions?|transitioned|steps?\s+up|stepped\s+up)\s+from\s+"
+    r"(?:the\s+(?:role|position)\s+of\s+)?(?P<old>[^.;]+?)\s+to\s+(?:the\s+)?(?:(?:role|position)\s+of\s+)?(?P<new>[^.;,]+)",
+    _FLAGS)
+
+
+def role_vacated(description: str) -> bool:
+    """True when a relevant role holder LEFT and the text names no incoming leader ('CTO left to join another org',
+    'Interim Chief Digital Officer leaving'). A vacancy is a valid trigger: a new leader is coming."""
+    text = _LEFT_TO_JOIN.sub(" ", description or "")
+    return bool(_DEPARTURE.search(description or "")) and not _INCOMING.search(text)
+
+
+def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
+    """Apply the per-kind keep rules; the detail is a phrase, not a full sentence."""
     desc = scoop.description or ""
     topics = _lower_set(scoop.topics)
     sg = config.signals
@@ -405,15 +655,35 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
     if kind is SignalKind.PROJECT_PAIN:
         hit = sorted(topics & PROJECT_TOPICS)
         if hit:
-            return True, f"buyer topic {', '.join(hit)}", False
-        return False, "Project/Pain Point without a Pendo-buyer topic (needs Customer Experience, Product Management, " \
-                      "Customer Success, Product Development or Digital Workplace)", False
+            return _J(True, f"buyer topic {', '.join(hit)}")
+        return _J(False, "Project/Pain Point without a Pendo-buyer topic (needs Customer Experience, Product Management, "
+                         "Customer Success, Product Development or Digital Workplace)")
 
     if kind in (SignalKind.EXEC_MOVE, SignalKind.NEW_HIRE):
+        tr = _TRANSITION.search(desc)
+        if tr:
+            # 'promoted from CFO to CEO': judge the NEW role and the VACATED role separately, never the whole sentence
+            new_rm, old_rm = role_match(tr.group("new")), role_match(tr.group("old"))
+            if not new_rm.role and not old_rm.role:
+                return _J(False, f"C-suite move from '{tr.group('old').strip()}' to '{tr.group('new').strip()}': "
+                                 "neither the new nor the vacated role is a buyer role")
+            rm = new_rm if new_rm.role else old_rm
+            start = incoming_start_date(desc, scoop.published_date)
+            where = "new role" if new_rm.role else "vacated role"
+            detail = f"{where} '{rm.role}'" + ("" if new_rm.role else ", new leader likely")
+            if start:
+                detail += f", incoming leader starts {start.date().isoformat()}"
+            return _J(True, detail, rm.ambiguous, event_date=start)
         rm = role_match(desc)
-        if rm.role:
-            return True, f"role '{rm.role}'", rm.ambiguous
-        return False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description", False
+        if not rm.role:
+            return _J(False, "people move without a product/digital/CX/customer success/support/engineering/IT role in the description")
+        start = incoming_start_date(desc, scoop.published_date)
+        detail = f"role '{rm.role}'"
+        if role_vacated(desc):
+            detail += " vacated, new leader likely"
+        if start:
+            detail += f", incoming leader starts {start.date().isoformat()}"
+        return _J(True, detail, rm.ambiguous, event_date=start)
 
     if kind is SignalKind.HIRING_PLAN:
         # Generic hiring (nurses, drivers, legal, 'more open roles in Medical & Health') is dropped unless the
@@ -422,39 +692,68 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> tuple[bool, s
         context = hiring_context(desc)
         drop_kw = _first_hit(desc, sg.keywords_drop)
         if drop_kw and not context:
-            return False, f"generic hiring note (matches drop keyword '{drop_kw}', no buyer-role context)", False
+            return _J(False, f"generic hiring note (matches drop keyword '{drop_kw}', no buyer-role context)")
         if context:
-            return True, f"buyer role '{context}'", False
+            return _J(True, f"buyer role '{context}'")
         hit = sorted(topics & HIRING_TOPICS)
         if hit:
-            return True, f"relevant topic {', '.join(hit)}", False
+            return _J(True, f"relevant topic {', '.join(hit)}")
         strong = _first_hit(desc, [k for k in sg.keywords_keep if k.strip().lower() not in WEAK_KEEP_KEYWORDS])
         if strong:
-            return True, f"buyer keyword '{strong}'", False
+            return _J(True, f"buyer keyword '{strong}'")
         weak = _first_hit(desc, sg.keywords_keep)
         extra = f" (only the weak keyword '{weak}')" if weak else ""
-        return False, "hiring note with no relevant topic, buyer role or strong keyword" + extra, False
+        return _J(False, "hiring note with no relevant topic, buyer role or strong keyword" + extra)
 
     if kind is SignalKind.FUNDING:
         why = _funding_drop_reason(scoop)
         if why:
-            return False, why, False
-    return True, "", False
+            return _J(False, why)
+        if _DEBT.search(desc) and not _EQUITY.search(desc):
+            return _J(True, DEBT_NOTE, factor=FUNDING_DEBT_WEIGHT / KIND_BASE_WEIGHT[kind], notes=(DEBT_NOTE,))
+        return _J(True)
+
+    if kind is SignalKind.PRODUCT_LAUNCH:
+        if _DIGITAL_PRODUCT.search(desc) or _CAMEL_AI.search(desc):
+            return _J(True)
+        if _FINANCIAL_PRODUCT.search(desc):
+            return _J(True, FINANCIAL_LAUNCH_NOTE, factor=LAUNCH_FINANCIAL_WEIGHT / KIND_BASE_WEIGHT[kind],
+                      notes=(FINANCIAL_LAUNCH_NOTE,))
+        return _J(True, LAUNCH_NOTE, factor=LAUNCH_NON_DIGITAL_WEIGHT / KIND_BASE_WEIGHT[kind], notes=(LAUNCH_NOTE,))
+
+    if kind is SignalKind.MA:
+        role, weight, note = classify_ma(desc, scoop.company_name)
+        notes = [] if role == "target" or weight >= KIND_BASE_WEIGHT[kind] else [note]
+        if role == "acquirer" and _RUMOUR.search(desc):
+            weight *= MA_RUMOUR_FACTOR
+            note += "; " + RUMOUR_NOTE
+            notes.append(RUMOUR_NOTE)
+        return _J(True, note, factor=weight / KIND_BASE_WEIGHT[kind], notes=tuple(notes))
+
+    if kind is SignalKind.PARTNERSHIP:
+        if _PARTNERSHIP_WORDS.search(desc):
+            return _J(True)
+        return _J(True, PARTNERSHIP_NOTE, factor=PARTNERSHIP_NO_PRODUCT_WEIGHT / KIND_BASE_WEIGHT[kind],
+                  notes=(PARTNERSHIP_NOTE,))
+    return _J(True)
 
 
 def filter_scoops(scoops: list[Scoop], config: Config, today: date | datetime) -> list[ScoopVerdict]:
     """One verdict per input scoop, in input order. Never drops silently: every verdict has a reason sentence.
 
     Checks: scoop type (must be in ``signals.scoop_types_keep``, or be Project / Pain Point which has its own topic
-    gate); then for each kind the scoop could be, in weight order: age limit for that kind (KIND_MAX_AGE_DAYS;
-    exactly the limit is kept, one more day is dropped), the per-kind rules in ``_judge_kind``, and the strength floor
-    (MIN_STRENGTH_FLOOR). The highest-weight kind that passes everything wins.
+    gate); a Funding scoop that says the company is being acquired (and received no money) becomes an M&A scoop;
+    then for each kind the scoop could be, in weight order: age limit for that kind (KIND_MAX_AGE_DAYS; exactly the
+    limit is kept, one more day is dropped; an incoming leader's start date replaces the publish date as the age
+    basis), the per-kind rules in ``_judge_kind``, and the strength floor (MIN_STRENGTH_FLOOR). The highest-weight
+    kind that passes everything wins. Finally, kept M&A scoops of different companies in this batch that describe the
+    same deal each get 'same deal as <other>' (both are kept).
     """
     sg = config.signals
     allowed_types = _lower_set(sg.scoop_types_keep) | {"project", "pain point"}
     verdicts: list[ScoopVerdict] = []
     for s in scoops:
-        days = (_as_date(today) - _as_date(s.published_date)).days
+        pub_days = (_as_date(today) - _as_date(s.published_date)).days
         types = [t for t in s.types if t.strip().lower() in allowed_types]
         if not types:
             shown = ", ".join(s.types) if s.types else "none"
@@ -466,32 +765,67 @@ def filter_scoops(scoops: list[Scoop], config: Config, today: date | datetime) -
             verdicts.append(ScoopVerdict(s, False, SignalKind.NONE,
                                          f"Dropped: type {', '.join(types)} has no SignalKind mapping in signals.py"))
             continue
-        passed: dict[SignalKind, tuple[str, bool]] = {}
+        reclassified = False
+        if SignalKind.FUNDING in kinds and looks_like_acquisition_of_company(s.description):
+            kinds.discard(SignalKind.FUNDING)
+            kinds.add(SignalKind.MA)
+            reclassified = True
+        passed: dict[SignalKind, tuple[_J, int]] = {}
         failed: list[str] = []
         for k in _by_weight(kinds):
             limit = max_age_for(k, config)
+            j = _judge_kind(k, s, config)
+            if not j.ok:
+                failed.append(j.detail)
+                continue
+            days = (_as_date(today) - _as_date(j.event_date)).days if j.event_date else pub_days
             if days > limit:
                 failed.append(f"expired, {days} days old (limit {limit} for {k.value})")
                 continue
-            ok, why, ambiguous = _judge_kind(k, s, config)
-            if not ok:
-                failed.append(why)
-                continue
-            strength = _strength(k, max(0, days), ambiguous)
+            strength = _strength(k, max(0, days), j.ambiguous, j.factor)
             if strength < MIN_STRENGTH_FLOOR:
                 failed.append(f"faded below floor ({strength:.2f} < {MIN_STRENGTH_FLOOR:.2f}, {days} days old)")
                 continue
-            passed[k] = (why, ambiguous)
+            passed[k] = (j, days)
         if passed:
             best = _by_weight(passed)[0]
-            detail, ambiguous = passed[best]
-            label = next(t for t in types if TYPE_TO_KIND.get(t.strip().lower()) is best)
-            parts = [label] + ([detail] if detail else []) + [_age_phrase(days)]
-            reason = "Kept: " + ", ".join(parts) + (f"; {AMBIGUOUS_NOTE}" if ambiguous else "")
-            verdicts.append(ScoopVerdict(s, True, best, reason, ambiguous))
+            j, days = passed[best]
+            label = next((t for t in types if TYPE_TO_KIND.get(t.strip().lower()) is best),
+                         f"{types[0]} (reclassified as M&A: company is being acquired)" if reclassified else types[0])
+            if j.event_date and days <= 0:
+                age_text = ""          # the detail already says when the incoming leader starts
+            elif j.event_date:
+                age_text = f"started {days} day{'s' if days != 1 else ''} ago"
+            else:
+                age_text = _age_phrase(days)
+            parts = [label] + ([j.detail] if j.detail else []) + ([age_text] if age_text else [])
+            reason = "Kept: " + ", ".join(parts) + (f"; {AMBIGUOUS_NOTE}" if j.ambiguous else "")
+            verdicts.append(ScoopVerdict(s, True, best, reason, j.ambiguous, j.factor, j.notes, j.event_date))
         else:
             verdicts.append(ScoopVerdict(s, False, SignalKind.NONE, "Dropped: " + "; ".join(failed)))
-    return verdicts
+    return _mark_same_deals(verdicts)
+
+
+def _mark_same_deals(verdicts: list[ScoopVerdict]) -> list[ScoopVerdict]:
+    """Add 'same deal as <other company>' to kept M&A verdicts of different companies on the same deal."""
+    idx = [i for i, v in enumerate(verdicts) if v.keep and v.kind is SignalKind.MA]
+    others: dict[int, list[str]] = {i: [] for i in idx}
+    for a in range(len(idx)):
+        for b in range(a + 1, len(idx)):
+            va, vb = verdicts[idx[a]], verdicts[idx[b]]
+            if _key(va.scoop.company_id) == _key(vb.scoop.company_id):
+                continue
+            if _same_deal_scoops(va.scoop, vb.scoop):
+                others[idx[a]].append(vb.scoop.company_name or vb.scoop.company_id)
+                others[idx[b]].append(va.scoop.company_name or va.scoop.company_id)
+    out = list(verdicts)
+    for i, names in others.items():
+        if names:
+            names = sorted(set(names))
+            v = verdicts[i]
+            out[i] = replace(v, reason=v.reason + "; " + SAME_DEAL_PREFIX + ", ".join(names),
+                             notes=v.notes + (SAME_DEAL_PREFIX + ", ".join(names),), same_deal_as=tuple(names))
+    return out
 
 
 # ---------------------------------------------------------------- 2. scoops -> signals
@@ -519,11 +853,33 @@ def _trim_evidence(text: str, reserve: int = 0) -> str:
 #: Appended to Signal.evidence of a kept people move whose 'product' role may be physical goods. The shared Signal
 #: model has no flag field, so the warning travels with the text the opener would quote. Use is_ambiguous(signal).
 AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
+#: Every warning note that can follow the evidence text, one ' (note)' per note. signal_notes() reads them back.
+NOTE_PREFIXES = ("role ambiguous", "physical or unclear product launch", "acquirer of a minority stake",
+                 "M&A direction unclear", "partnership without product", "debt facility", "financial or property",
+                 "reported talks", SAME_DEAL_PREFIX.strip())
+
+
+def _suffix(notes) -> str:
+    return "".join(f" ({n})" for n in notes)
+
+
+def signal_notes(signal: Signal) -> list[str]:
+    """The warning notes carried at the end of ``signal.evidence`` (role ambiguous, physical launch, minority stake,
+    unclear M&A direction, weak partnership, same deal as ...). Empty when the evidence is the plain scoop text."""
+    notes: list[str] = []
+    text = signal.evidence
+    while True:
+        m = re.search(r" \(([^()]*)\)$", text)
+        if not m or not m.group(1).startswith(NOTE_PREFIXES):
+            break
+        notes.insert(0, m.group(1))
+        text = text[:m.start()]
+    return notes
 
 
 def is_ambiguous(signal: Signal) -> bool:
     """True when the signal's role was flagged ambiguous (see AMBIGUOUS_SUFFIX)."""
-    return signal.evidence.endswith(AMBIGUOUS_SUFFIX)
+    return AMBIGUOUS_NOTE in signal_notes(signal)
 
 
 def _signal_sort_key(sig: Signal):
@@ -561,15 +917,17 @@ def scoops_to_signals(verdicts: list[ScoopVerdict],
         if not accts:
             unmatched.append(s)
             continue
+        notes = ((AMBIGUOUS_NOTE,) if v.ambiguous else ()) + v.notes
+        # an incoming leader's start date (when already past) is the age basis and the signal's date
+        basis = v.event_date if v.event_date and _as_date(v.event_date) <= _as_date(today) else s.published_date
         for acct in accts:
             signals.append(Signal(
                 sf_account_id=acct.sf_account_id,
                 kind=v.kind,
-                strength=_strength(v.kind, age_days(s.published_date, today), v.ambiguous),
+                strength=_strength(v.kind, age_days(v.event_date or s.published_date, today), v.ambiguous, v.factor),
                 source=f"{SOURCE_PREFIX}:{s.id}",
-                source_date=s.published_date,
-                evidence=(_trim_evidence(s.description, len(AMBIGUOUS_SUFFIX)) + AMBIGUOUS_SUFFIX) if v.ambiguous
-                else _trim_evidence(s.description),
+                source_date=basis,
+                evidence=_trim_evidence(s.description, len(_suffix(notes))) + _suffix(notes),
                 zoominfo_id=_key(s.company_id),
             ))
     signals.sort(key=lambda x: (*_signal_sort_key(x), x.sf_account_id or ""))
@@ -591,12 +949,31 @@ def best_signal(signals: list[Signal]) -> Signal | None:
     return min(pool, key=_signal_sort_key) if pool else None
 
 
+def _plain_evidence(signal: Signal) -> str:
+    text = signal.evidence
+    for _ in signal_notes(signal):
+        text = re.sub(r" \([^()]*\)$", "", text)
+    return text
+
+
+def dedupe_deals(signals: list[Signal]) -> list[Signal]:
+    """Within one account, several M&A signals about the SAME deal (shared names and figures) count once: the
+    strongest is kept. Other kinds and different deals are untouched."""
+    kept: list[Signal] = []
+    for sig in sorted(signals, key=_signal_sort_key):
+        if sig.kind is SignalKind.MA and any(
+                k.kind is SignalKind.MA and _same_deal_text(_plain_evidence(k), _plain_evidence(sig)) for k in kept):
+            continue
+        kept.append(sig)
+    return kept
+
+
 def combined_strength(signals: list[Signal]) -> float:
     """Diminishing returns over all signals of one account, in 0.0-1.0.
     The best counts fully, each other counts at COMBINE_DAMPING: 1 - (1-best) * prod(1 - d*other).
     When the account has any real (non-intent) signal, the best is chosen among those only, so intent can only
     count as a damped 'other'."""
-    real = _real_signals(signals)
+    real = dedupe_deals(_real_signals(signals))
     dated = sorted((x.strength for x in real if x.kind is not SignalKind.INTENT), reverse=True)
     intent = sorted((x.strength for x in real if x.kind is SignalKind.INTENT), reverse=True)
     strengths = dated + intent if dated else intent

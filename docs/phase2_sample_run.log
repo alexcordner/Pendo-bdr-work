@@ -1,0 +1,151 @@
+RUN LOG pipeline  now=2026-11-25T03:00:00+00:00  run_date=2026-11-25  mode=DRY RUN  limit=config cap 40
+Nothing is sent or written to Nooks, Gmail or Salesforce by this run. Salesforce is read-only.
+Real data never enters git: output/, state/ and logs/ are gitignored.
+DNC visibility: Nooks-dialer calls only (Outreach-sourced calls have no Do Not Call disposition); calls fetched with the owner filter; dry-run DNC match is by phone/email hash, Nooks prospect id after lazy resolution in Phase 3. Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id before writing any task (hard precondition, see PHASE 3 PRECONDITIONS in the RESULT section).
+
+== INTAKE ==
+rows kept per file: gmail_sent=0, nooks_accounts=0, nooks_calls=7, nooks_dispositions=16, nooks_prospects=48, nooks_tasks=0, sf_accounts=21, sf_contacts=48, zoominfo_scoops=29
+oldest fetched_at: 2026-11-25T03:00:00+00:00
+reached_last_page: nooks_accounts=True, nooks_calls=True, nooks_prospects=True, nooks_tasks=True, sf_accounts=True, sf_contacts=True, zoominfo_scoops=True
+zoominfo credits used: 0
+  calls_source_nooks_sep: 7
+  gmail_addresses_searched: 48
+  gmail_window_days: 7
+
+ZoomInfo credits used this run (rule 7): 0 (budget 0)
+recent calls not tied to an account: 0 of 0 (last 14 days: 0 tied, 0 unresolved, 0 on a book contact with no account, 0 resolved but not in your book (Lead / outside contact: not counted), 0 phone-only with no unique contact (not counted); 0 Nooks prospect ids still to resolve with listProspects filter_id; live is blocked above 5% and by any unresolved call in the last 3 days)
+recent calls that nothing can tie (no prospect, no usable number): 0 of 0 (0%)
+
+== JOINS (prospects, contacts, Nooks to Salesforce links) ==
+  call_prospect_ids_left_unresolved: 0
+  contacts_opted_out_email: 0
+  contacts_sales_opt_out_email_unverified: 0
+  contacts_total: 48
+  contacts_with_usable_phone: 48
+  last_sheet_accounts_from_tasks: 0
+  nooks_accounts_linked_to_salesforce: 21
+  nooks_rows_without_contact_row: 0
+  prospect_ids_inferred_from_call_phone: 0
+  prospects_nooks_id_resolved: 48
+  prospects_nooks_id_unresolved: 0
+  recent_call_prospect_ids_to_resolve: 0
+  recent_calls_no_account: 0
+  recent_calls_not_in_book: 0
+  recent_calls_not_tied_to_account: 0
+  recent_calls_phone_unmatched: 0
+  recent_calls_tied: 0
+  recent_calls_total: 0
+  recent_calls_unlinkable: 0
+  recent_calls_unresolved: 0
+  recent_calls_unresolved_last_3d: 0
+  tagged_tasks: 0
+
+== STATE ==
+state loaded: new=True reset=False reason=None dnc_rebuilt_at=None
+Do Not Call calls whose 'to' is not E.164 in the source: 0
+DNC calls not matched to any contact: 0 (re-checked by Nooks prospect id in Phase 3)
+record_calls: {"calls_seen": 7, "dnc_added": 0, "duplicate": 0, "new": 7, "no_account": 0, "unmatched": 0, "unmatched_call_ids": [], "unmatched_reasons": {}}
+record_sent_emails: {"date_unknown": 0, "duplicate": 0, "new": 0, "no_account": 0, "skipped_no_key": 0}
+Do Not Call rebuilt from full history this run: True
+state saved (local file, gitignored): yes
+prospects marked do-not-call from state: 0
+last-sheet memory: 0 accounts from state.json, 0 from tagged Nooks tasks (0 tagged tasks seen)
+Gmail coverage: 20 of 20 ranked prospects with an email were searched; 0 still need a Gmail search; 0 have no email
+
+== SIGNALS ==
+  scoops matched to your book: 29 of 29 (0 unmatched, normal: only ~30% of scoop companies are in your book; companies 21 of 21)
+  0 contacts with Sales_Opt_Out_Email__c (meaning unverified, NOT used to block)
+  scoop types in the file: Executive Move=11, Funding=6, Mergers & Acquisitions (M&A)=4, New Hire=2, Partnership=1, Product Launch=5
+  calls with a 'to' that is not E.164: 0 literal 'external', 0 other (not usable for phone matching, matched by prospect id)
+  FAKE-SCOOP-00001 (Quill Only Assistant Pty Ltd): Kept: Executive Move, role 'Head of Product', 2 days ago
+  FAKE-SCOOP-00002 (Reed Assistant And Clean Pty Ltd): Kept: Executive Move, role 'Head of Product', 2 days ago
+  FAKE-SCOOP-00003 (Sable Assistant Director Pty Ltd): Kept: Executive Move, role 'Head of Product', 3 days ago
+  FAKE-SCOOP-00004 (Catapult Communications): Kept: Executive Move, role 'Head of Product', 3 days ago
+  FAKE-SCOOP-00005 (Catapult Communications): Kept: Funding, 6 days ago
+  FAKE-SCOOP-00006 (Catapult Communications): Kept: Product Launch, 9 days ago
+  FAKE-SCOOP-00007 (Catapult Communications): Kept: Partnership, 12 days ago
+  FAKE-SCOOP-00008 (Catapult Communications): Kept: New Hire, role 'VP of Customer Experience', 15 days ago
+  FAKE-SCOOP-00009 (Catapult Communications): Kept: Executive Move, role 'Chief Digital Officer', 18 days ago
+  FAKE-SCOOP-00010 (Catapult Communications): Kept: Funding, 21 days ago
+  FAKE-SCOOP-00011 (Catapult Communications): Kept: Product Launch, 24 days ago
+  FAKE-SCOOP-00012 (Catapult Communications): Kept: New Hire, role 'Director of Product', 27 days ago
+  FAKE-SCOOP-00013 (Catapult): Kept: Funding, 12 days ago
+  FAKE-SCOOP-00014 (Bank Australia Pty Ltd): Kept: Executive Move, role 'Head of Product', 4 days ago
+  FAKE-SCOOP-00015 (Arab Bank Pty Ltd): Kept: Executive Move, role 'Head of Product', 5 days ago
+  FAKE-SCOOP-00016 (Labware Supplies Pty Ltd): Kept: Product Launch, physical or unclear product launch: check it is digital, 4 days ago
+  FAKE-SCOOP-00017 (Eqtbound Bank Pty Ltd): Kept: Funding (reclassified as M&A: company is being acquired), being acquired: leadership/platform change likely, 6 days ago
+  FAKE-SCOOP-00018 (Holder Capital Pty Ltd): Kept: Mergers & Acquisitions (M&A), acquirer of a minority stake or unrelated business, 4 days ago; same deal as Foo Digital Pty Ltd
+  FAKE-SCOOP-00019 (Foo Digital Pty Ltd): Kept: Mergers & Acquisitions (M&A), being acquired: leadership/platform change likely, 4 days ago; same deal as Holder Capital Pty Ltd
+  FAKE-SCOOP-00020 (Airlike Infrastructure Pty Ltd): Kept: Funding, debt facility, not an equity round, 5 days ago
+  FAKE-SCOOP-00021 (Chartlike Property Group Pty Ltd): Kept: Product Launch, financial or property product launch, not a digital product, 5 days ago
+  FAKE-SCOOP-00022 (Cfopromoted Pty Ltd): Dropped: C-suite move from 'CFO' to 'CEO at Cfopromoted Pty Ltd': neither the new nor the vacated role is a buyer role
+  FAKE-SCOOP-00023 (Acqrumour Pty Ltd): Kept: Mergers & Acquisitions (M&A), acquirer of a digital business or a full acquisition; reported talks, not a confirmed deal, 5 days ago
+  FAKE-SCOOP-00024 (Digicontrol Pty Ltd): Kept: Product Launch, 5 days ago
+  FAKE-SCOOP-00025 (Plainfunding Pty Ltd): Kept: Funding, 5 days ago
+  FAKE-SCOOP-00026 (Fullacquirer Pty Ltd): Kept: Mergers & Acquisitions (M&A), acquirer of a digital business or a full acquisition, 5 days ago
+  FAKE-SCOOP-00027 (Ambigretail Pty Ltd): Kept: Executive Move, role 'Head of Product', 3 days ago; role ambiguous: check it is a digital product role
+  FAKE-SCOOP-00028 (Personalmail Pty Ltd): Kept: Executive Move, role 'Head of Product', 1 day ago
+  FAKE-SCOOP-00029 (Normalmail Pty Ltd): Kept: Executive Move, role 'Head of Product', 6 days ago
+  kept scoops with no matching account: 0
+
+== ACCOUNTS ==  (first call date 2026-11-25)
+accounts kept: 21
+  low confidence: 0
+  size_unknown: 0
+kept but flagged for review:
+  possible_duplicate: 2
+    e.g. Catapult; Catapult Communications
+accounts dropped: 0
+possible duplicate pairs: 1 (evidence: name+same headcount: 1, name+shared contacts: 1; top 10 listed with names)
+    Catapult ~ Catapult Communications [name+same headcount, name+shared contacts]
+merged by name: 0
+name_merge_ambiguous (not merged): 0
+  flagged - Catapult Communications: possible_duplicate
+  flagged - Catapult: possible_duplicate
+
+== FLAG COUNTS ==
+  junk_title (needs prospect: only contacts are assistants / junk titles): 1
+  personal_email (chosen contact, call only, no email draft): 1
+  possible_duplicate: 2 accounts in 1 groups (kept on the account list, collapsed on the sheet)
+
+== RANKER ==
+Ranked 20 accounts; skipped 0; needs prospect 1; spilled 0.
+  window morning: 0 accounts
+  window afternoon: 20 accounts
+  needs prospect (NOT callable, no task) - junk_title: 1
+  no real trigger (ranked on fit only): 1
+   1. Catapult Communications score=93.78 afternoon Wed 14:01 AEDT | Executive move scoop 3 days ago; 8 more triggers; Tier 1 fit (220 employees); Prospect: Morgan (VP Product); Flag: possible_duplicate - check before calling
+   2. Personalmail Pty Ltd score=90.28 afternoon Wed 14:08 AEDT | Executive move scoop 1 day ago; Tier 1 fit (220 employees); Prospect: Quin (Head of Product)
+   3. Reed Assistant And Clean Pty Ltd score=89.58 afternoon Wed 14:15 AEDT | Executive move scoop 2 days ago; Tier 1 fit (220 employees); Prospect: Cleo (Head of Product)
+   4. Sable Assistant Director Pty Ltd score=88.88 afternoon Wed 14:23 AEDT | Executive move scoop 3 days ago; Tier 1 fit (220 employees); Prospect: Dev (Assistant Director of Product)
+   5. Bank Australia Pty Ltd score=88.18 afternoon Wed 14:30 AEDT | Executive move scoop 4 days ago; Tier 1 fit (220 employees); Prospect: Eli (Head of Product)
+   6. Arab Bank Pty Ltd score=87.5 afternoon Wed 14:38 AEDT | Executive move scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Fay (Head of Product)
+   7. Normalmail Pty Ltd score=86.82 afternoon Wed 14:45 AEDT | Executive move scoop 6 days ago; Tier 1 fit (220 employees); Prospect: Rex (Head of Product)
+   8. Digicontrol Pty Ltd score=80.46 afternoon Wed 14:53 AEDT | Product launch scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Oli (Head of Product)
+   9. Ambigretail Pty Ltd score=78.56 afternoon Wed 15:00 AEDT | Executive move scoop 3 days ago; Tier 1 fit (220 employees); Prospect: Sia (Head of Product)
+  10. Plainfunding Pty Ltd score=73.68 afternoon Wed 15:08 AEDT | Funding scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Pam (Head of Product)
+  11. Foo Digital Pty Ltd score=71.2 afternoon Wed 15:15 AEDT | M&A scoop 4 days ago; Tier 1 fit (220 employees); Prospect: Jon (Head of Product)
+  12. Fullacquirer Pty Ltd score=70.29 afternoon Wed 15:22 AEDT | M&A scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Rae (Head of Product)
+  13. Eqtbound Bank Pty Ltd score=69.41 afternoon Wed 15:30 AEDT | M&A scoop 6 days ago; Tier 1 fit (220 employees); Prospect: Hal (Head of Product)
+  14. Labware Supplies Pty Ltd score=67.69 afternoon Wed 15:37 AEDT | Product launch scoop 4 days ago; Tier 1 fit (220 employees); Prospect: Gus (Head of Product)
+  15. Catapult score=67.15 afternoon Wed 15:45 AEDT | Funding scoop 12 days ago; Tier 1 fit (220 employees); Prospect: Morgan (VP Product); Flag: possible_duplicate - check before calling
+  16. Holder Capital Pty Ltd score=62.43 afternoon Wed 15:52 AEDT | M&A scoop 4 days ago; Tier 1 fit (220 employees); Prospect: Ida (Head of Product)
+  17. Acqrumour Pty Ltd score=61.81 afternoon Wed 16:00 AEDT | M&A scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Nia (Head of Product)
+  18. Airlike Infrastructure Pty Ltd score=61.81 afternoon Wed 16:07 AEDT | Funding scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Kim (Head of Product)
+  19. Chartlike Property Group Pty Ltd score=60.11 afternoon Wed 16:15 AEDT | Product launch scoop 5 days ago; Tier 1 fit (220 employees); Prospect: Lee (Head of Product)
+  20. Cfopromoted Pty Ltd score=40 afternoon Wed 16:22 AEDT | No trigger: ranked on fit only; Tier 1 fit (220 employees); Prospect: Max (Head of Product)
+  NEEDS PROSPECT (no task) (1):
+    - Quill Only Assistant Pty Ltd: junk_title, score 74.58
+
+== RESULT ==
+  accounts_dropped=0, accounts_kept=21, call_prospect_ids_left_unresolved=0, calls=7, calls_source_nooks_sep=7, calls_to_external=0, calls_to_not_e164_other=0, chosen_personal_email=1, contacts_opted_out_email=0, contacts_sales_opt_out_email_unverified=0, contacts_total=48, contacts_with_usable_phone=48, dnc_calls_not_matched_to_contact=0, dnc_calls_phone_not_e164=0, gmail_addresses_searched=48, gmail_ranked_prospects=20, gmail_ranked_prospects_uncovered=0, gmail_ranked_prospects_without_email=0, gmail_window_days=7, last_sheet_accounts_from_tasks=0, needs_prospect=1, needs_prospect_junk_title=1, nooks_accounts_linked=21, nooks_accounts_linked_to_salesforce=21, nooks_rows_without_contact_row=0, our_open_nooks_tasks=0, possible_duplicate_accounts=2, possible_duplicate_groups=1, prospect_ids_inferred_from_call_phone=0, prospects=48, prospects_blocked_from_state=0, prospects_nooks_id_resolved=48, prospects_nooks_id_unresolved=0, ranked=20, recent_call_prospect_ids_to_resolve=0, recent_calls_no_account=0, recent_calls_not_in_book=0, recent_calls_not_tied_to_account=0, recent_calls_phone_unmatched=0, recent_calls_tied=0, recent_calls_total=0, recent_calls_unlinkable=0, recent_calls_unresolved=0, recent_calls_unresolved_last_3d=0, scoop_companies=21, scoop_companies_matched_to_book=21, scoops=29, scoops_kept=28, scoops_matched_to_book=29, scoops_unmatched=0, sent_email_records=0, sf_account_rows=21, signals=28, skipped=0, spilled=0, tagged_tasks=0
+  sheet history recorded: NO
+  Nooks tasks / Gmail drafts written: NONE (Phase 3 owns writes)
+
+== PHASE 3 PRECONDITIONS ==
+  Phase 3 HARD PRECONDITION 1: pass the owner id from Nooks getMe (resolved at run time) to src.callsheet.prepare_task as expected_owner_id; never a stored or guessed id.
+  Phase 3 HARD PRECONDITION 2: the writer refuses dry-run payloads (src.callsheet.is_dry_run_payload): a payload built in a dry run must never reach a Nooks write.
+  Phase 3 HARD PRECONDITION 3: write tasks ONLY for the `ranked` accounts of a live run (never spilled, needs_prospect or skipped), only for their chosen prospects.
+  Phase 3 HARD PRECONDITION 4: call state.record_sheet only AFTER the writes succeeded, for the accounts actually written (this command records no sheet).
+  Phase 3 HARD PRECONDITION 5: after resolving Nooks prospect ids (listProspects filter_crmId), RE-RUN the Do Not Call and opt-out check BY NOOKS PROSPECT ID for every chosen prospect (state.is_blocked(prospect, state, 'call')) before writing any task: a Do Not Call recorded on a Nooks id that matches no Contact is invisible to this run.
+  Phase 3 HARD PRECONDITION 6: every chosen prospect of the final ranked set must be covered by gmail_sent.json (re-run until the ranked set is stable and fully covered).

@@ -160,14 +160,20 @@ def _norm(text: str) -> list[str]:
     return [t for t in cleaned.split() if t not in _DROP_WORDS]
 
 
-def _phrase_in(phrase: list[str], tokens: list[str]) -> bool:
-    """True when ``phrase`` appears as consecutive whole tokens (last word may be plural: +s)."""
+def _phrase_starts(phrase: list[str], tokens: list[str]) -> list[int]:
+    """Token indexes where ``phrase`` appears as consecutive whole tokens (last word may be plural: +s)."""
     n = len(phrase)
+    out = []
     for k in range(len(tokens) - n + 1):
         window = tokens[k:k + n]
         if window[:-1] == phrase[:-1] and window[-1] in (phrase[-1], phrase[-1] + "s"):
-            return True
-    return False
+            out.append(k)
+    return out
+
+
+def _phrase_in(phrase: list[str], tokens: list[str]) -> bool:
+    """True when ``phrase`` appears as consecutive whole tokens (last word may be plural: +s)."""
+    return bool(_phrase_starts(phrase, tokens))
 
 
 def _variants(persona: str) -> list[list[str]]:
@@ -179,38 +185,114 @@ def _variants(persona: str) -> list[list[str]]:
     return [n.split() for n in sorted(names)]
 
 
-def _persona_rank(title: str | None, config: Config) -> tuple[int, int, int] | None:
-    """Best persona match for a title as a sort key (lower is better), else None.
+# --- title hygiene (applied BEFORE persona matching) ------------------------------------------
+# Titles that are never a buyer: assistants / admin support / trainees / 'to the <C-level>' / stale titles.
+# 'Assistant' alone is NOT rejected: Assistant Director / Assistant Manager / Assistant General Manager /
+# Assistant Secretary / Assistant Commissioner / Assistant Vice President are real buyer-level titles
+# (Australian public service, banking). Only the PA/EA family is: a title ENDING in Assistant ('Marketing
+# Assistant'), the whole title 'Assistant', 'Assistant to ...', PA to / EA to, and the named support roles
+# below. 'Secretary' is rejected only as Company / Corporate / Executive / Legal Secretary or 'Secretary to ...'.
+_NON_BUYER = re.compile(
+    r"(?<!\w)(?:assistant\s+to|personal\s+assistant|executive\s+assistant|administrative\s+assistant|"
+    r"admin\s+assistant|virtual\s+assistant|pa\s+to|ea\s+to|"
+    r"(?:company|corporate|executive|legal)\s+secretary|secretary\s+to|"
+    r"coordinator|administrator|intern|graduate|trainee)(?!\w)|"
+    r"(?<!\w)assistant\W*$", re.IGNORECASE)
+_C_LEVEL = r"(?:chief|c[a-z]o|ceo|cfo|cto|cio|cpo|coo|cro|cmo|cdo|president|managing\s+director)"
+_TO_C_LEVEL = re.compile(r"(?<!\w)to\s+(?:the\s+)?" + _C_LEVEL + r"(?!\w)", re.IGNORECASE)
+_REPORTING = re.compile(r"(?<!\w)(?:reporting|reports|report)\s+to\b.*$", re.IGNORECASE)
+_SEPARATORS = re.compile(r"[,;/|]|\s[-\u2013\u2014]\s|[()]")      # ends the first ('head') segment of a title
+_LIST_SPLIT = re.compile(r"[,;/|&]|\band\b|\s[-\u2013\u2014]\s", re.IGNORECASE)
+_ROLE_WORDS = {"head", "director", "chief", "vp", "svp", "evp", "avp", "vice", "president", "manager", "officer",
+               "lead", "ceo", "cfo", "cto", "cio", "cpo", "coo", "cro", "cmo", "cdo", "founder", "owner", "partner",
+               "principal"}
+MAX_TITLE_CHARS = 80
+MAX_ROLE_PHRASES = 2
 
-    Key = (level 0 primary / 1 secondary, -words in the matched persona, position in its list)
-    would let a long secondary beat a short primary, so the order is instead decided in two steps:
-    among all matching personas the one with the MOST words wins (so 'Group Head of Digital
-    Workplace' hits the secondary 'Head of Digital Workplace', not the primary 'Head of Digital'),
-    ties go to primary before secondary, then to list position (seniority order in the config).
-    Returned tuple is (level, position, 0) of that winner.
 
-    Matching is on whole tokens (see _norm / _phrase_in / ALIASES): 'CTO' does not match 'Director',
+def _strip_reporting(title: str) -> str:
+    """'X, reporting to the CTO' -> 'X' (the manager named after 'reporting to' is not this person's role)."""
+    return _REPORTING.sub("", title).strip()
+
+
+def _is_non_buyer(title: str) -> bool:
+    """Stale titles (Former/Ex-/Past), assistants and admin/trainee roles, and 'to the <C-level>' titles
+    (PA to the CEO, Chief of Staff to the CTO). 'reporting to the CTO' is NOT a 'to the' title."""
+    if _STALE.match(title) or _NON_BUYER.search(title):
+        return True
+    return bool(_TO_C_LEVEL.search(_strip_reporting(title)))
+
+
+def _role_phrase_count(title: str) -> int:
+    """How many comma / slash / and / & separated parts of the title contain a role word."""
+    parts = [p for p in _LIST_SPLIT.split(_strip_reporting(title).lower()) if p.strip()]
+    return sum(1 for p in parts if _ROLE_WORDS & set(re.findall(r"[a-z]+", p)))
+
+
+def _is_junk_shape(title: str) -> bool:
+    """Too long, or lists more than two roles: a data-entry dump, not one person's role."""
+    return len(title.strip()) > MAX_TITLE_CHARS or _role_phrase_count(title) > MAX_ROLE_PHRASES
+
+
+def _raw_persona_rank(title: str, config: Config) -> tuple[int, int, int] | None:
+    """Persona match on the cleaned title, ignoring hygiene rules. (level, position, later) or None.
+
+    ``later`` is 0 when the matched phrase starts in the HEAD segment of the title (before the first
+    comma / semicolon / slash / spaced dash / bracket: the role itself) and 1 when it only appears in a
+    later segment (a qualifier). Among matching personas: head match first, then the MOST words (so
+    'Group Head of Digital Workplace' hits the secondary 'Head of Digital Workplace', not the primary
+    'Head of Digital'), then primary before secondary, then config order. Text after 'reporting to' is
+    ignored. Whole-token matching (see _norm / _phrase_in / ALIASES): 'CTO' does not match 'Director',
     'Director of Product-Led Growth' does not match 'Director of Product'.
     """
-    if not title or _STALE.match(title):
-        return None
-    tokens = _norm(title)
-    best = None   # (-words, level, idx)
+    cleaned = _strip_reporting(title)
+    tokens = _norm(cleaned)
+    seg = _SEPARATORS.search(cleaned)
+    head_end = len(_norm(cleaned[:seg.start()])) if seg else len(tokens)
+    best = None   # (later, -words, level, idx)
     for level, titles in enumerate((config.personas.primary, config.personas.secondary)):
         for idx, persona in enumerate(titles):
-            if any(_phrase_in(v, tokens) for v in _variants(persona)):
-                cand = (-len(_norm(persona)), level, idx)
-                if best is None or cand < best:
-                    best = cand
-    return None if best is None else (best[1], best[2], 0)
+            starts = [k for v in _variants(persona) for k in _phrase_starts(v, tokens)]
+            if not starts:
+                continue
+            cand = (0 if min(starts) < max(head_end, 1) else 1, -len(_norm(persona)), level, idx)
+            if best is None or cand < best:
+                best = cand
+    return None if best is None else (best[2], best[3], best[0])
+
+
+def _title_class(title: str | None, config: Config) -> tuple[str, tuple[int, int, int] | None]:
+    """('ok', rank) | ('junk', None) | ('non_buyer', None) | ('none', None).
+
+    junk / non_buyer are reported only for titles that WOULD match a persona, so the needs-prospect
+    code can say why a matching person was refused. Junk shape wins over non-buyer (a 120-character
+    'Executive Assistant To CFO, CTO And CRO' is a junk title)."""
+    if not title or not title.strip():
+        return "none", None
+    t = title.strip()
+    raw = _raw_persona_rank(t, config)
+    if raw is None:
+        return "none", None
+    if _is_junk_shape(t):
+        return "junk", None
+    if _is_non_buyer(t):
+        return "non_buyer", None
+    return "ok", raw
+
+
+def _persona_rank(title: str | None, config: Config) -> tuple[int, int, int] | None:
+    """(level, position, later) of the persona a clean buyer title matches, else None.
+    None for stale / assistant / junk-shaped titles (see _title_class)."""
+    return _title_class(title, config)[1]
 
 
 def pick_prospects(prospects: list[Prospect], config: Config) -> list[Prospect]:
     """Up to ``limits.max_per_account_per_run`` callable prospects, best first.
 
-    Callable = persona match + phone_e164 + not blocked. Order: primary before secondary, then
-    the title's position in the config list (seniority order), then name (case-insensitive), then
-    nooks_id, so the result never depends on input order.
+    Callable = clean buyer title + persona match + phone_e164 + not blocked. Order: head-of-title
+    match before a match buried in a qualifier, then primary before secondary, then the title's
+    position in the config list (seniority order), then name (case-insensitive), then nooks_id, so
+    the result never depends on input order.
     """
     scored = []
     for p in prospects:
@@ -218,7 +300,8 @@ def pick_prospects(prospects: list[Prospect], config: Config) -> list[Prospect]:
             continue
         rank = _persona_rank(p.title, config)
         if rank is not None:
-            scored.append((rank, p.name.casefold(), p.nooks_id or "", p))
+            level, idx, later = rank
+            scored.append(((later, level, idx), p.name.casefold(), p.nooks_id or "", p))
     scored.sort(key=lambda t: t[:3])
     return [t[3] for t in scored[:config.limits.max_per_account_per_run]]
 
@@ -325,6 +408,13 @@ def score_account(account: Account, sigs: list[Signal], has_prospect: bool,
 _FLAG_HINTS = {"noise_location": "check this is a real company"}
 
 
+
+def _log_name(name: str | None) -> str:
+    """First name only: reasons end up in the run log, and a surname is not needed to tell who was chosen."""
+    first = (name or "").split()[0] if (name or "").split() else ""
+    return first if first and not first.startswith("(") else (name or "the contact")
+
+
 def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect: Prospect | None,
              config: Config, call_date: date) -> list[str]:
     out = []
@@ -346,7 +436,7 @@ def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect
         tier = tier_for(config, account.employees)
         out.append(f"{tier.replace('tier', 'Tier ')} fit ({account.employees} employees)" if tier
                    else f"Outside size tiers ({account.employees} employees)")
-    out.append(f"Prospect: {prospect.name} ({prospect.title})" if prospect else "No callable persona with a phone")
+    out.append(f"Prospect: {_log_name(prospect.name)} ({prospect.title})" if prospect else "No callable persona with a phone")
     if account.non_anz_billing_anz_hq:
         out.append("Non-ANZ billing, ANZ HQ (small penalty)")
     if account.timezone_guessed:
@@ -363,15 +453,22 @@ def _skip(account: Account, reason: str, sigs: list[Signal] | None = None) -> Ra
 
 
 # --- main entry -------------------------------------------------------------------------------
-NEEDS_PROSPECT_CODES = ("no_prospects_on_account", "no_persona_match", "persona_match_no_phone")
+NEEDS_PROSPECT_CODES = ("no_prospects_on_account", "no_persona_match", "persona_match_no_phone", "junk_title")
 
 
 def _needs_prospect_code(unblocked: list[Prospect], config: Config) -> str:
-    """Why an account has no callable prospect (blocked ones are ignored here)."""
+    """Why an account has no callable prospect (blocked ones are ignored here).
+
+    persona_match_no_phone: a clean buyer title but no phone. junk_title: the only persona matches are
+    junk-shaped titles (too long / lists many roles). no_persona_match: nothing usable (includes
+    assistants, stale titles and other non-buyers)."""
     if not unblocked:
         return "no_prospects_on_account"
-    if any(_persona_rank(p.title, config) is not None for p in unblocked):
+    kinds = {_title_class(p.title, config)[0] for p in unblocked}
+    if "ok" in kinds:
         return "persona_match_no_phone"
+    if "junk" in kinds:
+        return "junk_title"
     return "no_persona_match"
 
 

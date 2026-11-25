@@ -1,0 +1,401 @@
+{
+ "_comment": "Real ResearchPacket.to_dict() built by src/callsheet.py @16781aa from the synthetic 2c fixture world (names Pat1->Pat). FAKE data.",
+ "packets": {
+  "Alpha Digital Pty Ltd": {
+   "account_key": "001FAKE00000001",
+   "account_name": "Alpha Digital Pty Ltd",
+   "website": "www.fake1.example.com",
+   "industry": null,
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 400,
+   "tier": "tier1",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0001",
+   "local_time": "2026-11-25T14:01:00+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "exec_move",
+     "label": "Executive Move",
+     "evidence": "Alpha Digital Pty Ltd has a new digital product lead.",
+     "source": "zoominfo_scoop:FAKE-S-1",
+     "source_label": "ZoomInfo scoop 2026-11-22",
+     "date": "2026-11-22",
+     "age_days": 3,
+     "verdict_reason": "kept: Executive Move within 90 day limit (3 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "ambiguity_flags": [],
+   "sdr_target": true,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Alpha Digital Pty Ltd has a new digital product lead.",
+     "source": "ZoomInfo scoop 2026-11-22"
+    },
+    {
+     "text": "About 400 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Foxtrot Bank Pty Ltd": {
+   "account_key": "001FAKE00000006",
+   "account_name": "Foxtrot Bank Pty Ltd",
+   "website": "www.fake6.example.com",
+   "industry": null,
+   "state": "New South Wales",
+   "city": "Sydney",
+   "employees": 900,
+   "tier": "tier1",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0006",
+   "local_time": "2026-11-25T14:38:15+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "product_launch",
+     "label": "Product Launch",
+     "evidence": "Foxtrot Bank Pty Ltd has a new digital product lead.",
+     "source": "zoominfo_scoop:FAKE-S-6",
+     "source_label": "ZoomInfo scoop 2026-11-20",
+     "date": "2026-11-20",
+     "age_days": 5,
+     "verdict_reason": "kept: Product Launch within 45 day limit (5 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Foxtrot Bank Pty Ltd has a new digital product lead.",
+     "source": "ZoomInfo scoop 2026-11-20"
+    },
+    {
+     "text": "About 900 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Sydney, New South Wales",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Hotel Travel Pty Ltd": {
+   "account_key": "001FAKE00000008",
+   "account_name": "Hotel Travel Pty Ltd",
+   "website": "www.fake8.example.com",
+   "industry": null,
+   "state": "New South Wales",
+   "city": null,
+   "employees": 600,
+   "tier": "tier1",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0008",
+   "local_time": "2026-11-25T15:15:30+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [
+    {
+     "kind": "partnership",
+     "label": "Partnership",
+     "evidence": "Hotel Travel Pty Ltd has a new digital product lead.",
+     "source": "zoominfo_scoop:FAKE-S-8",
+     "source_label": "ZoomInfo scoop 2026-10-16",
+     "date": "2026-10-16",
+     "age_days": 40,
+     "verdict_reason": "kept: Partnership within 30 day limit (40 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Hotel Travel Pty Ltd has a new digital product lead.",
+     "source": "ZoomInfo scoop 2026-10-16"
+    },
+    {
+     "text": "About 600 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in New South Wales",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Echo Logistics Pty Ltd": {
+   "account_key": "001FAKE00000005",
+   "account_name": "Echo Logistics Pty Ltd",
+   "website": "www.fake5.example.com",
+   "industry": null,
+   "state": "New South Wales",
+   "city": null,
+   "employees": null,
+   "tier": null,
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0005",
+   "local_time": "2026-11-25T15:52:45+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Sydney",
+   "signals": [],
+   "has_real_trigger": false,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Based in New South Wales",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 1,
+   "facts_note": "Only 1 verified fact(s) available. Write the missing fact as 'none verified'. Do not pad.",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Bravo Software Pty Ltd": {
+   "account_key": "001FAKE00000002",
+   "account_name": "Bravo Software Pty Ltd",
+   "website": "www.fake2.example.com",
+   "industry": null,
+   "state": "Western Australia",
+   "city": "Perth",
+   "employees": 120,
+   "tier": "tier2",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0002",
+   "local_time": "2026-11-25T11:01:00+08:00",
+   "window": "morning",
+   "timezone": "Australia/Perth",
+   "signals": [
+    {
+     "kind": "funding",
+     "label": "Funding",
+     "evidence": "Bravo Software Pty Ltd has a new digital product lead.",
+     "source": "zoominfo_scoop:FAKE-S-2",
+     "source_label": "ZoomInfo scoop 2026-11-15",
+     "date": "2026-11-15",
+     "age_days": 10,
+     "verdict_reason": "kept: Funding within 45 day limit (10 days old)",
+     "ambiguous": false
+    }
+   ],
+   "has_real_trigger": true,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "Bravo Software Pty Ltd has a new digital product lead.",
+     "source": "ZoomInfo scoop 2026-11-15"
+    },
+    {
+     "text": "About 120 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Perth, Western Australia",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 3,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Charlie Retail Ltd": {
+   "account_key": "001FAKE00000003",
+   "account_name": "Charlie Retail Ltd",
+   "website": "www.fake3.example.com",
+   "industry": null,
+   "state": null,
+   "city": "Auckland",
+   "employees": 260,
+   "tier": "tier1",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0003",
+   "local_time": "2026-11-25T16:01:00+13:00",
+   "window": "afternoon",
+   "timezone": "Pacific/Auckland",
+   "signals": [],
+   "has_real_trigger": false,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 260 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Auckland",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 2,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Golf Media Pty Ltd": {
+   "account_key": "001FAKE00000007",
+   "account_name": "Golf Media Pty Ltd",
+   "website": "www.fake7.example.com",
+   "industry": null,
+   "state": "Victoria",
+   "city": "Melbourne",
+   "employees": 30,
+   "tier": "tier3",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0007",
+   "local_time": "2026-11-25T14:01:00+11:00",
+   "window": "afternoon",
+   "timezone": "Australia/Melbourne",
+   "signals": [],
+   "has_real_trigger": false,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 30 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Melbourne, Victoria",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 2,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  },
+  "Delta Health Pty Ltd": {
+   "account_key": "001FAKE00000004",
+   "account_name": "Delta Health Pty Ltd",
+   "website": "www.fake4.example.com",
+   "industry": null,
+   "state": "Queensland",
+   "city": "Brisbane",
+   "employees": 75,
+   "tier": "tier2",
+   "prospect_first_name": "Pat",
+   "prospect_title": "Head of Product",
+   "prospect_sf_contact_id": "003FAKE0004",
+   "local_time": "2026-11-25T13:30:00+10:00",
+   "window": "afternoon",
+   "timezone": "Australia/Brisbane",
+   "signals": [],
+   "has_real_trigger": false,
+   "ambiguity_flags": [],
+   "sdr_target": false,
+   "contact_history": null,
+   "contact_history_source": null,
+   "available_facts": [
+    {
+     "text": "About 75 employees",
+     "source": "Salesforce account record (ZoomInfo employee count)"
+    },
+    {
+     "text": "Based in Brisbane, Queensland",
+     "source": "Salesforce account record"
+    }
+   ],
+   "fact_count": 2,
+   "facts_note": "",
+   "must_not_claim": [
+    "Do not invent a trigger, quote, number, date or news item that is not in available_facts.",
+    "Do not claim any Pendo customer, case study or result for this account.",
+    "Do not state the company's revenue, tech stack, product roadmap or strategy unless listed in available_facts.",
+    "Do not say the prospect said, posted or announced anything unless a fact below says so.",
+    "Do not pad to two facts: if fewer than two facts are available, say so (FACT 2: none verified).",
+    "Do not include or guess an email address or phone number."
+   ]
+  }
+ }
+}

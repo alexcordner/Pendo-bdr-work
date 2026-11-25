@@ -589,7 +589,7 @@ def test_json_roundtrip(sheet):
     d = json.loads(cs.sheet_to_json(sheet))
     assert len(d["lines"]) == 8 and d["run_date"] == "2026-11-25"
     assert d["lines"][0]["nooks_prospect_id"].startswith("FAKE-NK-P") and d["lines"][0]["sf_contact_id"].startswith("003FAKE")
-    assert "email" not in cs.sheet_to_json(sheet).lower().replace("email address", "")
+    assert "@" not in cs.sheet_to_json(sheet) and '"email"' not in cs.sheet_to_json(sheet)
 
 
 @pytest.fixture
@@ -1740,3 +1740,239 @@ def test_n5_note_prefix_or_placeholder_owner_alone_is_enough(sheet):
 @pytest.mark.parametrize("bad", [None, "x", 5, [], {}, {"note": 5, "ownerId": "a"}, {"note": "n"}, {"ownerId": "a"}])
 def test_n5_unusable_payload_counts_as_dry(bad):
     assert cs.is_dry_run_payload(bad) is True
+
+
+# ================================================================ personal email + duplicate collapse
+PERSONAL = ["pat@gmail.com", "pat@googlemail.com", "pat@outlook.com", "pat@hotmail.com", "pat@live.com", "pat@msn.com",
+            "pat@yahoo.com", "pat@ymail.com", "pat@icloud.com", "pat@me.com", "pat@mac.com", "pat@bigpond.com",
+            "pat@bigpond.net.au", "pat@optusnet.com.au", "pat@tpg.com.au", "pat@iinet.net.au", "pat@internode.on.net",
+            "pat@aapt.net.au", "pat@xtra.co.nz", "pat@orcon.net.nz", "pat@slingshot.co.nz", "pat@protonmail.com",
+            "pat@proton.me", "pat@yahoo.com.au", "pat@outlook.com.au", "pat@hotmail.com.au", "pat@live.com.au",
+            "PAT@GMAIL.COM", "pat@Gmail.com ", " <pat@gmail.com>", "pat+work@gmail.com", "pat@gmail.com.", "pat@gmail.com​"]
+BUSINESS = ["pat@acme.com", "pat@acme.com.au", "pat@live.acme.com", "pat@gmail.acme.com", "pat@mygmail.com",
+            "pat@gmailer.com", "pat@yahoo.acme.com.au", "pat@tpg.example.org.nz", "pat@pendo.io", "pat@notproton.me.example.com",
+            "", None, "not an email", "pat@"]
+
+
+@pytest.mark.parametrize("email", PERSONAL)
+def test_pe_personal_domains(email):
+    assert cs.is_personal_email(email) is True
+
+
+@pytest.mark.parametrize("email", BUSINESS)
+def test_pe_business_domains_not_personal(email):
+    assert cs.is_personal_email(email) is False
+
+
+def _pe_sheet(config, email, **kw):
+    rows = load_rows()
+    accts, signals, prospects = world(rows)
+    prospects[0] = replace(prospects[0], email=email, **kw)
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    return cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+
+
+def test_pe_flag_why_and_packet(config):
+    s = _pe_sheet(config, "pat.private@gmail.com")
+    ln = line_for(s, "Alpha Digital Pty Ltd")
+    assert "personal_email" in ln.flags
+    assert "Flag: contact email is personal: call only, no email draft" in ln.why_chosen
+    p = ln.packet
+    assert p.email_ok is False and p.email_reason == "personal_email" and p.to_dict()["email_ok"] is False
+    assert any("Do not suggest or draft an email" in m and "personal" in m for m in p.must_not_claim)
+    assert "contact email is personal: call only, no email draft" in cs.render_sheet_text(s)
+    assert "contact email is personal" in cs.render_sheet_markdown(s)
+
+
+def test_pe_no_address_or_domain_in_any_output(config):
+    s = _pe_sheet(config, "pat.private@gmail.com")
+    t = all_text(s) + repr(s) + repr(s.lines[0]) + "".join(cs.render_packet_text(x.packet) for x in s.lines)
+    assert "pat.private" not in t and "@" not in t and "gmail" not in t.lower()
+    assert not EMAIL_RE.findall(t)
+
+
+def test_pe_business_email_is_ok(sheet):
+    ln = line_for(sheet, "Alpha Digital Pty Ltd")
+    assert ln.packet.email_ok is True and ln.packet.email_reason == "ok" and "personal_email" not in ln.flags
+    assert not any("Do not suggest or draft an email" in m for m in ln.packet.must_not_claim)
+
+
+def test_pe_missing_email_flag_and_packet(config):
+    s = _pe_sheet(config, None)
+    ln = line_for(s, "Alpha Digital Pty Ltd")
+    assert "no_email" in ln.flags and ln.packet.email_ok is False and ln.packet.email_reason == "no_email"
+
+
+def test_pe_calls_still_fine_for_personal_email(config):
+    s = _pe_sheet(config, "pat@gmail.com")
+    ln = line_for(s, "Alpha Digital Pty Ltd")
+    assert ln in s.lines
+    assert prep(ln)["action"] == "call"
+
+
+def test_pe_history_unaffected(config, parts):
+    accts, signals, prospects, _ = parts
+    prospects = [replace(p, email="x@gmail.com") for p in prospects]
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    key = account_key(next(a for a in accts if a.name == "Delta Health Pty Ltd"))
+    h = {key: cs.ContactHistory(date(2026, 11, 20), "Left Voicemail", 2, matched_by="phone")}
+    p = line_for(cs.build_sheet(rr, accts, signals, prospects, config, NOW, history=h), "Delta Health Pty Ltd").packet
+    assert p.contact_history == "last call 2026-11-20, outcome Left Voicemail, 2 call(s) logged" and p.email_ok is False
+
+
+def test_pe_email_draft_allowed_helper(config, sheet):
+    ok = line_for(sheet, "Alpha Digital Pty Ltd")
+    assert cs.email_draft_allowed(ok) is True
+    for email, expect in (("a@gmail.com", False), ("a@acme.com", True), (None, False), ("", False), ("junk", False)):
+        s = _pe_sheet(config, email)
+        assert cs.email_draft_allowed(line_for(s, "Alpha Digital Pty Ltd")) is expect, email
+
+
+def test_pe_email_draft_allowed_opt_out_and_dnc(sheet):
+    ln = sheet.lines[0]
+    ln.entry.prospect = replace(ln.entry.prospect, opted_out_email=True)
+    assert cs.email_draft_allowed(ln) is False
+    ln.entry.prospect = replace(ln.entry.prospect, opted_out_email=False, do_not_call=True)
+    assert cs.email_draft_allowed(ln) is False
+
+
+def test_pe_email_draft_allowed_checks_resolved_prospect_too(sheet):
+    ln = sheet.lines[0]
+    assert cs.email_draft_allowed(ln, replace(ln.prospect, nooks_id=NID)) is True
+    assert cs.email_draft_allowed(ln, replace(ln.prospect, nooks_id=NID, email="z@yahoo.com")) is False
+    assert cs.email_draft_allowed(ln, replace(ln.prospect, nooks_id=NID, email=None)) is False
+
+
+@pytest.mark.parametrize("bad", [None, "line", {}, 5])
+def test_pe_email_draft_allowed_non_line_false(bad):
+    assert cs.email_draft_allowed(bad) is False
+
+
+def test_pe_constants_are_configurable(monkeypatch):
+    monkeypatch.setattr(cs, "PERSONAL_EMAIL_EXACT", frozenset(cs.PERSONAL_EMAIL_EXACT | {"fastmail.example"}))
+    assert cs.is_personal_email("a@fastmail.example") is True
+
+
+# ---- duplicate collapse (reads accounts.duplicate_groups: the NEW 'possible_duplicate group dup-<id> (reason): also ...' notes)
+def _group_note(gid, other):
+    return (f"possible_duplicate group {gid} (same website domain): also {other.name!r} ({other.sf_account_id}); "
+            "not merged, collapse on the sheet")
+
+
+def _dup_world(config, score_boost_second=False, extra=None):
+    rows = load_rows()
+    accts, signals, prospects = world(rows)
+    by = {a.name: a for a in accts}
+    a, b = by["Alpha Digital Pty Ltd"], by["Echo Logistics Pty Ltd"]
+    # make Alpha and a clone-ish 'Alpha Digital' second record a flagged pair
+    for x, y in ((a, b), (b, a)):
+        x.flags.append("possible_duplicate")
+        x.notes.append(_group_note("dup-alpha-echo", y))
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    return accts, signals, prospects, rr
+
+
+def test_dup_keeps_higher_score_only(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+    names = {x.account.name for x in s.lines}
+    assert "Alpha Digital Pty Ltd" in names and "Echo Logistics Pty Ltd" not in names
+    assert len(s.lines) == 7
+    assert any(d.name == "Echo Logistics Pty Ltd" and "probable duplicate of Alpha Digital Pty Ltd" in d.reason for d in s.dropped)
+
+
+def test_dup_why_chosen_mentions_other(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+    assert "also on your list as Echo Logistics Pty Ltd: probable same company" in line_for(s, "Alpha Digital Pty Ltd").why_chosen
+    assert "also on your list as Echo Logistics" in cs.render_sheet_markdown(s)
+
+
+def test_dup_flag_in_note_only_is_enough(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    for a in accts:
+        a.flags[:] = [f for f in a.flags if f != "possible_duplicate"]
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+    assert len(s.lines) == 7
+
+
+def test_dup_lone_group_member_collapses_nothing(config):
+    """build_account_list writes the note on EVERY member; a group with a single carrier is not a group."""
+    accts, signals, prospects, rr = _dup_world(config)
+    echo = next(a for a in accts if a.name.startswith("Echo"))
+    echo.notes.clear(); echo.flags.clear()
+    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 8
+
+
+
+
+def test_dup_never_both_even_with_limit(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    for lim in (1, 2, 3, 5, 8):
+        names = [x.account.name for x in cs.build_sheet(rr, accts, signals, prospects, config, NOW, limit=lim).lines]
+        assert not ({"Alpha Digital Pty Ltd", "Echo Logistics Pty Ltd"} <= set(names))
+        assert len(names) == min(lim, 7)
+
+
+def test_dup_collapse_happens_before_limit_so_slot_goes_to_next(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    full = cs.build_sheet(rr, accts, signals, prospects, config, NOW, limit=3)
+    assert len(full.lines) == 3 and all("Echo" not in x.account.name for x in full.lines)
+
+
+def test_dup_lower_scorer_dropped_regardless_of_order(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    rr.ranked.reverse()
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+    assert "Alpha Digital Pty Ltd" in {x.account.name for x in s.lines} and len(s.lines) == 7
+
+
+def test_dup_partner_not_callable_means_no_collapse(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    echo = next(r for r in rr.ranked if r.account.name.startswith("Echo"))
+    rr2 = RankResult(ranked=[r for r in rr.ranked if r is not echo], needs_prospect=[echo], prospects=rr.prospects)
+    s = cs.build_sheet(rr2, accts, signals, prospects, config, NOW)
+    assert len(s.lines) == 7 and "also on your list" not in " ".join(line_for(s, "Alpha Digital Pty Ltd").why_chosen)
+
+
+def test_dup_unrelated_flagged_accounts_not_collapsed(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    for a in accts:
+        if a.name.startswith("Echo"):
+            a.notes[:] = [_group_note("dup-other-1", Account(sf_account_id="001ZZZ", name="Nobody Else"))]
+    for a in accts:
+        if a.name.startswith("Alpha"):
+            a.notes[:] = [_group_note("dup-other-2", Account(sf_account_id="001YYY", name="Somebody"))]
+    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 8
+
+
+
+
+
+
+def test_dup_helper_probable_duplicates():
+    x = Account(sf_account_id=sf(1), name="X", flags=["possible_duplicate"])
+    y = Account(sf_account_id=sf(2), name="Y", flags=["possible_duplicate"])
+    z = Account(sf_account_id=sf(3), name="Z")
+    x.notes.append(_group_note("dup-x", y))
+    y.notes.append(_group_note("dup-x", x))
+    assert cs.probable_duplicates(x, y) and cs.probable_duplicates(y, x) and not cs.probable_duplicates(x, z)
+    assert not cs.probable_duplicates(x, x)
+
+
+def test_dup_no_flags_no_collapse(sheet):
+    assert len(sheet.lines) == 8 and sheet.dropped == []
+
+
+def test_dup_names_scrubbed(config):
+    accts, signals, prospects, rr = _dup_world(config)
+    for a in accts:
+        if a.name.startswith("Echo"):
+            a.name = "Echo boss@x.example.com Pty Ltd"
+    accts2 = accts
+    rr = rank_accounts(accts2, signals, prospects, {}, set(), config, NOW)
+    for a in accts2:
+        if a.name.startswith("Alpha"):
+            a.notes[:] = [_group_note("dup-alpha-echo", next(e for e in accts2 if e.name.startswith("Echo")))]
+    s = cs.build_sheet(rr, accts2, signals, prospects, config, NOW)
+    assert "boss@" not in all_text(s) and "boss@" not in repr(s.dropped)
