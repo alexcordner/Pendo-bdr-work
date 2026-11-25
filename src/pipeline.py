@@ -34,7 +34,7 @@ from zoneinfo import ZoneInfo
 from src import accounts as acc_mod
 from src import ranker, signals as sig_mod, state as st_mod
 from src.config import Config, load_config, next_working_windows
-from src.intake import (MAX_UNTIED_RECENT_SHARE, RECENT_CALL_DAYS, IntakeReport, RawData, address_hash, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
+from src.intake import (MAX_UNLINKABLE_SHARE, MAX_UNTIED_RECENT_SHARE, RECENT_CALL_DAYS, UNRESOLVED_RECENT_DAYS, IntakeReport, RawData, address_hash, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
                         last_sheet_from_tasks, load_raw, nooks_account_rows, scrub, untied_recent_calls)
 from src.intake import DEFAULT_ADDRESS_SALT
 from src.loaders import parse_utc
@@ -52,10 +52,18 @@ DNC_NOTE = ("DNC visibility: Nooks-dialer calls only (Outreach-sourced calls hav
             "resolution in Phase 3. Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id before "
             "writing any task (hard precondition, see PHASE 3 PRECONDITIONS in the RESULT section).")
 PHASE3_PRECONDITIONS = (
-    "Phase 3 HARD PRECONDITION: after resolving Nooks prospect ids (listProspects filter_crmId), RE-RUN the Do Not Call "
+    "Phase 3 HARD PRECONDITION 1: pass the owner id from Nooks getMe (resolved at run time) to src.callsheet.prepare_task "
+    "as expected_owner_id; never a stored or guessed id.",
+    "Phase 3 HARD PRECONDITION 2: the writer refuses dry-run payloads (src.callsheet.is_dry_run_payload): a payload built "
+    "in a dry run must never reach a Nooks write.",
+    "Phase 3 HARD PRECONDITION 3: write tasks ONLY for the `ranked` accounts of a live run (never spilled, "
+    "needs_prospect or skipped), only for their chosen prospects.",
+    "Phase 3 HARD PRECONDITION 4: call state.record_sheet only AFTER the writes succeeded, for the accounts actually "
+    "written (this command records no sheet).",
+    "Phase 3 HARD PRECONDITION 5: after resolving Nooks prospect ids (listProspects filter_crmId), RE-RUN the Do Not Call "
     "and opt-out check BY NOOKS PROSPECT ID for every chosen prospect (state.is_blocked(prospect, state, 'call')) "
     "before writing any task: a Do Not Call recorded on a Nooks id that matches no Contact is invisible to this run.",
-    "Phase 3 HARD PRECONDITION: every chosen prospect of the final ranked set must be covered by gmail_sent.json "
+    "Phase 3 HARD PRECONDITION 6: every chosen prospect of the final ranked set must be covered by gmail_sent.json "
     "(re-run until the ranked set is stable and fully covered).",
 )
 MIN_FIRST_RUN_CALLS = 5   # a first-ever run with fewer calls than this is suspicious (truncated history?)
@@ -285,17 +293,33 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     prospects = infer_prospect_ids_from_calls(raw, build_prospects(raw, by_sf, by_nooks))
     recent = untied_recent_calls(raw, prospects, now)
     rep.stats["recent_calls_total"], rep.stats["recent_calls_not_tied_to_account"] = recent["total"], recent["untied"]
-    rep.stats["recent_calls_unlinkable"] = recent["unlinkable"]
+    for k in ("tied", "not_in_book", "phone_unmatched", "unresolved", "no_account", "unlinkable"):
+        rep.stats[f"recent_calls_{k}"] = recent[k]
+    rep.stats["recent_calls_unresolved_last_3d"] = recent["unresolved_recent"]
     rep.stats["recent_call_prospect_ids_to_resolve"] = len(recent["ids_to_resolve"])
     log.append(f"recent calls not tied to an account: {recent['untied']} of {recent['total']} "
-               f"(last {RECENT_CALL_DAYS} days; {recent['unlinkable']} more have no prospect and no usable number and "
-               f"cannot be tied; {len(recent['ids_to_resolve'])} Nooks prospect ids still to resolve with listProspects "
-               f"filter_id; live is blocked above {MAX_UNTIED_RECENT_SHARE:.0%})")
+               f"(last {RECENT_CALL_DAYS} days: {recent['tied']} tied, {recent['unresolved']} unresolved, "
+               f"{recent['no_account']} on a book contact with no account, {recent['not_in_book']} resolved but not in "
+               f"your book (Lead / outside contact: not counted), {recent['phone_unmatched']} phone-only with no unique "
+               f"contact (not counted); {len(recent['ids_to_resolve'])} Nooks prospect ids still to resolve with "
+               f"listProspects filter_id; live is blocked above {MAX_UNTIED_RECENT_SHARE:.0%} and by any unresolved "
+               f"call in the last {UNRESOLVED_RECENT_DAYS} days)")
+    log.append(f"recent calls that nothing can tie (no prospect, no usable number): {recent['unlinkable']} of "
+               f"{recent['all_recent']} ({recent['unlinkable_share']:.0%})")
+    if recent["unlinkable_share"] > MAX_UNLINKABLE_SHARE:
+        rep.warn(f"{recent['unlinkable_share']:.0%} of recent calls have no prospect and no usable number (manual dials "
+                 "outside the dialer?): their accounts get no cooldown")
+        log.append(f"WARNING: more than {MAX_UNLINKABLE_SHARE:.0%} of recent calls cannot be tied to anyone")
     if recent["share"] > MAX_UNTIED_RECENT_SHARE:
         rep.warn(f"{recent['untied']} of {recent['total']} recent calls are not tied to an account: cooldowns for those "
                  "accounts are lost")
         rep.block_live(f"more than {MAX_UNTIED_RECENT_SHARE:.0%} of the last {RECENT_CALL_DAYS} days of calls are not "
                        "tied to an account (fetch their prospects into nooks_prospects.json)")
+    if recent["unresolved_recent"]:
+        rep.warn(f"{recent['unresolved_recent']} calls from the last {UNRESOLVED_RECENT_DAYS} days have a Nooks prospect id "
+                 "that is not resolved: their no-answer cooldown would be missed")
+        rep.block_live(f"{recent['unresolved_recent']} calls in the last {UNRESOLVED_RECENT_DAYS} days have an "
+                       "unresolved Nooks prospect id (fetch them with listProspects filter_id)")
     task_last_ids = last_sheet_from_tasks(raw, prospects, run_date)
     rep.stats["last_sheet_accounts_from_tasks"] = len(task_last_ids)
     email_window = rep.stats.get("gmail_window_days")

@@ -774,3 +774,57 @@ def test_gmail_hashes_are_read_and_raw_addresses_are_refused(raw):
 def test_missing_gmail_hashes_warn_and_cover_nothing(raw):
     d = load_raw(raw, now=NOW)
     assert d.gmail_searched == set() and has(d.report.warnings, "no searched_address_hashes")
+
+
+# ---------------------------------------------------------------- round 3: call classification (O1, O5, O6)
+def _lead_row(pid, crm="00QFAKE00000001"):
+    return {"id": pid, "type": "salesforce", "name": "Lead Person", "crmId": crm, "account": None}
+
+
+def test_calls_on_resolved_lead_prospects_are_not_held_against_the_threshold(raw):
+    calls = [_rcall(i, f"NK-L{i}", "+61400000099") for i in range(3)] + [_rcall(10, "NK-T", "+61400000001"),
+                                                                        _rcall(11, "NK-T", "+61400000001")]
+    contacts = [_contact(1, "+61400000001")]
+    leads = [_lead_row(f"NK-L{i}", f"00QFAKE0000000{i}") for i in range(3)]
+    d = _recent_world(raw, calls, contacts, leads + [{"id": "NK-T", "type": "salesforce", "name": "T", "crmId": contacts[0]["Id"],
+                                                      "account": {"id": "NA"}}])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert (r["tied"], r["not_in_book"], r["unresolved"], r["untied"]) == (2, 3, 0, 0) and r["share"] == 0.0
+
+
+def test_calls_on_a_contact_outside_the_book_are_not_in_book(raw):
+    outside = {"id": "NK-O", "type": "salesforce", "name": "O", "crmId": "003OUTSIDE000001", "account": {"id": "NB"}}
+    d = _recent_world(raw, [_rcall(1, "NK-O", "+61400000099")], [_contact(1, "+61400000001")], [outside])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["not_in_book"] == 1 and r["untied"] == 0
+
+
+def test_unfetched_ids_and_book_contacts_without_account_still_count(raw):
+    noacct = {**_contact(1, "+61400000001"), "AccountId": None}
+    calls = [_rcall(1, "NK-UNFETCHED", "+61400000099"), _rcall(2, None, "+61400000001")]
+    d = _recent_world(raw, calls, [noacct])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unresolved"] == 1 and r["no_account"] == 1 and r["untied"] == 2 and r["ids_to_resolve"] == ["NK-UNFETCHED"]
+
+
+def test_phone_only_calls_with_no_unique_contact_are_logged_not_counted(raw):
+    d = _recent_world(raw, [_rcall(1, None, "+61400000555"), _rcall(2, None, "+61400000001")],
+                      [_contact(1, "+61400000001"), _contact(2, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["phone_unmatched"] == 2 and r["untied"] == 0
+
+
+def test_unresolved_calls_in_the_last_three_days_are_counted_separately(raw):
+    calls = [_rcall(1, "NK-A", "+61400000099", days=1), _rcall(2, "NK-B", "+61400000099", days=2),
+             _rcall(3, "NK-C", "+61400000099", days=5)]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unresolved"] == 3 and r["unresolved_recent"] == 2
+
+
+def test_unlinkable_share_is_of_all_recent_calls(raw):
+    calls = [_rcall(i, None, "external") for i in range(3)] + [_rcall(9, "NK-A", "+61400000001")]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unlinkable"] == 3 and r["all_recent"] == 4 and abs(r["unlinkable_share"] - 0.75) < 1e-9
+    assert r["total"] == 1                                              # the threshold denominator excludes them

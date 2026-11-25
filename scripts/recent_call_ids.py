@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scripts.safeout import UnsafeOutput, write_private  # noqa: E402
 from src.intake import (RECENT_CALL_DAYS, build_prospects, id_batches, infer_prospect_ids_from_calls, load_raw,  # noqa: E402
                         recent_call_prospect_ids, untied_recent_calls)
 
@@ -42,9 +43,13 @@ def main(argv=None) -> int:
     prospects = infer_prospect_ids_from_calls(data, build_prospects(data, {}, {}))
     ids = recent_call_prospect_ids(data, now) if args.all else untied_recent_calls(data, prospects, now)["ids_to_resolve"]
     batches = id_batches(ids)
-    Path(args.out).write_text(json.dumps(batches), encoding="utf-8")
+    try:
+        out = write_private(args.out, json.dumps(batches))
+    except UnsafeOutput as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     print(f"{len(ids)} prospect ids from calls in the last {RECENT_CALL_DAYS} days to resolve, "
-          f"{len(batches)} batches of up to 25 written to {args.out}")
+          f"{len(batches)} batches of up to 25 written to {out} (mode 0600)")
     return 0
 
 

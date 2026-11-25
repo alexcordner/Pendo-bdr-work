@@ -690,35 +690,69 @@ def id_batches(ids: list[str], size: int = ID_BATCH) -> list[list[str]]:
     return [ids[i:i + size] for i in range(0, len(ids), size)]
 
 
+UNRESOLVED_RECENT_DAYS = 3             # live needs 0 unresolved calls this recent (the no-answer cooldown window)
+MAX_UNLINKABLE_SHARE = 0.25            # warn above this share of recent calls that nothing can tie (external / no number)
+
+
 def untied_recent_calls(data: RawData, prospects: list[Prospect], now: datetime, days: int = RECENT_CALL_DAYS) -> dict:
-    """How many of the last ``days`` days of calls can be tied to a Salesforce account (state records a call on an
-    account, and so starts a cooldown, only then). A call with a prospect id is tied when a prospect carries that
-    Nooks id AND an account; a call with no prospect id is tied by a phone number that belongs to exactly one
-    prospect with an account. A call with neither a prospect id nor a usable number can never be tied: it is
-    counted separately and NOT held against the threshold. Returns counts and the ids still to resolve."""
+    """Classify the last ``days`` days of calls by whether state can record them on a Salesforce account (only then
+    does a cooldown start):
+
+      tied          a prospect carries the call's Nooks id (or, with no id, the dialled number belongs to exactly one
+                    prospect) AND has an account.
+      not_in_book   the Nooks id IS resolved (a Nooks row was fetched) but cannot yield a book account: a Lead
+                    (crmId 00Q...), a Contact that is not in sf_contacts, or no crmId. Fetching more cannot help and
+                    no book account can cool down, so these are logged, NOT held against the threshold. A call with no
+                    id whose number matches no prospect (or several) is counted separately (``phone_unmatched``), also
+                    not held against it.
+      unresolved    a prospect id on the call that no fetched row or prospect carries yet: counts.
+      no_account    resolved to a book Contact that has no AccountId: counts.
+      unlinkable    no prospect id and no usable number: counted separately; ``unlinkable_share`` (of ALL recent
+                    calls) feeds a warning above ``MAX_UNLINKABLE_SHARE``.
+
+    ``untied`` = unresolved + no_account (the threshold numerator); ``share`` = untied / (total - unlinkable);
+    ``unresolved_recent`` = unresolved calls in the last ``UNRESOLVED_RECENT_DAYS`` days (live needs 0)."""
     by_id = {p.nooks_id: p for p in prospects if p.nooks_id}
+    contact_ids = {normalise_sf_id(c.get("Id")) for c in data.sf_contacts if c.get("Id")}
     by_phone: dict[str, list[Prospect]] = {}
     for p in prospects:
         if p.phone_e164:
             by_phone.setdefault(p.phone_e164, []).append(p)
-    total = untied = unlinkable = 0
+    recent = _recent(data, now, days)
+    cut3 = now - timedelta(days=UNRESOLVED_RECENT_DAYS)
+    out = {"tied": 0, "not_in_book": 0, "phone_unmatched": 0, "unresolved": 0, "no_account": 0, "unlinkable": 0}
     missing: set[str] = set()
-    for c in _recent(data, now, days):
+    unresolved_recent = 0
+    for c in recent:
         if not c.prospect_id and not c.to_e164:
-            unlinkable += 1
+            out["unlinkable"] += 1
             continue
-        total += 1
         if c.prospect_id:
             p = by_id.get(c.prospect_id)
             if p is None:
+                out["unresolved"] += 1
                 missing.add(c.prospect_id)
+                if c.started_at >= cut3:
+                    unresolved_recent += 1
+                continue
         else:
             hits = by_phone.get(c.to_e164, [])
-            p = hits[0] if len(hits) == 1 else None
-        if p is None or not p.sf_account_id:
-            untied += 1
-    return {"total": total, "untied": untied, "unlinkable": unlinkable, "ids_to_resolve": sorted(missing),
-            "share": (untied / total) if total else 0.0}
+            if len(hits) != 1:
+                out["phone_unmatched"] += 1
+                continue
+            p = hits[0]
+        if p.sf_account_id:
+            out["tied"] += 1
+        elif p.sf_contact_id and normalise_sf_id(p.sf_contact_id) in contact_ids:
+            out["no_account"] += 1
+        else:
+            out["not_in_book"] += 1
+    total = len(recent)
+    judged = total - out["unlinkable"]
+    untied = out["unresolved"] + out["no_account"]
+    return {**out, "total": judged, "all_recent": total, "untied": untied, "ids_to_resolve": sorted(missing),
+            "share": (untied / judged) if judged else 0.0, "unresolved_recent": unresolved_recent,
+            "unlinkable_share": (out["unlinkable"] / total) if total else 0.0}
 
 
 # ------------------------------------------------------------------ last sheet from our tagged tasks

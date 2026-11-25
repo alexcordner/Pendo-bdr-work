@@ -5,7 +5,7 @@
     python scripts/gmail_queue.py hashes --addresses output/gmail_queue.json --out output/gmail_meta.json [--also output/gmail_meta.json]
 
 ``queue`` runs the pipeline as a dry run (it writes no state and no log) and writes the REAL dotted addresses of the
-ranked, chosen prospects that are not yet covered by gmail_sent.json to --out (gitignored output/): the session
+ranked, chosen prospects that are not yet covered by gmail_sent.json to --out (under output/ only, mode 0600, refused if git does not ignore it): the session
 reads them ONE AT A TIME into ``search_threads`` queries (addresses enter the session's context, never git, logs or
 chat). It prints a count only. ``hashes`` turns the file of addresses that were actually searched into
 ``{"hash_salt", "searched_address_hashes"}`` (salted hashes, no raw addresses) for ``merge_pages.py --meta-json``;
@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import load_config  # noqa: E402
 from src.intake import DEFAULT_ADDRESS_SALT, address_hash  # noqa: E402
+from scripts.safeout import UnsafeOutput, write_private  # noqa: E402
 from src.pipeline import PipelineStopped, run_pipeline  # noqa: E402
 
 
@@ -47,8 +48,12 @@ def cmd_queue(a) -> int:
             h = address_hash(p.email, salt)
             if h in want and p.email not in addrs:
                 addrs.append(p.email)
-    Path(a.out).write_text(json.dumps(sorted(addrs)), encoding="utf-8")
-    print(f"{len(addrs)} addresses to search written to {a.out} ({len(res.gmail_uncovered)} uncovered hashes)")
+    try:
+        out = write_private(a.out, json.dumps(sorted(addrs)))
+    except UnsafeOutput as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"{len(addrs)} addresses to search written to {out} (mode 0600; {len(res.gmail_uncovered)} uncovered hashes)")
     return 0
 
 
@@ -75,8 +80,12 @@ def cmd_hashes(a) -> int:
         old = old.get("meta", old) if isinstance(old, dict) else {}
         if old.get("hash_salt", a.salt) == a.salt:
             hashes |= set(old.get("searched_address_hashes") or [])
-    Path(a.out).write_text(json.dumps({"hash_salt": a.salt, "searched_address_hashes": sorted(hashes)}), encoding="utf-8")
-    print(f"{len(hashes)} address hashes written to {a.out} (no raw addresses)")
+    try:
+        out = write_private(a.out, json.dumps({"hash_salt": a.salt, "searched_address_hashes": sorted(hashes)}))
+    except UnsafeOutput as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    print(f"{len(hashes)} address hashes written to {out} (mode 0600, no raw addresses)")
     return 0
 
 

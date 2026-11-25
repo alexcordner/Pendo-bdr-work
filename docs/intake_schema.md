@@ -124,3 +124,10 @@ A hit for `in:sent to:<addr> newer_than:7d` means "sent inside the window". `sen
 - **Do Not Call not matched to a contact.** Log line `DNC calls not matched to any contact: N (re-checked by Nooks prospect id in Phase 3)`. The Phase 3 re-check by Nooks prospect id and the Gmail coverage are HARD PRECONDITIONS: they are in the log header's DNC note, the `PHASE 3 PRECONDITIONS` log section and the `--live` output.
 - **Task tags.** A note with several tags uses the NEWEST tag date.
 - **Manifest checks and `--expect-pages`** are described in `docs/fetch_runbook.md` section 8.
+
+## Review round 4 additions (O1 to O6)
+
+- **Recent-call classes** (log line `recent calls not tied to an account: X of Y (...)`, stats `recent_calls_tied / _unresolved / _no_account / _not_in_book / _phone_unmatched / _unlinkable`): X = unresolved + book-contact-without-account. A call whose Nooks id resolved to a Lead (`crmId` `00Q...`), a Contact outside the book or no `crmId` is `not_in_book`: logged, not counted. Live is blocked above 5% of the judged calls AND by any unresolved call in the last 3 days (`UNRESOLVED_RECENT_DAYS`). Calls with no prospect and no usable number are `unlinkable`: a warning above 25% of all recent calls (`MAX_UNLINKABLE_SHARE`).
+- **Helper-script outputs** (`scripts/gmail_queue.py`, `scripts/recent_call_ids.py`): only under `output/` (symlinks resolved and refused, git must not report the path as not ignored), created with mode 0600; any other path exits 2 and writes nothing (`scripts/safeout.py`).
+- **Manifest checks** default to order-agnostic (duplicate ids, cursor continuity, full non-final pages, ZoomInfo totals) and `--expect-pages` is mandatory with `--derive-last-page`; `--strict-order` is opt-in.
+- **Phase 3 preconditions** are six (owner id from getMe as `expected_owner_id`; dry-run payloads refused; tasks only for `ranked`; `record_sheet` only after the writes; Do Not Call re-check by Nooks prospect id; full Gmail coverage) in `pipeline.PHASE3_PRECONDITIONS`, the log and the `--live` output.

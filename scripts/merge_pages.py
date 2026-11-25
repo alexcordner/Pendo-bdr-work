@@ -41,7 +41,9 @@ This script reads local files only. It never calls a connector.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -199,7 +201,51 @@ def _ascending(pages: list, key_names: tuple[str, ...], what: str) -> None:
             prev = v
 
 
-def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expect_pages: int | None = None) -> bool:
+def _row_ids(raw, key_names) -> list[str]:
+    out = []
+    for row in extract_rows(raw):
+        v = next((str(row[k]) for k in key_names if row.get(k) not in (None, "")), None)
+        if v is not None:
+            out.append(v)
+    return out
+
+
+def _no_duplicate_ids(pages: list, key_names: tuple[str, ...], what: str) -> None:
+    """Order-agnostic: a set of ids across the whole manifest. A page given twice, overlapping pages or a repeated
+    terminal page repeat ids whatever the server's ordering is."""
+    seen: set[str] = set()
+    for n, raw in enumerate(pages, 1):
+        for v in _row_ids(raw, key_names):
+            if v in seen:
+                raise MergeError(f"{what}: id repeated on page {n} (a page was given twice or pages overlap)")
+            seen.add(v)
+
+
+def unquote(text: str) -> str:
+    """Percent-decoding (urllib is not imported here: the static safety test bans network-capable modules)."""
+    return re.sub(r"%([0-9A-Fa-f]{2})", lambda m: chr(int(m.group(1), 16)), text)
+
+
+def cursor_id(next_link) -> str | None:
+    """The row id a Nooks cursor encodes. ``links.next`` carries ``page[after]=<cursor>`` (URL-encoded); the cursor is
+    base64 of ``{"id": "<uuid>", "v": 1}``. None when the link has no decodable cursor (nothing is then checked)."""
+    if not isinstance(next_link, str) or not next_link:
+        return None
+    m = re.search(r"page(?:\[|%5B)after(?:\]|%5D)=([^&]+)", next_link)
+    raw = unquote(m.group(1)) if m else next_link
+    for cand in (raw, unquote(raw)):
+        try:
+            pad = cand + "=" * (-len(cand) % 4)
+            obj = json.loads(base64.urlsafe_b64decode(pad.encode("ascii")).decode("utf-8"))
+        except (ValueError, UnicodeError):
+            continue
+        if isinstance(obj, dict) and obj.get("id") not in (None, ""):
+            return str(obj["id"])
+    return None
+
+
+def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expect_pages: int | None = None,
+                     strict_order: bool = False, page_size: int | None = 100) -> bool:
     """reached_last_page from the pages themselves (in page order), per source:
       nooks / auto  FINAL page ``links.next`` is null (Nooks has NO hasMore); a cursor means NOT reached.
                     ``hasMore`` is used when a page has that instead.
@@ -211,7 +257,10 @@ def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expe
         raise MergeError(f"unknown paging kind {kind!r}")
     if not pages:
         raise MergeError("no pages: cannot derive reached_last_page")
-    if expect_pages is not None and len(pages) != expect_pages:
+    if expect_pages is None:
+        raise MergeError("--expect-pages N is MANDATORY with --derive-last-page: N is the number of page calls you "
+                         "made (a missing middle page cannot be seen in the pages themselves)")
+    if len(pages) != expect_pages:
         raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {expect_pages}: "
                          "a page is missing or extra")
     if kind == "zoominfo":
@@ -225,14 +274,29 @@ def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expe
             if rows != sf_limit:
                 raise MergeError(f"page {n} of {len(pages)} holds {rows} rows, not {sf_limit}: only the final "
                                  "Salesforce page may be short (a middle page is missing or truncated)")
-        _ascending(pages, ("Id", "id"), "salesforce")
+        _no_duplicate_ids(pages, ("Id", "id"), "salesforce")
+        if strict_order:
+            _ascending(pages, ("Id", "id"), "salesforce")
         return last["done"] and len(extract_rows(last)) < sf_limit
     for n, raw in enumerate(pages[:-1], 1):                      # every non-final page must point at a next page
         pg = _page_dict(raw)
         if _nooks_end(pg) is not False:
             raise MergeError(f"page {n} of {len(pages)} has no next cursor (links.next is null / missing) but more "
                              "pages follow: the manifest is out of order or has a stray page")
-    _ascending(pages, ("id", "Id"), "nooks")
+    _no_duplicate_ids(pages, ("id", "Id"), "nooks")
+    for n, raw in enumerate(pages[:-1], 1):
+        pg = _page_dict(raw)
+        rows = extract_rows(pg)
+        if page_size and len(rows) != page_size:
+            raise MergeError(f"page {n} of {len(pages)} holds {len(rows)} rows, not {page_size}: only the final page "
+                             "may be short (a middle page is truncated; pass --page-size if you used another size)")
+        want = cursor_id((pg.get("links") or {}).get("next"))
+        ids = _row_ids(pg, ("id", "Id"))
+        if want is not None and ids and want != ids[-1]:
+            raise MergeError(f"page {n} of {len(pages)}: the next cursor points after id {want!r} but the page's last "
+                             f"row is {ids[-1]!r} (a page between the two is missing or the pages are out of order)")
+    if strict_order:
+        _ascending(pages, ("id", "Id"), "nooks")
     end = _nooks_end(last)
     if end is None:
         raise MergeError("cannot derive reached_last_page: the final page has neither links.next nor hasMore; "
@@ -364,7 +428,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sf-limit", type=int, default=2000, help="LIMIT used for Salesforce keyset pages")
     ap.add_argument("--expect-pages", type=int, default=None,
                     help="number of pages the session fetched (its own call count); a different manifest length "
-                         "is an error. Detects a missing middle page, which the pages themselves cannot show")
+                         "is an error. MANDATORY with --derive-last-page / --last-page-reached auto")
+    ap.add_argument("--page-size", type=int, default=100,
+                    help="rows per non-final Nooks page (the page_size used; non-final pages must be full)")
+    ap.add_argument("--strict-order", action="store_true",
+                    help="also require row ids strictly ascending across the manifest (off by default: the server's "
+                         "ordering of mixed-case ids is unverified and a false rejection would stall every run)")
     ap.add_argument("--meta-json", type=Path, default=None,
                     help="JSON object whose keys are added to meta (e.g. window_days, searched_address_hashes, "
                          "hash_salt); it can never replace the keys this script computes")
@@ -384,7 +453,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.derive_last_page and args.last_page_reached not in (None, "auto"):
             raise MergeError("--derive-last-page cannot be combined with --last-page-reached true/false")
         if args.derive_last_page or args.last_page_reached == "auto":
-            args.last_page_reached = derive_last_page(pages, args.paging, args.sf_limit, args.expect_pages)
+            args.last_page_reached = derive_last_page(pages, args.paging, args.sf_limit, args.expect_pages,
+                                                      args.strict_order, args.page_size)
         elif args.expect_pages is not None and args.expect_pages != len(pages):
             raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {args.expect_pages}")
         extra = read_meta_json(args.meta_json) if args.meta_json else {}
