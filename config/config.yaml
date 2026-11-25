@@ -34,6 +34,17 @@ call_windows:          # local time at the prospect, Mon-Fri
   - { name: "afternoon", start: "13:30", end: "16:30" }
   # TODO: tell me if you want a different split (e.g. avoid Fri afternoon)
 
+# Working days for call windows (public holidays are not modelled).
+working_days: [Mon, Tue, Wed, Thu, Fri]
+
+# Nooks call disposition NAMES (resolved to ids at run time via listCallDispositions; never hard-code ids).
+dispositions:
+  voicemail: "Left Voicemail"
+  no_answer: "No Answer"
+  do_not_call: "Do Not Call"
+  gatekeeper: "Gatekeeper"
+  wrong_number: "Bad Number / Wrong Number"
+
 limits:
   daily_call_cap: 40                 # top N accounts per night
   max_per_account_per_run: 1         # contacts called per account per night
@@ -43,6 +54,7 @@ limits:
   voicemail_lookback_hours: 24
   max_voicemail_drafts_per_run: 25
   zoominfo_credit_budget_per_run: 0  # 0 = search only. Raise deliberately.
+  no_contact_max_duration_s: 20      # a "No Answer" shorter than this counts as no contact (decision 8)
 
 sources:               # in priority order
   - salesforce         # read-only: accounts where I'm the BDR ("ROE" BDR) on the account team; open tasks. Exact field TBC in Phase 1
@@ -83,6 +95,7 @@ signals:
     recency: 15
     named_prospect_with_phone: 15
     cooldown_penalty: -30
+    sdr_target_boost: 10             # points when Account.SDR_Target__c is true. A BOOST, not a filter (decision 6)
 
 filters:
   drop_name_patterns: ["CBD", "Sydney", "Melbourne", "Brisbane", "Auckland", "Perth", "Adelaide"]  # only dropped when the whole name is just a place
