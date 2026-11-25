@@ -122,7 +122,7 @@ Fix: NFKC-normalise, strip Cf characters, fold common Cyrillic/Greek lookalikes 
 - The 25-word / 8-second opener cap and 79-word email cap are from the skill and the brief; whether 25 words really is ~8 s of Alex's speech is **UNVERIFIED** (no audio); "Hi X, Alex from Pendo." already spends 5 of the 25 words.
 - 2c fixture names with digits (`Pat1`) should be renamed digit-free so 2c tests do not trip the (real) tokenizer bug.
 
-## 3. Adversarial recall (labels in `docs/review_2d_labels.json`, committed in `16cf4d3` before the lint was run)
+## 3. Adversarial recall (labels in `docs/review_2d_labels.json`, committed in `918d215` before the lint was run)
 
 143 opener blocks (22 good, 121 bad) and 50 email drafts (10 good, 40 bad). "Intended reason" = a violation code I wrote down as the right one before running.
 
