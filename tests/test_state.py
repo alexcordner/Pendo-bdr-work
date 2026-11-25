@@ -312,7 +312,7 @@ def test_email_opt_out_keys_dotted_and_none(scenario):
 
 def test_mark_do_not_call_returns_copies(config):
     st = rec([call("C1", disp="Do Not Call")], config=config)
-    orig = [pros(), pros(nid="FAKE-P2", acct="FAKE-ACC-2", phone="+61400000012")]
+    orig = [pros(), pros(nid="FAKE-P2", acct="FAKE-ACC-2", phone="+61400000012", email="sam.two@example.com")]
     out = S.mark_do_not_call(orig, st)
     assert [p.do_not_call for p in out] == [True, False]
     assert orig[0].do_not_call is False
@@ -436,9 +436,9 @@ def test_emailed_recently_outside_window_reason():
 
 
 def test_date_unknown_sent_email_treated_as_recent_and_says_so():
-    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()])
-    recent, reason = S.emailed_recently(st, "pat.one@example.com", date(2030, 1, 1), 7)
-    assert recent and "unknown" in reason
+    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()], today=date(2026, 11, 25))
+    recent, reason = S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 26), 7)
+    assert recent and "unknown" in reason and "2026-12-02" in reason
 
 
 def test_date_unknown_does_not_set_account_last_email():
@@ -471,14 +471,15 @@ def test_record_sent_emails_guards_missing_ids_and_unknown_recipient():
     bad = SentEmail(message_id="", thread_id=None, recipient="", recipient_key="", sent_at=None)
     st = S.record_sent_emails(S.State(), [bad, sent_email("M9", addr="stranger@example.com")], [pros()])
     assert st.report["record_sent_emails"]["skipped_no_key"] == 1
-    assert "FAKE-ACC-1" not in st.accounts and "stranger@example.com" in st.emails
+    assert "FAKE-ACC-1" not in st.accounts and len(st.emails) == 1
+    assert "stranger@example.com" not in json.dumps(S.state_to_dict(st))   # no raw email at rest
 
 
 def test_scenario_emails(scenario):
     prospects, _, sent = scenario
-    st = S.record_sent_emails(S.State(), sent, prospects)
+    st = S.record_sent_emails(S.State(), sent, prospects, today=date(2026, 11, 25))
     assert S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 22), 7)[0]
-    recent, reason = S.emailed_recently(st, "sam.two@example.com", date(2026, 12, 30), 7)
+    recent, reason = S.emailed_recently(st, "sam.two@example.com", date(2026, 11, 30), 7)
     assert recent and "unknown" in reason
 
 
@@ -559,15 +560,15 @@ def test_future_or_missing_version_is_rejected(tmp_path):
 
 
 def test_malformed_entries_skipped_rest_kept(tmp_path, caplog):
-    raw = {"version": 1, "accounts": {"GOOD": {"last_outcome": "connect"}, "BAD": "oops"},
-           "prospects": {"P": 5}, "emails": {"k": "x"}, "sheets": [{"run_date": "nonsense"}, "x",
+    raw = {"version": 2, "accounts": {"GOOD": {"last_outcome": "connect"}, "BAD": "oops"},
+           "prospects": {"P": 5}, "emails": {"k": "x", "k2": {"m": {"sent_on": "x"}}}, "sheets": [{"run_date": "nonsense"}, "x",
            {"run_date": "2026-11-24", "account_ids": ["A", 3]}]}
     (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
     with caplog.at_level(logging.WARNING, logger="src.state"):
         st = S.load_state(tmp_path)
     assert list(st.accounts) == ["GOOD"] and st.prospects == {} and st.emails == {}
     assert st.sheets == [{"run_date": "2026-11-24", "account_ids": ["A"]}]
-    assert "skipping malformed" in caplog.text
+    assert "skipped malformed" in caplog.text and len(st.load_warnings) == 6
 
 
 def test_atomic_write_leaves_no_temp_files(tmp_path):
@@ -604,6 +605,320 @@ def test_state_dir_comes_from_config_paths(config):
 
 
 def test_naive_datetimes_in_file_are_read_as_utc(tmp_path):
-    raw = {"version": 1, "accounts": {"A": {"last_call_at": "2026-11-10T01:00:00"}}}
+    raw = {"version": 2, "accounts": {"A": {"last_call_at": "2026-11-10T01:00:00"}}}
     (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
     assert S.load_state(tmp_path).accounts["A"].last_call_at == datetime(2026, 11, 10, 1, tzinfo=timezone.utc)
+
+
+# ================================================================= review fixes (docs/review_1c.md)
+from zoneinfo import ZoneInfo  # noqa: E402
+
+
+class FakeAcct:
+    def __init__(self, tz=None, nooks=None, zi=None):
+        self.timezone, self.nooks_account_id, self.zoominfo_id = tz, nooks, zi
+
+
+def local(y, mo, d, h, mi, tz):
+    """Aware UTC iso string for a wall-clock time in ``tz``."""
+    return datetime(y, mo, d, h, mi, tzinfo=ZoneInfo(tz)).astimezone(timezone.utc).isoformat()
+
+
+# ---- F1 / F8: reset flag and require_healthy
+def test_corrupt_file_sets_was_reset_and_reason(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text("{trunc", encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert st.was_reset and "unusable" in st.reset_reason and not st.is_new
+
+
+def test_missing_file_is_new_not_reset(tmp_path):
+    st = S.load_state(tmp_path)
+    assert st.is_new and not st.was_reset
+    S.require_healthy(st)                               # first run is fine
+
+
+def test_require_healthy_raises_after_reset_unless_rebuilt(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text("x", encoding="utf-8")
+    st = S.load_state(tmp_path)
+    with pytest.raises(S.StateResetError, match="Do Not Call"):
+        S.require_healthy(st)
+    S.require_healthy(st, rebuilt_from_history=True)    # caller confirmed a full history rebuild
+
+
+def test_healthy_loaded_state_passes_require_healthy(tmp_path):
+    S.save_state(S.State(), tmp_path)
+    st = S.load_state(tmp_path)
+    assert not st.was_reset
+    S.require_healthy(st)
+
+
+@pytest.mark.parametrize("raw", [
+    {"version": 2, "prospects": "x"}, {"version": 2, "accounts": []}, {"version": 2, "emails": 5},
+    {"version": 2, "sheets": {}}, {"version": 2, "seen_calls": []},
+    {"version": 2, "dnc_prospect_ids": "abc"}, {"version": 2, "dnc_phones": [1, 2]},
+    {"version": 2, "dnc_emails": {"a": 1}}, {"version": 1}, {"version": 3}, [], "str", None, 7])
+def test_wrong_container_types_reset_and_never_crash(tmp_path, raw):
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps(raw), encoding="utf-8")
+    st = S.load_state(tmp_path)
+    assert st.was_reset and st.reset_reason
+    assert (tmp_path / "state.json.corrupt-1").exists()
+
+
+def test_dnc_string_is_not_split_into_characters(tmp_path):
+    (tmp_path / S.STATE_FILENAME).write_text(json.dumps({"version": 2, "dnc_prospect_ids": "abc"}), encoding="utf-8")
+    assert S.load_state(tmp_path).dnc_prospect_ids == set()
+
+
+def test_reset_flags_are_not_saved(tmp_path):
+    st = S.State(was_reset=True, reset_reason="x")
+    S.save_state(st, tmp_path)
+    assert not S.load_state(tmp_path).was_reset
+
+
+# ---- F12: account-local days
+def test_sydney_morning_no_answer_plus_three_local_days(config):
+    c = call("C1", when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))      # AEDT: UTC date is Nov 1
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert st.accounts["FAKE-ACC-1"].last_call_date == "2026-11-02"
+    assert S.cooldown_until(st, config)["FAKE-ACC-1"] == date(2026, 11, 5)
+    assert S.is_in_cooldown(st, "FAKE-ACC-1", date(2026, 11, 4), config)
+    assert not S.is_in_cooldown(st, "FAKE-ACC-1", date(2026, 11, 5), config)
+
+
+def test_sydney_morning_connect_plus_fourteen_local_days(config):
+    c = call("C1", disp="Interested", dur=60, when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert S.cooldown_until(st, config)["FAKE-ACC-1"] == date(2026, 11, 16)
+
+
+def test_auckland_morning_no_answer_and_connect(config):
+    tz = "Pacific/Auckland"                                                  # NZDT: UTC date is Nov 1
+    c = call("C1", when=local(2026, 11, 2, 8, 50, tz))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct(tz)}, config=config)
+    assert S.cooldown_until(st, config)["FAKE-ACC-1"] == date(2026, 11, 5)
+    c2 = call("C2", disp="Interested", dur=60, when=local(2026, 11, 2, 8, 50, tz))
+    st2 = rec([c2], accounts_by_id={"FAKE-ACC-1": FakeAcct(tz)}, config=config)
+    assert S.cooldown_until(st2, config)["FAKE-ACC-1"] == date(2026, 11, 16)
+
+
+def test_aest_winter_morning_also_local(config):
+    c = call("C1", when=local(2026, 7, 6, 9, 0, "Australia/Sydney"))        # AEST UTC+10
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert S.cooldown_until(st, config)["FAKE-ACC-1"] == date(2026, 7, 9)
+
+
+def test_perth_and_afternoon_calls_unchanged(config):
+    c = call("C1", when=local(2026, 11, 2, 15, 0, "Australia/Sydney"))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert S.cooldown_until(st, config)["FAKE-ACC-1"] == date(2026, 11, 5)
+    c = call("C2", when=local(2026, 11, 2, 23, 30, "Australia/Perth"))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Perth")}, config=config)
+    assert st.accounts["FAKE-ACC-1"].last_call_date == "2026-11-02"
+
+
+def test_unknown_or_none_timezone_defaults_to_sydney_not_utc(config):
+    c = call("C1", when="2026-11-01T21:50:00Z")                              # = Nov 2 08:50 Sydney
+    for acct in ({}, {"FAKE-ACC-1": FakeAcct(None)}):
+        st = rec([c], accounts_by_id=acct, config=config)
+        assert st.accounts["FAKE-ACC-1"].last_call_date == "2026-11-02"
+
+
+@pytest.mark.parametrize("bad", ["Mars/Olympus", "", "../../etc/passwd", 42, "UTC+11"])
+def test_invalid_timezone_does_not_crash(config, bad):
+    st = rec([call("C1", when="2026-11-01T21:50:00Z")],
+             accounts_by_id={"FAKE-ACC-1": FakeAcct(bad)}, config=config)
+    assert st.accounts["FAKE-ACC-1"].last_call_date == "2026-11-02"
+
+
+def test_local_dates_survive_save_load(config, tmp_path):
+    c = call("C1", when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    S.save_state(st, tmp_path)
+    assert S.cooldown_until(S.load_state(tmp_path), config)["FAKE-ACC-1"] == date(2026, 11, 5)
+
+
+def test_last_touched_uses_local_date(config):
+    c = call("C1", when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))
+    st = rec([c], accounts_by_id={"FAKE-ACC-1": FakeAcct("Australia/Sydney")}, config=config)
+    assert S.last_touched(st)["FAKE-ACC-1"] == date(2026, 11, 2)
+
+
+def test_email_sent_date_is_account_local():
+    se = sent_email(when=local(2026, 11, 2, 8, 50, "Australia/Sydney"))
+    st = S.record_sent_emails(S.State(), [se], [pros()], {"FAKE-ACC-1": FakeAcct("Australia/Sydney")})
+    assert st.accounts["FAKE-ACC-1"].last_email_date == "2026-11-02"
+    assert S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 8), 7)[0]
+    assert not S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 9), 7)[0]
+
+
+def test_lookup_by_nooks_and_zoominfo_ids(config):
+    acct = FakeAcct("Australia/Sydney", nooks="FAKE-NA-1", zi="FAKE-ZI-1")
+    st = rec([call("C1")], accounts_by_id={"FAKE-ACC-1": acct}, config=config)
+    base = S.cooldown_until(st, config)["FAKE-ACC-1"]
+    assert S.cooldown_until_by(st, config, "nooks_account_id") == {"FAKE-NA-1": base}
+    assert S.cooldown_until_by(st, config, "zoominfo_id") == {"FAKE-ZI-1": base}
+    with pytest.raises(ValueError):
+        S.cooldown_until_by(st, config, "name")
+
+
+def test_lookup_by_alt_id_skips_accounts_without_it(config):
+    st = rec([call("C1")], config=config)       # no accounts_by_id: nooks id falls back to the prospect's (None here)
+    assert S.cooldown_until_by(st, config, "zoominfo_id") == {}
+
+
+# ---- F2: duplicate prospect, same email
+def test_duplicate_prospect_same_email_stays_blocked(config):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    dup = pros(nid="FAKE-DUP", phone="+61400000777", email="PAT.ONE@example.com")
+    blocked, reason = S.is_blocked(dup, st)
+    assert blocked and "email" in reason
+    assert S.is_blocked(dup, st, "call")[0] and S.is_blocked(dup, st, "email")[0]
+
+
+def test_dnc_email_dotless_form_blocks_too(config):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    assert S.is_blocked(pros(nid="D", phone=None, email="patone@example.com"), st)[0]
+
+
+def test_dnc_email_learned_when_prospect_listed_later(config):
+    st = rec([call("C1", disp="Do Not Call")], prospects=[], config=config)          # prospect unknown yet
+    assert st.dnc_emails == set()
+    st = rec([], prospects=[pros()], state=st, config=config)                         # now the list has the email
+    assert S.is_blocked(pros(nid="D", phone=None, email=None), st)[0] is False
+    assert S.is_blocked(pros(nid="D", phone=None, email="pat.one@example.com"), st)[0]
+
+
+def test_no_raw_email_stored_in_state_file(config, tmp_path):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    st = S.record_sent_emails(st, [sent_email()], [pros()])
+    S.save_state(st, tmp_path)
+    text = (tmp_path / S.STATE_FILENAME).read_text()
+    assert "example.com" not in text and "patone" not in text
+
+
+def test_different_email_not_blocked(config):
+    st = rec([call("C1", disp="Do Not Call")], config=config)
+    assert not S.is_blocked(pros(nid="O", phone=None, email="other@example.com"), st)[0]
+
+
+# ---- F3: disposition spelling variants
+@pytest.mark.parametrize("name", ["Do Not Call.", "DO  NOT CALL", "Do-Not-Call", "do not call",
+                                   "  Do Not Call\n", "Do\u00a0Not\u00a0Call", "Do_Not_Call!!", "DO NOT CALL "])
+def test_dnc_name_variants_fail_closed(config, name):
+    c = call("C1", disp=name)
+    assert S.do_not_call_prospects([c], config) == {"FAKE-P1"}
+    assert "FAKE-P1" in rec([c], config=config).dnc_prospect_ids
+
+
+@pytest.mark.parametrize("name", ["Do Not Call (DNC)", "Not Do Call", "Do Not Callback", "Call", "", None])
+def test_dnc_name_non_matches(config, name):
+    assert S.do_not_call_prospects([call("C1", disp=name)], config) == set()
+
+
+def test_voicemail_variants_still_no_contact(config):
+    assert S.call_outcome(call(disp="LEFT  VOICEMAIL.", dur=500), config) == S.NO_CONTACT
+    assert S.call_outcome(call(disp="bad number - wrong number", dur=500), config) == S.NO_CONTACT
+
+
+# ---- F4: phone normalisation
+def test_spaced_dnc_phone_blocks_canonical_number(config):
+    c = call("C1", pid=None, disp="Do Not Call", to="+61 400 000 010")
+    st = rec([c], prospects=[], config=config)
+    assert S.is_blocked(pros(nid="X", phone="+61400000010", email=None), st)[0]
+    assert S.is_blocked(pros(nid="Y", phone="+61 400 000 010", email=None), st)[0]
+
+
+def test_unnormalisable_phone_still_blocks_exact_stripped_value(config):
+    st = rec([call("C1", pid=None, disp="Do Not Call", to="(12) 345")], prospects=[], config=config)
+    assert "12345" in st.dnc_phones or any("345" in p for p in st.dnc_phones)
+
+
+def test_spaced_unlinked_call_matches_one_prospect_by_phone(config):
+    st = rec([call("C1", pid=None, to="+61 400 000 011")], config=config)
+    assert st.prospects["FAKE-P1"].call_count == 1
+
+
+def test_do_not_call_phones_canonical(config):
+    c = call("C1", pid=None, disp="Do Not Call", to="+61 400 000 010")
+    assert S.do_not_call_phones([c], config) == {"+61400000010"}
+
+
+# ---- F7: DNC is never a connect
+def test_dnc_never_a_connect_whatever_duration(config):
+    assert S.call_outcome(call(disp="Do Not Call", dur=600), config) == S.NO_CONTACT
+    st = rec([call("C1", disp="Do Not Call", dur=600)], config=config)
+    assert st.prospects["FAKE-P1"].connect_count == 0
+    assert st.accounts["FAKE-ACC-1"].last_connect_at is None
+
+
+# ---- F5: deterministic ties
+def test_equal_timestamps_order_independent(config):
+    a = call("C-A", disp="Interested", dur=60, when="2026-11-10T01:00:00Z")
+    b = call("C-B", disp="No Answer", dur=3, when="2026-11-10T01:00:00Z")
+    one = rec([a, b], config=config)
+    two = rec([b, a], config=config)
+    assert S.state_to_dict(one) == S.state_to_dict(two)
+    assert one.accounts["FAKE-ACC-1"].last_call_key == "C-B"
+
+
+def test_ties_across_batches_order_independent(config):
+    a = call("C-A", disp="Interested", dur=60, when="2026-11-10T01:00:00Z")
+    b = call("C-B", disp="No Answer", dur=3, when="2026-11-10T01:00:00Z")
+    x = rec([b], state=rec([a], config=config), config=config)
+    y = rec([a], state=rec([b], config=config), config=config)
+    assert S.state_to_dict(x) == S.state_to_dict(y)
+
+
+def test_shuffled_inputs_give_identical_state(config, scenario):
+    import random
+    prospects, calls, _ = scenario
+    ref = S.state_to_dict(S.record_calls(S.State(), calls, prospects, config=config))
+    rnd = random.Random(7)
+    for _ in range(20):
+        shuffled = calls[:]
+        rnd.shuffle(shuffled)
+        assert S.state_to_dict(S.record_calls(S.State(), shuffled, prospects, config=config)) == ref
+
+
+# ---- F11: undated emails expire
+def test_undated_email_expires_after_first_seen_plus_days():
+    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()], today=date(2026, 11, 1))
+    assert S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 7), 7)[0]
+    recent, reason = S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 8), 7)
+    assert not recent and "expired 2026-11-08" in reason
+
+
+def test_undated_reason_names_first_seen_and_expiry():
+    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()], today=date(2026, 11, 1))
+    _, reason = S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 2), 7)
+    assert "date is unknown" in reason and "first seen 2026-11-01" in reason and "until 2026-11-08" in reason
+
+
+def test_undated_first_seen_not_reset_by_resighting():
+    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()], today=date(2026, 11, 1))
+    st = S.record_sent_emails(st, [sent_email(when=None)], [pros()], today=date(2026, 11, 6))
+    assert not S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 8), 7)[0]
+
+
+def test_old_dated_plus_expired_undated_not_recent_forever():
+    st = S.record_sent_emails(S.State(), [sent_email("M1", when="2026-09-01T00:00:00Z"),
+                                          sent_email("M2", when=None)], [pros()], today=date(2026, 10, 1))
+    assert not S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 25), 7)[0]
+
+
+def test_dated_email_still_recent_while_undated_expired():
+    st = S.record_sent_emails(S.State(), [sent_email("M1", when="2026-11-24T00:00:00Z"),
+                                          sent_email("M2", when=None)], [pros()], today=date(2026, 10, 1))
+    assert S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 25), 7)[0]
+
+
+def test_undated_email_roundtrips_through_file(tmp_path):
+    st = S.record_sent_emails(S.State(), [sent_email(when=None)], [pros()], today=date(2026, 11, 1))
+    S.save_state(st, tmp_path)
+    assert S.emailed_recently(S.load_state(tmp_path), "pat.one@example.com", date(2026, 11, 2), 7)[0]
+
+
+def test_future_dated_email_reason_is_sane():
+    st = S.record_sent_emails(S.State(), [sent_email(when="2026-12-30T00:00:00Z")], [pros()])
+    recent, reason = S.emailed_recently(st, "pat.one@example.com", date(2026, 11, 25), 7)
+    assert recent
