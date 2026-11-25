@@ -1,0 +1,29 @@
+{
+ "meta": {
+  "source_tool": "soqlQuery",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "Id": "003FAKE00010001",
+   "AccountId": "001FAKE00000001",
+   "Phone": null,
+   "MobilePhone": "+61400000001",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person1.1@fake1.example.com"
+  },
+  {
+   "Id": "003FAKE00020001",
+   "AccountId": "001FAKE00000002",
+   "Phone": null,
+   "MobilePhone": "+64200000002",
+   "HasOptedOutOfEmail": false,
+   "Title": "VP Product",
+   "Email": "person2.1@fake2.example.com"
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "source_tool": "search_scoops",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "id": "FAKE-SCOOP-00001",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00001",
+    "company": {
+     "id": "FAKE-ZI-0001",
+     "name": "Co 1"
+    },
+    "description": "Alpha has appointed a new Head of Product.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,47 @@
+{
+ "meta": {
+  "source_tool": "listCalls",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "id": "FAKE-CALL-000001",
+   "source": "nooks_sep",
+   "duration": 25,
+   "to": "+61400000001",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0001-1"
+   },
+   "callDisposition": {
+    "id": "disp-voicemail"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2025-10-21T03:00:00Z",
+   "createdAt": "2025-10-21T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000002",
+   "source": "nooks_sep",
+   "duration": 12,
+   "to": "+64200000002",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0002-1"
+   },
+   "callDisposition": {
+    "id": "disp-no-answer"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-11-20T03:00:00Z",
+   "createdAt": "2026-11-20T03:00:00Z"
+  }
+ ]
+}

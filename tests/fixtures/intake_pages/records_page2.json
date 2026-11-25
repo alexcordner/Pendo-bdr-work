@@ -1,0 +1,20 @@
+{
+ "totalSize": 4,
+ "done": true,
+ "records": [
+  {
+   "attributes": {
+    "type": "Account"
+   },
+   "Id": "001FAKE00000003",
+   "Name": "Co 3"
+  },
+  {
+   "attributes": {
+    "type": "Account"
+   },
+   "Id": "001FAKE00000004",
+   "Name": "Co 4"
+  }
+ ]
+}

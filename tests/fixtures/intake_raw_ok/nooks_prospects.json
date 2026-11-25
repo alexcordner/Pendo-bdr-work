@@ -1,0 +1,37 @@
+{
+ "meta": {
+  "source_tool": "listProspects",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "id": "FAKE-NK-P-0001-1",
+   "type": "salesforce",
+   "name": "Person 1-1",
+   "firstName": "Person",
+   "lastName": "1-1",
+   "title": "Head of Product",
+   "primaryEmail": "person1.1@fake1.example.com",
+   "crmId": "003FAKE00010001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0001"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0002-1",
+   "type": "salesforce",
+   "name": "Person 2-1",
+   "firstName": "Person",
+   "lastName": "2-1",
+   "title": "VP Product",
+   "primaryEmail": "person2.1@fake2.example.com",
+   "crmId": "003FAKE00020001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0002"
+   }
+  }
+ ]
+}
