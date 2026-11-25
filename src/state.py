@@ -206,6 +206,17 @@ def _clone(state: State) -> State:
         is_new=state.is_new, load_warnings=list(state.load_warnings))
 
 
+def _pid(v) -> str | None:
+    """Canonical key for a Nooks prospect id: stripped and CASEFOLDED. Do Not Call checks compare
+    these keys, so 'ABC', 'abc' and ' Abc ' are one person. casefold() (not lower()) is used because it
+    is the stricter Unicode comparison (e.g. 'ß' == 'ss'); it only ever merges more ids, which fails
+    closed. None / blank / non-str give None."""
+    if not isinstance(v, str):
+        return None
+    k = v.strip().casefold()
+    return k or None
+
+
 def _sf(v: str | None) -> str | None:
     """Canonical Salesforce id key (15-char); FAKE- ids and None pass through."""
     return normalise_sf_id(v)
@@ -397,7 +408,7 @@ def state_from_dict(raw: dict) -> State:
 
     accounts, prospects = _need(raw, "accounts", dict), _need(raw, "prospects", dict)
     seen, emails, sheets = _need(raw, "seen_calls", dict), _need(raw, "emails", dict), _need(raw, "sheets", list)
-    st.dnc_prospect_ids = _str_list(raw, "dnc_prospect_ids")
+    st.dnc_prospect_ids = {k for x in _str_list(raw, "dnc_prospect_ids") if (k := _pid(x))}   # merges mixed case
     st.dnc_phones = _str_list(raw, "dnc_phones")
     st.dnc_emails = _str_list(raw, "dnc_emails")
     at, n = raw.get("dnc_rebuilt_at"), raw.get("dnc_rebuilt_calls", 0)
@@ -528,8 +539,14 @@ def _shrinks(old: dict, new: dict) -> list[str]:
     for key, label in (("dnc_prospect_ids", "Do Not Call prospect ids"), ("dnc_phones", "Do Not Call phones"),
                        ("dnc_emails", "Do Not Call emails"), ("accounts", "accounts")):
         o, n = old.get(key), new.get(key)
-        if isinstance(o, (list, dict)) and len(o) > len(n or ()):
-            why.append(f"{label}: {len(o)} on disk, {len(n or ())} in the new state")
+        if isinstance(o, (list, dict)) and isinstance(n, (list, dict)):
+            # Count CANONICAL keys on disk: ids that differ only in case / 15-vs-18 chars merge on load,
+            # which is not a loss.
+            canon = {"dnc_prospect_ids": _pid, "accounts": _sf}.get(key)
+            on_disk = len({canon(x) if canon else x for x in o if (canon(x) if canon else x)}) \
+                if all(isinstance(x, str) for x in o) else len(o)
+            if on_disk > len(n):
+                why.append(f"{label}: {on_disk} on disk, {len(n)} in the new state")
     if old.get("dnc_rebuilt_at") and not new.get("dnc_rebuilt_at"):
         why.append("the Do Not Call rebuild marker would be lost")
     return why
@@ -602,10 +619,17 @@ def _is_dnc(call: CallRecord, config: Config) -> bool:
     return bool(n) and n == _norm(config.dispositions.do_not_call)
 
 
+def is_dnc_call(call: CallRecord, config: Config) -> bool:
+    """True if the call's disposition NAME is the configured Do Not Call (case, punctuation and repeated
+    spaces ignored; never compares ids). Public wrapper for callers outside this module."""
+    return _is_dnc(call, config)
+
+
 def do_not_call_prospects(calls: list[CallRecord], config: Config) -> set[str]:
     """Nooks prospect ids with ANY past call dispositioned 'Do Not Call' (matched by normalised NAME).
-    Calls with no prospect id are skipped here (see do_not_call_phones for those)."""
-    return {c.prospect_id for c in calls if c.prospect_id and _is_dnc(c, config)}
+    The ids are returned stripped and casefolded (the same keys state stores). Calls with no prospect id
+    are skipped here (see do_not_call_phones for those)."""
+    return {k for c in calls if _is_dnc(c, config) and (k := _pid(c.prospect_id))}
 
 
 def do_not_call_phones(calls: list[CallRecord], config: Config) -> set[str]:
@@ -625,8 +649,8 @@ def _link_prospect(call: CallRecord, by_id: dict, by_phone: dict) -> tuple[Prosp
     status: 'id' | 'id_unknown_prospect' | 'phone' | 'no_phone' | 'ambiguous_phone' | 'no_match'.
     Never guesses: a phone must identify exactly one prospect."""
     if call.prospect_id:
-        p = by_id.get(call.prospect_id)
-        return p, call.prospect_id, ("id" if p else "id_unknown_prospect")
+        p = by_id.get(_pid(call.prospect_id))
+        return p, (p.nooks_id if p else call.prospect_id), ("id" if p else "id_unknown_prospect")
     phone = _phone_key(call.to_e164)
     if not phone:
         return None, None, "no_phone"
@@ -668,7 +692,7 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
     """
     st = _clone(state)
     accounts_by_id = _norm_accounts(accounts_by_id)
-    by_id = {p.nooks_id: p for p in prospects if p.nooks_id}
+    by_id = {k: p for p in prospects if (k := _pid(p.nooks_id))}
     by_phone: dict[str, list[Prospect]] = {}
     for p in prospects:
         if (k := _phone_key(p.phone_e164)):
@@ -689,14 +713,14 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
         if (ph := _phone_key(c.to_e164)):
             st.dnc_phones.add(ph)
         prospect, pkey, status = _link_prospect(c, by_id, by_phone)
-        if pkey and pkey not in st.dnc_prospect_ids:      # id given, or the one prospect on that number
-            st.dnc_prospect_ids.add(pkey)
+        if _pid(pkey) and _pid(pkey) not in st.dnc_prospect_ids:   # id given, or the one prospect on that number
+            st.dnc_prospect_ids.add(_pid(pkey))
             rep["dnc_added"] += 1
         if prospect and (h := _hash_email(prospect.email)):
             st.dnc_emails.add(h)
     # Any known prospect already on the DNC list contributes its email (e.g. DNC learned earlier).
     for p in prospects:
-        if p.nooks_id in st.dnc_prospect_ids and (h := _hash_email(p.email)):
+        if _pid(p.nooks_id) in st.dnc_prospect_ids and (h := _hash_email(p.email)):
             st.dnc_emails.add(h)
 
     for c in calls:
@@ -770,7 +794,7 @@ def is_blocked(prospect: Prospect, state: State, channel: str = "any") -> tuple[
         raise ValueError(f"channel must be 'call', 'email' or 'any', got {channel!r}")
     if prospect.do_not_call:
         return True, "Do Not Call flag set on prospect"
-    if prospect.nooks_id and prospect.nooks_id in state.dnc_prospect_ids:
+    if _pid(prospect.nooks_id) and _pid(prospect.nooks_id) in state.dnc_prospect_ids:
         return True, "past call dispositioned Do Not Call"
     phone = _phone_key(prospect.phone_e164)
     if phone and phone in state.dnc_phones:
