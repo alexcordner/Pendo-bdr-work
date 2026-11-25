@@ -54,6 +54,28 @@ class MergeError(ValueError):
     """Malformed input. The CLI prints it and exits 2; nothing is written."""
 
 
+def decode_text(raw: bytes) -> str:
+    """UTF-8 (with or without BOM) or UTF-16 text; anything else is a MergeError (never UnicodeDecodeError)."""
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        try:
+            return raw.decode("utf-16")
+        except UnicodeError as e:
+            raise MergeError("file has a UTF-16 BOM but is not valid UTF-16") from e
+    if b"\x00" in raw[:8]:                  # BOM-less UTF-16 (NUL bytes are valid UTF-8, so test this first)
+        for enc in ("utf-16-le", "utf-16-be"):
+            try:
+                text = raw.decode(enc)
+            except UnicodeError:
+                continue
+            if text.lstrip()[:1] in ("{", "["):
+                return text
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    raise MergeError("file is not valid UTF-8 or UTF-16 text")
+
+
 def _unwrap_mcp_text(page):
     """Rule 9: ``[{"type":"text","text":"<json>"}]`` or ``{"content": [...]}``. Returns the inner
     JSON value, or the page unchanged if it is not that wrapper."""
@@ -113,20 +135,77 @@ def _row_id(row: dict, id_field: str):
     return None
 
 
-def derive_last_page(pages: list) -> bool:
-    """Was the last page the end? From the FINAL page only (page order). Nooks: ``links.next`` is null on the
-    last page and a cursor URL otherwise. Other tools: ``hasMore``. Anything else: MergeError (no guess)."""
+PAGING_KINDS = ("auto", "nooks", "salesforce", "zoominfo")
+
+
+def _page_dict(page) -> dict:
+    page = _unwrap_mcp_text(page)
+    if not isinstance(page, dict):
+        raise MergeError("cannot derive reached_last_page: the page is not an object")
+    return page
+
+
+def _nooks_end(last: dict):
+    links = last.get("links")
+    if isinstance(links, dict) and "next" in links:
+        return links["next"] in (None, "")
+    if isinstance(last.get("hasMore"), bool):
+        return not last["hasMore"]
+    return None
+
+
+def _zoominfo_complete(pages: list) -> bool:
+    """Every ``meta.page`` sequence in the pages (one per type fetched) must be complete: page numbers run
+    1..total without a gap, the last page of each sequence has number == total, and (when ``meta.totalResults`` is
+    given) the rows of the sequence add up to it. The FINAL page must end a sequence."""
+    expected, seq_rows, seq_total, ok = None, 0, None, True
+    for n, raw in enumerate(pages, 1):
+        pg = _page_dict(raw)
+        meta = pg.get("meta") if isinstance(pg.get("meta"), dict) else {}
+        info = meta.get("page") if isinstance(meta.get("page"), dict) else {}
+        num, total = info.get("number"), info.get("total")
+        if not isinstance(num, int) or not isinstance(total, int):
+            raise MergeError(f"cannot derive reached_last_page: page {n} has no meta.page.number / total")
+        rows = len(extract_rows(pg))
+        if num == 1:
+            if expected is not None:               # a new sequence began before the old one ended
+                ok = False
+            expected, seq_rows, seq_total = 1, 0, meta.get("totalResults")
+        elif expected is None or num != expected:
+            ok = False
+        seq_rows += rows
+        expected = num + 1
+        if num >= total:                           # sequence ends here
+            if isinstance(seq_total, int) and seq_rows < seq_total:
+                ok = False
+            expected = None
+    return ok and expected is None
+
+
+def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000) -> bool:
+    """reached_last_page from the pages themselves (in page order), per source:
+      nooks / auto  FINAL page ``links.next`` is null (Nooks has NO hasMore); a cursor means NOT reached.
+                    ``hasMore`` is used when a page has that instead.
+      salesforce    FINAL page ``done`` is true AND it holds fewer than ``sf_limit`` rows (keyset pages: ``done`` is
+                    true on every page, so a full page may have more behind it).
+      zoominfo      every page sequence is complete (see ``_zoominfo_complete``).
+    Without the evidence this is a MergeError: it never returns True on a guess."""
+    if kind not in PAGING_KINDS:
+        raise MergeError(f"unknown paging kind {kind!r}")
     if not pages:
         raise MergeError("no pages: cannot derive reached_last_page")
-    last = _unwrap_mcp_text(pages[-1])
-    if isinstance(last, dict):
-        links = last.get("links")
-        if isinstance(links, dict) and "next" in links:
-            return links["next"] in (None, "")
-        if isinstance(last.get("hasMore"), bool):
-            return not last["hasMore"]
-    raise MergeError("cannot derive reached_last_page: the final page has neither links.next nor hasMore; "
-                     "pass --last-page-reached true or false")
+    if kind == "zoominfo":
+        return _zoominfo_complete(pages)
+    last = _page_dict(pages[-1])
+    if kind == "salesforce":
+        if not isinstance(last.get("done"), bool):
+            raise MergeError("cannot derive reached_last_page: the final page has no 'done' field")
+        return last["done"] and len(extract_rows(last)) < sf_limit
+    end = _nooks_end(last)
+    if end is None:
+        raise MergeError("cannot derive reached_last_page: the final page has neither links.next nor hasMore; "
+                         "pass --paging salesforce / zoominfo, or --last-page-reached true or false")
+    return end
 
 
 def merge_pages(pages: list, *, id_field: str = "id", allow_no_id: bool = False,
@@ -163,8 +242,8 @@ def merge_pages(pages: list, *, id_field: str = "id", allow_no_id: bool = False,
 
 def read_manifest(path: Path) -> list[dict]:
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+        data = json.loads(decode_text(Path(path).read_bytes()))
+    except (OSError, ValueError) as e:
         raise MergeError(f"cannot read manifest {path}: {e}") from e
     if not isinstance(data, list) or not data:
         raise MergeError("manifest must be a non-empty JSON list of {path, page?}")
@@ -191,10 +270,12 @@ def load_pages(entries: list[dict]) -> list:
     for e in entries:
         p = Path(e["path"])
         try:
-            pages.append(json.loads(p.read_text(encoding="utf-8")))
+            pages.append(json.loads(decode_text(p.read_bytes())))
         except OSError as err:
             raise MergeError(f"cannot read page file {p}: {err}") from err
-        except json.JSONDecodeError as err:
+        except MergeError as err:
+            raise MergeError(f"page file {p}: {err}") from err
+        except ValueError as err:
             raise MergeError(f"page file {p} is not valid JSON: {err}") from err
     return pages
 
@@ -233,6 +314,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--last-page-reached", type=_bool_arg, default=None,
                     help="true/false as SEEN by the session, or auto (from the final page's links.next / hasMore); "
                          "omit for a non-paged source")
+    ap.add_argument("--derive-last-page", action="store_true",
+                    help="set reached_last_page from the pages (see --paging); same as --last-page-reached auto")
+    ap.add_argument("--paging", choices=PAGING_KINDS, default="auto",
+                    help="rule for --derive-last-page: nooks (links.next null), salesforce (done and a short page), "
+                         "zoominfo (meta.page sequences complete); auto = nooks")
+    ap.add_argument("--sf-limit", type=int, default=2000, help="LIMIT used for Salesforce keyset pages")
     ap.add_argument("--id-field", default="id")
     ap.add_argument("--rows-key", default=None)
     ap.add_argument("--allow-no-id", action="store_true")
@@ -246,8 +333,10 @@ def main(argv: list[str] | None = None) -> int:
         pages = load_pages(entries)
         rows, stats = merge_pages(pages, id_field=args.id_field, allow_no_id=args.allow_no_id,
                                   rows_key=args.rows_key)
-        if args.last_page_reached == "auto":
-            args.last_page_reached = derive_last_page(pages)
+        if args.derive_last_page and args.last_page_reached not in (None, "auto"):
+            raise MergeError("--derive-last-page cannot be combined with --last-page-reached true/false")
+        if args.derive_last_page or args.last_page_reached == "auto":
+            args.last_page_reached = derive_last_page(pages, args.paging, args.sf_limit)
     except MergeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

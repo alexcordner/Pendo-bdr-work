@@ -39,7 +39,7 @@ WHERE Assigned_SDR__c = '<SF_USER_ID>' AND Current_Customer__c = false
 ORDER BY Id LIMIT 2000
 ```
 
-Loop: run the query → note the spilled file path → read ONLY the count and the last id (snippet below) → set `<LAST_ID>` → repeat. Stop when a page returns fewer than 2000 rows: that is `reached_last_page = true` (pass `--last-page-reached true`; there is no end marker in the response). Add `{"path": "<spilled file>"}` to the manifest after each page.
+Loop: run the query → note the spilled file path → read ONLY the count and the last id (snippet below) → set `<LAST_ID>` → repeat. Stop when a page returns fewer than 2000 rows: that is `reached_last_page = true` (merge with `--derive-last-page --paging salesforce --sf-limit 2000`: `done` is true on EVERY keyset page, so the script requires `done` AND a final page shorter than the limit; it never returns true on a guess). Add `{"path": "<spilled file>"}` to the manifest after each page.
 
 Snippet that prints only the row count and last id of a spilled page (no row content):
 
@@ -68,15 +68,15 @@ Optionally add `AND (Account.BillingCountry IN ('Australia','New Zealand') OR Ac
 
 **Dispositions** (one call, ~33 rows, `page_size` 100, `links.next` null): `listCallDispositions` → save the rows. Ids are never hard-coded: the pipeline resolves by NAME across ALL sources (duplicate names such as "Left Voicemail" exist as separate ids), counts calls whose disposition id is unknown, and stops if a configured name is missing.
 
-**Calls** (the Do Not Call list is rebuilt from this, so it must be the FULL history): `listCalls` with **`filter_owner_id=<NOOKS_USER_ID>` ALWAYS** (verified: without it a page mixes ~40 reps and the sources `nooks_sep`, `outreach`, `csv`, `salesforce`; the filter is NOT a permission boundary, and other reps' Do Not Calls are invisible under it), no time filter, `page_size=100` (the maximum; 500 is rejected), the same page size on every page, and the cursor from the previous response (`page_after`, the value inside `links.next` / the `hint` text; it is an opaque base64 string, ids ascend by uuid, not by time). Volume: about 1.6k to 1.8k calls (~17 pages, ~75 KB per page, always spilled). Cheap enough to refetch in full every run.
+**Calls** (the Do Not Call list is rebuilt from this, so it must be the FULL history): `listCalls` with **`filter_owner_id=<NOOKS_USER_ID>` ALWAYS** (verified: without it a page mixes ~40 reps and the sources `nooks_sep`, `outreach`, `csv`, `salesforce`; the filter is NOT a permission boundary, and other reps' Do Not Calls are invisible under it), no time filter, `page_size=100` (the maximum; 500 is rejected), the same page size on every page, and the cursor from the previous response: take it from `links.next` (it carries `page[after]=<cursor>`; the response `hint` names the tool parameter, `page_after`, so read the tool schema for the exact parameter name and pass the cursor value, an opaque base64 string, unchanged; ids ascend by uuid, not by time). Volume: about 1.6k to 1.8k calls (~17 pages, ~75 KB per page, always spilled). Cheap enough to refetch in full every run.
 
-**There is NO `hasMore` field.** The end is `links.next == null` on the final page. Never infer the end from a short page. Per page read only `links.next` from the spilled file, add the file to the manifest, continue. Merge with `--last-page-reached auto`: it derives the flag from the FINAL page's `links.next` (null → `true`, a cursor → `false`). If paging stops for any other reason (error, rate limit, your own cap) the final page still has a `links.next`, so `auto` correctly writes `false`: the pipeline then does not rebuild Do Not Call and a live run is impossible. A hand-built cursor is UNVERIFIED as a feature: do not use it.
+**There is NO `hasMore` field.** The end is `links.next == null` on the final page. Never infer the end from a short page. Per page read only `links.next` from the spilled file, add the file to the manifest, continue. Merge with `--derive-last-page` (paging `nooks`, the default): it derives the flag from the FINAL page's `links.next` (null → `true`, a cursor → `false`). If paging stops for any other reason (error, rate limit, your own cap) the final page still has a `links.next`, so `auto` correctly writes `false`: the pipeline then does not rebuild Do Not Call and a live run is impossible. A hand-built cursor is UNVERIFIED as a feature: do not use it.
 
 Known limits, also stated in every log header: (a) **Do Not Call is visible only for Nooks-dialer (`nooks_sep`) calls**: Outreach / CSV / Salesforce-sourced calls use other disposition sets with no "Do Not Call" (about 85% of the owner's calls are `nooks_sep`); (b) about 19% of calls have `prospect: null` and `from`/`to` = `external`: the literal `external` is not a phone (`to_e164` becomes None, counted in the log) and such calls cannot be matched to anyone; (c) `to` is ~99% E.164, with the odd spaced international form from a `salesforce`-sourced row. Keep these rows; the loader tolerates them.
 
 ## 5. Nooks tasks, prospects, accounts
 
-- **`nooks_tasks.json`** (needed for a live run: it is the "last sheet" memory because `state.json` is ephemeral): `listTasks` with `filter_owner_id=<NOOKS_USER_ID>`, `filter_action=call`, **`filter_sequenceState_state=null`** (one-off tasks only; verified: without that filter the listing is dominated by ~4k sequence tasks, never use it) and NO status filter (completed and skipped tasks count as "on a sheet"). `page_size=100`, `links.next` paging, merge with `--last-page-reached auto`. `note` is returned in the list. Rows tagged `[apac-callsheet <date> #<rank>]` (Phase 3 writes these, ideally with ` acct=<SF account id>` before the `]`) define last night's accounts; untagged rows (a few hand-made tasks exist) are ignored. Never fetch or touch the `manual_email` sequence backlog. Before Phase 3 has written anything this file holds only untagged rows (or none): that is fine, write it anyway.
+- **`nooks_tasks.json`** (needed for a live run: it is the "last sheet" memory because `state.json` is ephemeral): `listTasks` with `filter_owner_id=<NOOKS_USER_ID>`, `filter_action=call`, **`filter_sequenceState_state=null`** (one-off tasks only; verified: without that filter the listing is dominated by ~4k sequence tasks, never use it) and NO status filter (completed and skipped tasks count as "on a sheet"). `page_size=100`, `links.next` paging, merge with `--derive-last-page`. `note` is returned in the list. Rows tagged `[apac-callsheet <date> #<rank>]` (Phase 3 writes these, ideally with ` acct=<SF account id>` before the `]`) define last night's accounts; untagged rows (a few hand-made tasks exist) are ignored. Never fetch or touch the `manual_email` sequence backlog. Before Phase 3 has written anything this file holds only untagged rows (or none): that is fine, write it anyway.
 - **`nooks_prospects.json`** (optional, lazy): NEVER list prospects in bulk (the table is workspace-wide, about 3M rows, no phone or opt-out field). Only after the first dry run, and only for what is needed: `listProspects` with `filter_crmId=<Contact id>` (single value; comma lists are UNVERIFIED) for shortlisted Contacts whose Nooks id Phase 3 needs, and `filter_id=<comma-separated prospect uuids>` for the prospects named in tagged tasks. Merge them as one file (`reached_last_page` is not meaningful; pass no flag). `crmId` can be a Lead id (`00Q...`): only `003...` ids join to Contacts; `account` is null for ~1/5 of rows. Without this file `Prospect.nooks_id` stays None (the pipeline infers some ids from unique call phones).
 - **`nooks_accounts.json`** (optional): `listAccounts`, `page_size=100`, paged. No country or state; no `crmId` on read. Skip unless needed.
 
@@ -101,6 +101,58 @@ Needed to avoid emailing someone emailed in the last 7 days; not needed for the 
 
 **Verified: search results carry NO date** (only `id`, `sender`, `toRecipients`, `threadId`, `messageCount`). So the QUERY WINDOW is the date: any hit means "emailed within the last 7 days"; `sent_at` stays None. Rule: the pipeline blocks such a prospect until the search day plus `email_cooldown_days` (7), i.e. exactly until the window could have elapsed (it anchors on `gmail_sent.json` `meta.fetched_at`). So: the window in the query must be at least `email_cooldown_days`, `meta.window_days` must be set (merge with `--source-tool search_threads --query "in:sent to:<addr> newer_than:7d"`: the `newer_than:7d` is also parsed), and the search must be done on the day of the run. Merge all threads (de-duplicated by thread id; envelope `{"threads": [...]}`; no `--last-page-reached`) into `gmail_sent.json`; an empty result is valid. Then re-run the pipeline. Addresses must not be written into the repo, the log or the manifest. Reading a real send date would need `get_thread` (bodies): not allowed here.
 
+## 7b. Exact parameters (from the probe, `docs/connector_notes_v2.md`)
+
+| Tool | Parameters (names exactly) |
+|---|---|
+| Nooks `listCalls` | `filter_owner_id=<NOOKS_USER_ID>` (ALWAYS), `page_size=100`, cursor from `links.next` (`page[after]`; tool parameter `page_after`, confirm in the schema); optional `filter_time_gte` (not used: full history); plus `USER_GOAL`, `REASON` |
+| Nooks `listCallDispositions` | `page_size=100`, `USER_GOAL`, `REASON` |
+| Nooks `listTasks` | `filter_owner_id`, `filter_action=call`, `filter_sequenceState_state=null`, `page_size=100`, cursor as above (no status filter) |
+| Nooks `listProspects` (lazy only) | `filter_crmId=<Contact id>` (single value) or `filter_id=<uuid,uuid,...>`; `page_size=100` |
+| Salesforce `soqlQuery` | the query text only (no other parameter) |
+| Salesforce `getUserInfo` | none |
+| ZoomInfo `search_scoops` | `userIntent` (10 to 500 chars), `country="Australia,New Zealand"`, scoop type names verbatim (`Executive Move`, `New Hire`, `Management Move`, `Mergers & Acquisitions (M&A)`, `Funding`, `Partnership`, `Product Launch`), `employeeRangeMax=2000`, `pageSize=100` (`pageSize=1` for a free count: read `meta.totalResults`), date window parameter per the schema (UNVERIFIED name) |
+| Gmail `search_threads` | `query="in:sent to:<ADDR> newer_than:7d"`, `view=THREAD_VIEW_METADATA_ONLY` |
+
+## 7c. Spill-safe handling (never read a page into context)
+
+Never `Read`, `cat` or print a spilled file. Results over ~20 to 30k characters are saved to a single-line JSON file by the harness (Nooks 100-row page ~75 KB, Salesforce 2000-row page 0.6 to 0.8 MB, ZoomInfo 100-row page ~60 KB). Only these snippets (they print counts and one cursor, nothing else):
+
+```bash
+# Nooks (listCalls / listTasks): row count and whether a next page exists
+python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); print(len(d.get('data',[])), bool((d.get('links') or {}).get('next')))" "<spilled file>"
+# Nooks: the next cursor value, only when you need to pass it (this prints the cursor, not data)
+python3 -I -c "import json,sys; print((json.load(open(sys.argv[1])).get('links') or {}).get('next'))" "<spilled file>"
+# ZoomInfo (search_scoops): rows, page number / total, totalResults
+python3 -I -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('meta',{}); print(len(d.get('data',[])), m.get('page'), m.get('totalResults'))" "<spilled file>"
+```
+
+(the Salesforce snippet is in section 2). A tool result that came back INLINE (small) is written to a scratch file with `Write` and added to the manifest the same way; do not paste rows into a command.
+
+## 7d. Stop / retry rule per source
+
+Per page: up to 3 tries with a short pause. After a timeout or error in the MIDDLE of a source, re-run THAT page with the same cursor or `<LAST_ID>`; never skip a page and never restart with a different page size. If a page still fails: stop that source, merge the pages already fetched with the end flag derived as usual (it will be `false`), add a line to `run_meta.warnings`, continue with the next source. Nooks failures can be inspected with `getRecentFailures` (read-only). Never retry anything that looks like a write (none is called here). Salesforce and Nooks pages are cheap to refetch: if in doubt, redo the whole source.
+
+## 7e. Shortlisted addresses for the Gmail step without printing them
+
+After the first dry run, write the search list to a gitignored scratch file and read ONE address at a time into the tool call (never print the list):
+
+```bash
+python3 -I - <<'EOF'
+import json
+# run_pipeline(...) result `r` from the dry run; the dotted addresses never go to chat or git
+rows = [p.email for ps in r.rank_result.prospects.values() for p in ps if p.email]
+open("output/gmail_queries.json", "w").write(json.dumps(sorted(set(rows))))
+print(len(rows), "addresses written to output/gmail_queries.json")
+EOF
+```
+
+(Run it in the same Python process as the pipeline run, or have the run save it; `output/` is gitignored.) Use the addresses from that file one by one in the `search_threads` query text; the printed output stays at a count.
+
+## 7f. Call-count estimate
+
+About 18 (Nooks calls) + 1 (dispositions) + 1 to 3 (tasks) + 10 (SF accounts) + 27 (SF contacts) + 6 to 10 (scoops, per type) + at most 40 (Gmail, shortlist) = **65 to 110 calls**, roughly 5 to 10 minutes if a call takes 3 to 6 s (per-call time NOT measured; no rate limit was hit in ~35 probe calls).
+
 ## 8. Merging spilled pages: `scripts/merge_pages.py`
 
 For each source, write a manifest (JSON list, in page order) in `output/raw/` or the scratchpad, never in git:
@@ -113,13 +165,13 @@ then:
 
 ```bash
 python scripts/merge_pages.py --manifest manifest_calls.json --name nooks_calls --raw-dir output/raw \
-    --source-tool listCalls --query "owner=<NOOKS_USER_ID>, page_size=100" --last-page-reached true
+    --source-tool listCalls --query "filter_owner_id=<NOOKS_USER_ID>, page_size=100" --derive-last-page
 ```
 
 - `--name` is the file stem from `docs/intake_schema.md` (`sf_accounts`, `sf_contacts`, `nooks_calls`, `nooks_dispositions`, `nooks_prospects`, `nooks_accounts`, `nooks_tasks`, `zoominfo_scoops`, `gmail_sent`).
-- Omit `--last-page-reached` for non-paged sources (`nooks_dispositions`, `gmail_sent`, `nooks_prospects`); for paged ones pass `auto` (Nooks, ZoomInfo is not auto: use `true` when `meta.page.number == meta.page.total`) or `true` / `false` exactly as you SAW it.
+- Omit both `--derive-last-page` and `--last-page-reached` for non-paged sources (`nooks_dispositions`, `gmail_sent`, `nooks_prospects`). For paged ones use `--derive-last-page --paging nooks|salesforce|zoominfo` (the script reads the pages and decides; `zoominfo` requires every per-type page sequence to run 1..total with no gap and the rows to add up to `meta.totalResults`) or, as a last resort, `--last-page-reached true|false` exactly as you SAW it. The two options cannot be combined.
 - `--id-field Id` is not needed: `Id` is accepted as a fallback. `--allow-no-id` keeps rows with no id (default: error).
-- `--last-page-reached auto` derives the flag from the final page (`links.next` null / `hasMore`); on a page with neither it is an error (pass `true` or `false` yourself, e.g. Salesforce).
+- With no evidence for the chosen `--paging` rule the script exits 2 and writes nothing (it never defaults to `true`).
 - Understood page envelopes: a bare list; `{"data": [...]}` (Nooks, ZoomInfo); `{"records": [...]}` (Salesforce); `{"threads": [...]}` (Gmail); `{"results"}`, `{"items"}`, `{"rows"}`; any object with exactly one list value; and an MCP text wrapper (`[{"type":"text","text":"<json>"}]` or `{"content":[...]}`) holding one of those. Anything else is an error and nothing is written.
 - It de-duplicates by id (first wins), keeps order, and prints only counts. Read that line; it is the only output.
 - For a small result that was NOT spilled (it came back inline), write it to a scratch file first (`Write` the tool result) and add that file to the manifest; do not paste data into commands.

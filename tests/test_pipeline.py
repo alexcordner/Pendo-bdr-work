@@ -742,7 +742,9 @@ def test_gmail_window_shorter_than_the_cooldown_blocks_live(world, cfg, tmp_path
 def test_log_header_states_the_dnc_limitation(raw, cfg, tmp_path):
     text = run(raw, cfg, tmp_path).log_path.read_text()
     head = text.split("== INTAKE ==")[0]
-    assert "Do Not Call visibility" in head and "nooks_sep" in head and "RE-RUN" in head
+    assert ("DNC visibility: Nooks-dialer calls only (Outreach-sourced calls have no Do Not Call disposition); calls "
+            "fetched with the owner filter; dry-run DNC match is by phone/email hash, Nooks prospect id after lazy "
+            "resolution in Phase 3") in head and "RE-RUN" in head
 
 
 def test_log_reports_scoops_matched_to_the_book(raw, cfg, tmp_path):
@@ -785,3 +787,124 @@ def test_calls_from_other_sources_warn_but_do_not_block_a_live_run(world, cfg, t
     raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
     r = run(raw, cfg, tmp_path, live=True)
     assert any("Outreach" in w for w in r.intake_report.warnings) and r.live
+
+
+# ---------------------------------------------------------------- review fixes (F1, F5, F6, F7, F10)
+def test_run_without_nooks_prospects_file_still_ranks_and_can_go_live(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, include_prospects=False)
+    assert not (raw / "nooks_prospects.json").exists()
+    r = run(raw, cfg, tmp_path, live=True)
+    assert len(r.rank_result.ranked) > 0 and r.live
+
+
+def test_empty_nooks_prospects_file_still_ranks(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_prospects=[])
+    assert len(run(raw, cfg, tmp_path).rank_result.ranked) > 0
+
+
+def test_foreign_owner_calls_block_live(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id)
+    rewrite(raw, "nooks_calls", lambda d: d["rows"][0].__setitem__("owner", {"id": "SOMEONE-ELSE"}))
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("owner other than" in r for r in e.value.reasons)
+    assert run(raw, cfg, tmp_path).live is False                       # a dry run only warns
+
+
+def test_tiny_first_ever_history_blocks_live_unless_confirmed(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=world.calls[:3])
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("suspiciously small" in r for r in e.value.reasons)
+    rewrite(raw, RUN_META, lambda d: d.__setitem__("empty_history_confirmed", True))
+    assert run(raw, cfg, tmp_path / "again", live=True).live
+
+
+def test_tiny_history_with_earlier_state_is_not_a_first_run_problem(world, cfg, tmp_path):
+    full = write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id)
+    run(full, cfg, tmp_path)                                           # state now exists
+    small = write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=world.calls[:3])
+    try:
+        run(small, cfg, tmp_path, live=True)
+    except LiveRefused as e:
+        assert not any("suspiciously small" in r for r in e.reasons)   # refused for the partial history instead
+
+
+def test_confirmed_empty_history_marks_dnc_rebuilt(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=[])
+    rewrite(raw, RUN_META, lambda d: d.__setitem__("empty_history_confirmed", True))
+    r = run(raw, cfg, tmp_path, live=True)
+    assert st_mod.dnc_is_rebuilt(r.state) and r.state.dnc_rebuilt_empty
+
+
+def test_unconfirmed_empty_history_blocks_live(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=[])
+    with pytest.raises(LiveRefused):
+        run(raw, cfg, tmp_path, live=True)
+
+
+def test_reset_state_without_tagged_tasks_blocks_live(raw, cfg, tmp_path):
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "state.json").write_text("{not json")
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("state was reset" in r for r in e.value.reasons)
+    assert run(raw, cfg, tmp_path).live is False                       # dry run continues
+
+
+def test_reset_state_with_tagged_tasks_is_recoverable(world, cfg, tmp_path):
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    top = base.rank_result.ranked[0].account
+    tasks = [{"id": "T1", "action": "call", "status": "finished", "completed": True,
+              "note": f"[apac-callsheet 2026-11-24 #1 acct={top.sf_account_id}]", "prospect": {"id": "NK"}}]
+    raw = write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks)
+    (tmp_path / "s2").mkdir()
+    (tmp_path / "s2" / "state.json").write_text("{not json")
+    r = run_pipeline(raw, cfg, tmp_path / "s2", NOW, live=True, record_sheet=False)
+    assert r.live and top.name not in names(r.rank_result.ranked)      # the state reset did not forget last night
+
+
+def test_sales_opt_out_is_counted_logged_and_never_blocks(world, cfg, tmp_path):
+    contacts = [dict(c) for c in world.contacts]
+    for c in contacts[:3]:
+        c["Sales_Opt_Out_Email__c"] = True
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    raw = write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, sf_contacts=contacts)
+    r = run(raw, cfg, tmp_path / "rb")
+    assert r.stats["contacts_sales_opt_out_email_unverified"] == 3
+    assert any("3 contacts with Sales_Opt_Out_Email__c (meaning unverified, NOT used to block)" in l for l in r.log_lines)
+    assert keys(r) == keys(base)
+
+
+def test_scoop_match_line_has_the_agreed_wording(raw, cfg, tmp_path):
+    r = run(raw, cfg, tmp_path)
+    s = r.stats
+    line = next(l for l in r.log_lines if "scoops matched to your book" in l)
+    assert f"{s['scoops_matched_to_book']} of {s['scoops']} ({s['scoops'] - s['scoops_matched_to_book']} unmatched, " \
+           "normal: only ~30% of scoop companies are in your book" in line
+
+
+def test_tagged_task_count_is_logged(world, cfg, tmp_path):
+    tasks = [{"id": f"T{i}", "action": "call", "status": "finished", "completed": True,
+              "note": f"[apac-callsheet 2026-11-24 #{i} acct=001FAKE0000000{i}]", "prospect": {"id": "NK"}} for i in (1, 2)]
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks)
+    assert any("(2 tagged tasks seen)" in l for l in run(raw, cfg, tmp_path).log_lines)
+
+
+def test_narrow_allowlist_argparse_and_sys_only_in_pipeline():
+    import ast
+    for p in (ROOT / "src").glob("*.py"):
+        tree = ast.parse(p.read_text())
+        mods = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        mods |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+        if p.name != "pipeline.py":
+            assert not mods & {"argparse", "sys"}, p.name
+
+
+def test_the_only_file_write_in_pipeline_is_write_log():
+    import ast
+    tree = ast.parse((ROOT / "src" / "pipeline.py").read_text())
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        has_write = any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "write_text"
+                        for c in ast.walk(fn))
+        assert has_write == (fn.name == "write_log"), fn.name

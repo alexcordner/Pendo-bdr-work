@@ -154,14 +154,45 @@ class RawData:
 
 
 # ------------------------------------------------------------------ reading files
+class IntakeError(ValueError):
+    """A raw file could not be read as text. ``load_raw`` turns it into a report error (it never raises)."""
+
+
+def decode_text(raw: bytes) -> str:
+    """Bytes of a JSON file -> text. Accepts UTF-8 (with or without a BOM) and UTF-16 (BOM, or NUL bytes in the
+    first bytes, as Windows tools write it). Anything else raises IntakeError (never UnicodeDecodeError)."""
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        try:
+            return raw.decode("utf-16")
+        except UnicodeError as e:
+            raise IntakeError("file has a UTF-16 BOM but is not valid UTF-16") from e
+    if b"\x00" in raw[:8]:                  # BOM-less UTF-16 (NUL bytes are valid UTF-8, so test this first)
+        for enc in ("utf-16-le", "utf-16-be"):
+            try:
+                text = raw.decode(enc)
+            except UnicodeError:
+                continue
+            if text.lstrip()[:1] in ("{", "["):
+                return text
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    raise IntakeError("file is not valid UTF-8 or UTF-16 text")
+
+
 def _read_json(path: Path, rep: IntakeReport, label: str):
     """Parsed JSON or None (error recorded)."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(decode_text(path.read_bytes()))
     except OSError as e:
         rep.error(f"{label}: cannot read {path.name} ({type(e).__name__})")
+    except IntakeError as e:
+        rep.error(f"{label}: {path.name}: {e}")
     except json.JSONDecodeError as e:
         rep.error(f"{label}: {path.name} is not valid JSON ({e.msg} at line {e.lineno})")
+    except (ValueError, RecursionError) as e:
+        rep.error(f"{label}: {path.name} cannot be parsed ({type(e).__name__})")
     return None
 
 
@@ -356,7 +387,9 @@ def _convert(data: RawData, now: datetime) -> None:
         other = sum(1 for c in data.calls if c.owner_id and c.owner_id != owner)
         if other:
             rep.stats["calls_by_other_owner"] = other
-            rep.warn(f"nooks_calls: {other} calls belong to an owner other than run_meta.nooks_user_id")
+            rep.warn(f"nooks_calls: {other} calls belong to an owner other than run_meta.nooks_user_id "
+                     "(the owner filter is not a permission boundary: another rep's calls would mix in)")
+            rep.block_live("some calls belong to an owner other than run_meta.nooks_user_id")
 
     for r in data.nooks_tasks:
         try:
@@ -427,8 +460,11 @@ def _convert(data: RawData, now: datetime) -> None:
                  "Salesforce-sourced calls use other disposition sets with no 'Do Not Call', so Do Not Call is only "
                  "visible for Nooks-dialer calls")
     if not data.calls and data.nooks_calls == [] and "nooks_calls" in data.metas:
-        rep.warn("nooks_calls is empty: Do Not Call cannot be rebuilt from an empty history")
-        rep.block_live("no call history")
+        if (data.run_meta or {}).get("empty_history_confirmed") is True:
+            rep.warn("nooks_calls is empty and run_meta.empty_history_confirmed is true: treated as a brand-new seat")
+        else:
+            rep.warn("nooks_calls is empty: Do Not Call cannot be rebuilt from an empty history")
+            rep.block_live("no call history")
 
 
 _WINDOW = re.compile(r"newer_than:(\d+)d\b")

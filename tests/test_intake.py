@@ -624,3 +624,63 @@ def test_report_lines_are_plain_text(raw):
     d = load_raw(raw, now=NOW)
     text = "\n".join(d.report.lines())
     assert "rows kept per file:" in text and "zoominfo credits used: 0" in text
+
+
+# ---------------------------------------------------------------- review F1 / F4 / F5 / F6 / F7
+def test_missing_nooks_prospects_file_does_not_stop_anything(raw):
+    (raw / "nooks_prospects.json").unlink()
+    d = load_raw(raw, now=NOW)
+    assert d.report.ok and d.report.can_go_live and not has(d.report.errors, "nooks_prospects")
+    assert "nooks_prospects" not in intake.SAFETY_PAGED and not FILES["nooks_prospects"][0]
+
+
+def test_partial_lazy_prospect_file_never_blocks_live(raw):
+    rewrite(raw, "nooks_prospects", lambda d: d["meta"].__setitem__("reached_last_page", False))
+    rewrite(raw, RUN_META, lambda d: d["reached_last_page"].__setitem__("nooks_prospects", False))
+    assert load_raw(raw, now=NOW).report.can_go_live
+
+
+def test_malformed_nooks_prospect_row_does_not_block_live(raw):
+    set_rows(raw, "nooks_prospects", read(raw, "nooks_prospects")["rows"] + [{"name": "No Id"}])
+    r = load_raw(raw, now=NOW).report
+    assert r.malformed["nooks_prospects"].count == 1 and r.can_go_live
+
+
+def test_calls_by_another_owner_block_live_but_not_a_dry_run(raw):
+    rewrite(raw, RUN_META, lambda d: d.__setitem__("nooks_user_id", "FAKE-SOMEONE-ELSE"))
+    r = load_raw(raw, now=NOW).report
+    assert r.ok and not r.can_go_live and has(r.live_blockers, "owner other than run_meta.nooks_user_id")
+
+
+@pytest.mark.parametrize("encode", [lambda t: t.encode("utf-8-sig"), lambda t: t.encode("utf-16"),
+                                    lambda t: t.encode("utf-16-le"), lambda t: t.encode("utf-16-be")])
+def test_bom_and_utf16_files_are_read(raw, encode):
+    p = raw / "sf_contacts.json"
+    p.write_bytes(encode(p.read_text()))
+    d = load_raw(raw, now=NOW)
+    assert d.report.ok and len(d.sf_contacts) == 2
+
+
+@pytest.mark.parametrize("payload", [b"\xff\xfe\x00garbage\x80", b"\x80\x81\x82\x83", b"\xff\xfe\xd8\x00", b"\x00\x00\x00\x00"])
+def test_undecodable_file_is_a_report_error_never_an_exception(raw, payload):
+    (raw / "nooks_calls.json").write_bytes(payload)
+    r = load_raw(raw, now=NOW).report
+    assert r.errors and any("nooks_calls" in e for e in r.errors) and not r.can_go_live
+
+
+def test_decode_text_raises_intake_error_only():
+    with pytest.raises(intake.IntakeError):
+        intake.decode_text(b"\x80\x81")
+    assert intake.decode_text(b"\xef\xbb\xbf{}") == "{}"
+
+
+def test_empty_history_confirmed_is_accepted_for_a_new_seat(raw):
+    set_rows(raw, "nooks_calls", [])
+    rewrite(raw, RUN_META, lambda d: d.__setitem__("empty_history_confirmed", True))
+    r = load_raw(raw, now=NOW).report
+    assert r.can_go_live and has(r.warnings, "empty_history_confirmed")
+
+
+def test_deeply_nested_json_is_an_error_not_a_crash(raw):
+    (raw / "sf_contacts.json").write_text("[" * 100000)
+    assert load_raw(raw, now=NOW).report.errors

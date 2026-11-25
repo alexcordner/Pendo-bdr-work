@@ -84,7 +84,6 @@ def test_owner_mismatch(tmp_path):
     assert not live_ok(raw, tmp_path)
 
 
-@pytest.mark.xfail(strict=True, reason='F5 other-owner calls only warn')
 def test_calls_by_other_owner_only_warning(tmp_path):
     """All calls belong to other reps: should this block live? (probe: filter is not a permission boundary)"""
     raw, _ = mk(tmp_path)
@@ -197,13 +196,12 @@ def test_dry_run_with_partial_calls_saves_state(tmp_path):
 
 
 # ---------------- intake tolerance
-@pytest.mark.xfail(strict=True, reason='F4 UnicodeDecodeError escapes load_raw')
 def test_utf16_file_does_not_raise(tmp_path):
     raw, _ = mk(tmp_path)
     p = raw / "sf_contacts.json"
     p.write_bytes(p.read_text().encode("utf-16"))
-    d = load_raw(raw, now=NOW)       # contract: never raises for bad data
-    assert not d.report.ok
+    d = load_raw(raw, now=NOW)       # contract: never raises for bad data; F4 fix: valid UTF-16 is read
+    assert d.report.ok and len(d.sf_contacts) > 0
 
 
 def test_bom_file(tmp_path):
@@ -212,10 +210,9 @@ def test_bom_file(tmp_path):
     p.write_bytes(b"\xef\xbb\xbf" + p.read_bytes())
     d = load_raw(raw, now=NOW)
     print("BOM ->", d.report.errors[:2])
-    assert not d.report.ok            # loud, not silent
+    assert d.report.ok                # F4 fix: a UTF-8 BOM is accepted
 
 
-@pytest.mark.xfail(strict=True, reason='F4 UnicodeDecodeError escapes load_raw')
 def test_binary_garbage(tmp_path):
     raw, _ = mk(tmp_path)
     (raw / "nooks_calls.json").write_bytes(b"\xff\xfe\x00garbage\x80")
@@ -320,7 +317,6 @@ def test_banned_tool_names_not_in_src():
         print(p.name, len(hits), [h.strip()[:90] for h in hits[:3]])
 
 
-@pytest.mark.xfail(strict=True, reason='F1 nooks_prospects required, no Contact-as-prospect path')
 def test_probe_c_without_nooks_prospects_pipeline_still_ranks(tmp_path):
     """Probe finding (c): nooks_prospects cannot be bulk fetched. Pipeline must still produce a sheet using
     Salesforce Contacts as prospects."""
@@ -330,7 +326,6 @@ def test_probe_c_without_nooks_prospects_pipeline_still_ranks(tmp_path):
     assert len(r.rank_result.ranked) > 0
 
 
-@pytest.mark.xfail(strict=True, reason='F1 empty prospects => nothing ranked')
 def test_probe_c_empty_prospects_ranks_nothing(tmp_path):
     raw, _ = mk(tmp_path, nooks_prospects=[])
     r = run_pipeline(raw, CFG, tmp_path / "state", NOW)
@@ -338,7 +333,6 @@ def test_probe_c_empty_prospects_ranks_nothing(tmp_path):
     assert len(r.rank_result.ranked) > 0
 
 
-@pytest.mark.xfail(strict=True, reason='F3 task note tag not read')
 def test_probe_b_task_note_tag_feeds_last_sheet(tmp_path):
     raw, w = mk(tmp_path, include_tasks=True)
     acct = w.sf_rows[0]["Id"]
@@ -350,4 +344,8 @@ def test_probe_b_task_note_tag_feeds_last_sheet(tmp_path):
     from src.intake import load_raw
     d = load_raw(raw, now=NOW)
     print("task rows:", len(d.nooks_tasks), "task models:", [t.__dict__.keys() for t in d.tasks][:1])
-    assert any(getattr(t, "note", None) for t in d.tasks), "TaskRecord/task_from_nooks drops `note`"
+    from datetime import date
+    from src.intake import build_prospects, last_sheet_from_tasks
+    from src.loaders import normalise_sf_id
+    # TaskRecord / task_from_nooks (loaders.py) drop `note`: intake parses the tag from the raw row instead
+    assert last_sheet_from_tasks(d, build_prospects(d, {}, {}), date(2026, 11, 25)) == {normalise_sf_id(acct)}

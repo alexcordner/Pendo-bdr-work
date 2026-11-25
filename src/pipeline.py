@@ -46,11 +46,11 @@ _E164 = re.compile(r"^\+\d{8,15}$")
 _LOG_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
 _LOG_E164 = re.compile(r"\+\d[\d ]{7,}\d")
 SURROGATE = "sfc:"        # internal state key for a Contact with no Nooks prospect id (never leaves this module)
-DNC_NOTE = ("Do Not Call visibility: only Nooks-dialer (nooks_sep) calls carry a 'Do Not Call' disposition; Outreach / "
-            "CSV / Salesforce-sourced calls use other disposition sets with none. This run matches Do Not Call by "
-            "phone and hashed email from call history (most contacts have no Nooks prospect id yet); after Nooks "
-            "prospect ids are resolved Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id "
-            "before writing any task.")
+DNC_NOTE = ("DNC visibility: Nooks-dialer calls only (Outreach-sourced calls have no Do Not Call disposition); calls "
+            "fetched with the owner filter; dry-run DNC match is by phone/email hash, Nooks prospect id after lazy "
+            "resolution in Phase 3. Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id before "
+            "writing any task.")
+MIN_FIRST_RUN_CALLS = 5   # a first-ever run with fewer calls than this is suspicious (truncated history?)
 _LOG_NATIONAL = re.compile(r"(?<![\w])0[2-478][\d ]{8,10}(?![\w])")
 
 
@@ -285,8 +285,13 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
         log.append("WARNING: listCalls paging did NOT reach the last page: Do Not Call is NOT rebuilt this run "
                    "and a live run is impossible")
     elif calls_seen == 0:
-        log.append("WARNING: no calls in the history: Do Not Call cannot be marked rebuilt from an empty history")
-        rep.block_live("no call history")
+        if (raw.run_meta or {}).get("empty_history_confirmed") is True:
+            st = st_mod.mark_dnc_rebuilt(st, run_date, 0, reached_last_page=True, empty_history_confirmed=True)
+            rebuilt_now = True
+            log.append("NOTE: empty call history confirmed in run_meta (brand-new Nooks seat)")
+        else:
+            log.append("WARNING: no calls in the history: Do Not Call cannot be marked rebuilt from an empty history")
+            rep.block_live("no call history")
     else:
         try:
             st = st_mod.mark_dnc_rebuilt(st, run_date, calls_seen, reached_last_page=True)
@@ -294,6 +299,14 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
         except ValueError as e:
             log.append(f"WARNING: Do Not Call rebuild rejected: {scrub(str(e))}")
             rep.block_live(f"Do Not Call rebuild rejected: {e}")
+    if st.is_new and 0 < len(raw.calls) < MIN_FIRST_RUN_CALLS and \
+            (raw.run_meta or {}).get("empty_history_confirmed") is not True:
+        log.append(f"WARNING: only {len(raw.calls)} calls on a run with no earlier state: the history may be truncated")
+        rep.block_live(f"call history is suspiciously small ({len(raw.calls)} calls) and there is no earlier state; "
+                       "set run_meta.empty_history_confirmed=true if this seat really is new")
+    if st.was_reset and rep.stats.get("tagged_tasks", 0) == 0:
+        log.append("WARNING: state.json was reset and there are no tagged tasks to recover the last sheet from")
+        rep.block_live("state was reset and the last sheet cannot be recovered from tagged tasks")
     n_bad_dnc, dnc_lines = _dnc_phone_issues(raw, cfg)
     log.append(f"Do Not Call calls whose 'to' is not E.164 in the source: {n_bad_dnc}")
     log += dnc_lines
@@ -399,9 +412,12 @@ def _stats(raw: RawData, res, result, marked, verdicts, batch, n_blocked, n_bad_
 
 def _log_body(raw, res, result, verdicts, batch, stats, run_date, call_date, sheet_recorded, live) -> list[str]:
     lines = ["", "== SIGNALS =="]
+    unmatched = stats["scoops"] - stats["scoops_matched_to_book"]
     lines.append(f"  scoops matched to your book: {stats['scoops_matched_to_book']} of {stats['scoops']} "
-                 f"(companies {stats['scoop_companies_matched_to_book']} of {stats['scoop_companies']}); unmatched scoops "
-                 "are normal (most scoop companies are not in your book)")
+                 f"({unmatched} unmatched, normal: only ~30% of scoop companies are in your book; companies "
+                 f"{stats['scoop_companies_matched_to_book']} of {stats['scoop_companies']})")
+    lines.append(f"  {stats.get('contacts_sales_opt_out_email_unverified', 0)} contacts with Sales_Opt_Out_Email__c "
+                 "(meaning unverified, NOT used to block)")
     types: dict[str, int] = {}
     for sc in raw.scoops:
         for t in sc.types:

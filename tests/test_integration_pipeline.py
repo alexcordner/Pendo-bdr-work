@@ -1466,8 +1466,9 @@ def test_l_no_network_or_process_imports(path):
     assert not mods & set(FORBIDDEN_IMPORTS), (path.name, mods & set(FORBIDDEN_IMPORTS))
     allowed = {"__future__", "collections", "copy", "dataclasses", "datetime", "enum", "functools", "hashlib",
                "json", "logging", "math", "os", "pathlib", "re", "tempfile", "typing", "unicodedata", "yaml",
-               "zoneinfo", "src", "itertools", "operator", "string",
-               "argparse", "sys"}          # 2a: src/pipeline.py is also the command line entry point
+               "zoneinfo", "src", "itertools", "operator", "string"}
+    if path.name == "pipeline.py":      # 2a: only the command line entry point may use argparse / sys
+        allowed = allowed | {"argparse", "sys"}
     assert mods <= allowed, (path.name, sorted(mods - allowed))
 
 
@@ -1484,14 +1485,13 @@ def test_l_no_hardcoded_real_ids_phones_emails(path):
 
 
 def test_l_nothing_in_src_writes_outside_state_dir():
-    """The only file writes in src/ are state.save_state (temp file + rename inside state_dir) and, since 2a,
-    pipeline.write_log (one new log file in logs/, never overwriting; tests/test_pipeline.py pins it to one call)."""
+    """The only file writes in src/ are state.save_state (temp file + rename inside state_dir)."""
     writers = []
     for p in SRC:
         t = p.read_text()
         if re.search(r"open\([^)]*[\"'][wa]b?[\"']|\.write_text\(|\.write_bytes\(|mkstemp|os\.replace|os\.unlink|shutil", t):
             writers.append(p.name)
-    assert writers == ["pipeline.py", "state.py"], writers
+    assert writers == ["pipeline.py", "state.py"], writers      # 2a: pipeline.write_log only (pinned in test_pipeline.py)
 
 
 def test_l_logging_calls_carry_no_contact_details():

@@ -15,7 +15,7 @@ Every data file is one JSON object:
 - `rows`: the connector's rows EXACTLY as returned (no renaming, no trimming, no added fields). The one exception is documented under `nooks_accounts`.
 - `meta.source_tool`: the tool that produced the rows. `meta.query`: the query / filters used (no secrets).
 - `meta.page_count`: pages merged. `meta.fetched_at`: ISO UTC time the fetch finished.
-- `meta.reached_last_page`: `true` only when the END was seen. **Nooks has no `hasMore` field: the end is `links.next == null` on the final page** (`merge_pages.py --last-page-reached auto` derives it from the final page; a non-null `links.next` is `false`). Salesforce keyset pages have no end marker (`done` is true on every page): the end is a page with fewer rows than `LIMIT`. ZoomInfo: `meta.page.number == meta.page.total` (or an empty page). `false` if paging stopped for any other reason (error, cap, rate limit). `null` for sources that are not paged. Never guessed.
+- `meta.reached_last_page`: `true` only when the END was seen. **Nooks has no `hasMore` field: the end is `links.next == null` on the final page** (`merge_pages.py --derive-last-page` derives it from the final page; a non-null `links.next` is `false`). Salesforce keyset pages: `done` is true on every page, so the end is `done` AND a final page with fewer rows than `LIMIT` (`--paging salesforce`). ZoomInfo: every page sequence runs `meta.page.number` 1..`total` without a gap and its rows add up to `meta.totalResults` (`--paging zoominfo`). `false` if paging stopped for any other reason (error, cap, rate limit). `null` for sources that are not paged. Never guessed.
 
 ## Files
 
@@ -107,3 +107,12 @@ Two sources, unioned: `state.json` (gitignored, starts "new" in a fresh containe
 ## Sent mail (undated search hits)
 
 A hit for `in:sent to:<addr> newer_than:7d` means "sent inside the window". `sent_at` stays None. `state.record_sent_emails` treats an undated email as recent until `first_seen + email_cooldown_days`; the pipeline passes `first_seen` = the Sydney date the SEARCH ran (`gmail_sent.json` `meta.fetched_at`), so the block lasts exactly until the window could have elapsed even if the pipeline is re-run later. A window shorter than `email_cooldown_days` blocks live.
+
+## Further live blockers and sanity rules (review F5 to F12)
+
+- Calls whose `owner.id` is not `run_meta.nooks_user_id`: warning in a dry run, **blocks live** (the owner filter is not a permission boundary, other reps' calls would mix in).
+- `run_meta.empty_history_confirmed: true` marks a brand-new Nooks seat: an empty call history is then accepted and Do Not Call is marked rebuilt from it. Without it an empty history blocks live.
+- Sanity floor: with no earlier state (new or deleted `state.json`) and fewer than 5 calls in the history, live is blocked unless `empty_history_confirmed` is true (a truncated first-ever history).
+- `state.json` was reset (corrupt) and the tasks file has no tagged tasks to recover the last sheet from: live is blocked.
+- Files are read as UTF-8 (BOM allowed) or UTF-16; anything else is a report error (`IntakeError`), never an exception.
+- `Sales_Opt_Out_Email__c` is fetched and counted (`N contacts with Sales_Opt_Out_Email__c (meaning unverified, NOT used to block)` in the log); it never blocks until Alex decides.

@@ -247,3 +247,106 @@ def test_probe_fixture_shapes_merge(tmp_path):
 def test_probe_nooks_page_has_links_next_and_no_has_more():
     pg = json.loads((Path(__file__).resolve().parent / "fixtures" / "probe_nooks_calls_page.json").read_text())
     assert "hasMore" not in pg and mp.derive_last_page([pg]) == (pg["links"]["next"] is None)
+
+
+# ---------------------------------------------------------------- --derive-last-page rules per source (review F2)
+def sf_page(n, done=True):
+    return {"totalSize": n, "done": done, "records": [{"Id": f"001FAKE{i:08d}"} for i in range(n)]}
+
+
+def zi_page(num, total, rows, total_results=None):
+    meta = {"page": {"number": num, "total": total}}
+    if total_results is not None:
+        meta["totalResults"] = total_results
+    return {"data": [{"id": f"S{num}-{i}"} for i in range(rows)], "meta": meta}
+
+
+def test_salesforce_short_final_page_with_done_is_the_end():
+    assert mp.derive_last_page([sf_page(2000), sf_page(37)], "salesforce") is True
+
+
+def test_salesforce_full_final_page_is_not_the_end():
+    assert mp.derive_last_page([sf_page(2000), sf_page(2000)], "salesforce") is False
+    assert mp.derive_last_page([sf_page(10)], "salesforce", sf_limit=10) is False
+
+
+def test_salesforce_done_false_or_missing():
+    assert mp.derive_last_page([sf_page(5, done=False)], "salesforce") is False
+    with pytest.raises(mp.MergeError, match="'done'"):
+        mp.derive_last_page([{"records": []}], "salesforce")
+
+
+def test_zoominfo_complete_single_sequence():
+    assert mp.derive_last_page([zi_page(1, 2, 3, 5), zi_page(2, 2, 2, 5)], "zoominfo") is True
+
+
+def test_zoominfo_missing_a_page_or_short_rows_is_not_complete():
+    assert mp.derive_last_page([zi_page(1, 3, 3), zi_page(3, 3, 3)], "zoominfo") is False      # page 2 missing
+    assert mp.derive_last_page([zi_page(1, 2, 3, 9), zi_page(2, 2, 2, 9)], "zoominfo") is False   # 5 rows of 9
+    assert mp.derive_last_page([zi_page(1, 2, 3)], "zoominfo") is False                       # final page not the end
+
+
+def test_zoominfo_several_type_sequences_must_each_be_complete():
+    good = [zi_page(1, 2, 3, 5), zi_page(2, 2, 2, 5), zi_page(1, 1, 4, 4)]
+    assert mp.derive_last_page(good, "zoominfo") is True
+    truncated_first = [zi_page(1, 2, 3, 5), zi_page(1, 1, 4, 4)]            # type 1 stopped after page 1
+    assert mp.derive_last_page(truncated_first, "zoominfo") is False
+
+
+def test_zoominfo_page_without_meta_is_an_error():
+    with pytest.raises(mp.MergeError, match="meta.page"):
+        mp.derive_last_page([{"data": []}], "zoominfo")
+
+
+def test_unknown_paging_kind():
+    with pytest.raises(mp.MergeError, match="unknown paging kind"):
+        mp.derive_last_page([sf_page(1)], "ldap")
+
+
+def _write(tmp_path, name, obj):
+    p = tmp_path / name
+    p.write_text(json.dumps(obj))
+    return {"path": str(p)}
+
+
+def test_cli_derive_last_page_salesforce_and_zoominfo(tmp_path):
+    assert run_cli(tmp_path, [_write(tmp_path, "a.json", sf_page(2000)), _write(tmp_path, "b.json", sf_page(3))],
+                   "--derive-last-page", "--paging", "salesforce", name="sf_accounts", ) == 0
+    assert json.loads((tmp_path / "raw" / "sf_accounts.json").read_text())["meta"]["reached_last_page"] is True
+    assert run_cli(tmp_path, [_write(tmp_path, "c.json", zi_page(1, 2, 2)), _write(tmp_path, "d.json", zi_page(2, 2, 1))],
+                   "--derive-last-page", "--paging", "zoominfo", name="zoominfo_scoops") == 0
+    assert json.loads((tmp_path / "raw" / "zoominfo_scoops.json").read_text())["meta"]["reached_last_page"] is True
+
+
+def test_cli_derive_cannot_be_combined_with_a_manual_flag(tmp_path, capsys):
+    rc = run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_last.json")}], "--derive-last-page", "--last-page-reached", "true")
+    assert rc == 2 and "cannot be combined" in capsys.readouterr().err
+
+
+def test_cli_derive_never_defaults_to_true(tmp_path, capsys):
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--derive-last-page") == 2
+    assert not (tmp_path / "raw").exists()
+
+
+# ---------------------------------------------------------------- encodings (review F7)
+def test_utf8_bom_and_utf16_pages_are_read(tmp_path):
+    (tmp_path / "bom.json").write_bytes(b"\xef\xbb\xbf" + (PAGES / "bare_list.json").read_bytes())
+    (tmp_path / "u16.json").write_bytes((PAGES / "bare_list.json").read_text().encode("utf-16"))
+    pages = mp.load_pages([{"path": str(tmp_path / "bom.json")}, {"path": str(tmp_path / "u16.json")}])
+    assert len(pages) == 2 and pages[0] == pages[1]
+
+
+@pytest.mark.parametrize("payload", [b"\xff\xfe\x00garbage\x80", b"\x80\x81\x82", b"\xff\xfe\xd8\x00"])
+def test_binary_page_is_a_merge_error_not_a_traceback(tmp_path, payload):
+    (tmp_path / "bad.json").write_bytes(payload)
+    with pytest.raises(mp.MergeError):
+        mp.load_pages([{"path": str(tmp_path / "bad.json")}])
+
+
+def test_cli_binary_page_and_manifest_exit_2(tmp_path, capsys):
+    (tmp_path / "bad.json").write_bytes(b"\x80\x81")
+    assert run_cli(tmp_path, [{"path": str(tmp_path / "bad.json")}]) == 2
+    (tmp_path / "m2.json").write_bytes(b"\x80\x81")
+    with pytest.raises(mp.MergeError):
+        mp.read_manifest(tmp_path / "m2.json")
+    assert "Traceback" not in capsys.readouterr().err
