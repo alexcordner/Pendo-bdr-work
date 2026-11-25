@@ -1239,7 +1239,7 @@ def test_rank2_scenario_junk_does_not_displace_callable(config):
 
 @pytest.mark.parametrize("title", [
     "Executive Assistant to the CEO", "Personal Assistant to the Chief Product Officer", "PA to CTO",
-    "EA to the Chief Technology Officer", "Assistant Product Manager", "Secretary to the CTO",
+    "EA to the Chief Technology Officer", "Secretary to the CTO",
     "Product Coordinator, Head of Product Office", "IT Administrator, CTO Office", "Product Intern, Head of Product",
     "Graduate Product Manager", "Trainee Product Manager", "Chief of Staff to the CTO",
     "Chief of Staff to the Chief Technology Officer", "Former Head of Product", "Ex-CTO", "Past VP Product",
@@ -1381,3 +1381,52 @@ def test_hygiene_is_deterministic_under_shuffle(config):
         p2 = ps[:]
         rnd.shuffle(p2)
         assert pick_prospects(p2, config) == base
+
+
+# ------------------------------------------------------------ 'Assistant' / 'Secretary' refinements
+@pytest.mark.parametrize("title", [
+    "Executive Assistant", "Personal Assistant", "Administrative Assistant", "Marketing Assistant", "Assistant",
+    "Executive Assistant to the CEO", "Assistant to the Head of Product", "Assistant to CTO", "PA to the CTO",
+    "EA to CIO", "Product Assistant", "Digital Assistant.", "Sales Assistant ", "Company Secretary",
+    "Corporate Secretary", "Executive Secretary", "Legal Secretary", "Secretary to the Chief Digital Officer",
+    "Assistant Company Secretary", "Virtual Assistant, Head of Product Office"])
+def test_pa_ea_family_rejected(config, title):
+    assert _is_non_buyer(title), title
+    assert pick_prospect([pros(title=title)], config) is None
+
+
+@pytest.mark.parametrize("title", [
+    "Assistant Director of Product", "Assistant Director, Digital", "Assistant General Manager",
+    "Assistant Manager, Product", "Assistant Secretary", "Assistant Commissioner", "Assistant Vice President",
+    "Assistant Vice President, Product", "Assistant Director, Customer Experience",
+    "Assistant Secretary, Digital Services", "Assistant Product Manager", "Secretary",
+    "Assistant Chief Digital Officer"])
+def test_assistant_buyer_level_titles_not_rejected(config, title):
+    assert not _is_non_buyer(title), title
+
+
+@pytest.mark.parametrize("title,expected", [
+    ("Assistant Director of Product", (0, 3, 0)),               # Director of Product
+    ("Assistant Director, Digital", (0, 4, 0)),                 # alias 'director digital' = Head of Digital
+    ("Assistant Vice President, Product", (0, 1, 0)),           # VP Product via 'vice president product'
+    ("Assistant Product Manager", (1, 0, 0)),                   # Product Manager
+    ("Assistant Chief Digital Officer", (0, 5, 0)),             # Chief Digital Officer
+    ("Assistant Secretary", None), ("Assistant General Manager", None), ("Assistant Manager, Product", None),
+    ("Assistant Commissioner", None), ("Assistant Vice President", None),
+])
+def test_assistant_buyer_titles_match_normally(config, title, expected):
+    assert _persona_rank(title, config) == expected, title
+
+
+def test_assistant_director_is_callable(config):
+    r = run([acct()], {}, [pros(title="Assistant Director of Product")], cfg=config)
+    assert len(r.ranked) == 1 and r.prospects["FAKE-A1"][0].title == "Assistant Director of Product"
+
+
+def test_executive_assistant_with_cto_in_title_still_rejected(config):
+    for t in ("Executive Assistant to Chief Technology Officer", "Executive Assistant, CTO Office", "CTO Assistant"):
+        assert pick_prospect([pros(title=t)], config) is None, t
+
+
+def test_assistant_secretary_with_buyer_words_is_callable(config):
+    assert pick_prospect([pros(title="Assistant Secretary, Head of Digital")], config) is not None

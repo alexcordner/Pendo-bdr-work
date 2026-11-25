@@ -187,9 +187,17 @@ def _variants(persona: str) -> list[list[str]]:
 
 # --- title hygiene (applied BEFORE persona matching) ------------------------------------------
 # Titles that are never a buyer: assistants / admin support / trainees / 'to the <C-level>' / stale titles.
+# 'Assistant' alone is NOT rejected: Assistant Director / Assistant Manager / Assistant General Manager /
+# Assistant Secretary / Assistant Commissioner / Assistant Vice President are real buyer-level titles
+# (Australian public service, banking). Only the PA/EA family is: a title ENDING in Assistant ('Marketing
+# Assistant'), the whole title 'Assistant', 'Assistant to ...', PA to / EA to, and the named support roles
+# below. 'Secretary' is rejected only as Company / Corporate / Executive / Legal Secretary or 'Secretary to ...'.
 _NON_BUYER = re.compile(
-    r"(?<!\w)(?:assistant|personal\s+assistant|executive\s+assistant|secretary|coordinator|administrator|"
-    r"intern|graduate|trainee|pa\s+to|ea\s+to)(?!\w)", re.IGNORECASE)
+    r"(?<!\w)(?:assistant\s+to|personal\s+assistant|executive\s+assistant|administrative\s+assistant|"
+    r"admin\s+assistant|virtual\s+assistant|pa\s+to|ea\s+to|"
+    r"(?:company|corporate|executive|legal)\s+secretary|secretary\s+to|"
+    r"coordinator|administrator|intern|graduate|trainee)(?!\w)|"
+    r"(?<!\w)assistant\W*$", re.IGNORECASE)
 _C_LEVEL = r"(?:chief|c[a-z]o|ceo|cfo|cto|cio|cpo|coo|cro|cmo|cdo|president|managing\s+director)"
 _TO_C_LEVEL = re.compile(r"(?<!\w)to\s+(?:the\s+)?" + _C_LEVEL + r"(?!\w)", re.IGNORECASE)
 _REPORTING = re.compile(r"(?<!\w)(?:reporting|reports|report)\s+to\b.*$", re.IGNORECASE)
