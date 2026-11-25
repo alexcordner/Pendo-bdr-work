@@ -223,3 +223,56 @@ prepare_task(line, good, State(was_reset=True, reset_reason="corrupt"), FIELDS, 
 Not verified: whether Nooks ids are case-sensitive or what its note limit is (R1, M2); real `crmId` presence on resolved prospects.
 
 Fix R1, R2 and R3 (each a few lines plus a test) and this is a PASS. R4-R6 are strongly recommended in the same pass because they are one-liners.
+
+---
+
+# Final re-review (worker commit `0eeb78e`, merged as `b818c6c`)
+
+Offline, read-only, invented data. `pytest tests/ -q`: 1621 passed; `-W error`: 1621 passed.
+
+## FINAL VERDICT: PASS
+
+Every blocking and recommended item (R1-R13) is fixed and re-tested with the same repros. What remains is Low or Info and can be fixed or documented during Phase 3.
+
+### R1-R13 status (same repros as before)
+
+| Item | Result | Evidence |
+|---|---|---|
+| R1 case-variant DNC id | FIXED | Resolved `ABC-123-DEF` / `Abc-123-Def` against state `abc-123-def`: blocked. State holding the upper-case id against a lower-case resolved id: blocked. State entry with padding: blocked. NBSP / newline padding on the resolved id: trimmed, then blocked. Zero-width, full-width and non-ASCII digits in the resolved id: refused by the id pattern. |
+| R2 unhealthy / wrong-type state | FIXED | Fresh `State(is_new=True)` and reset state refused live (`Do Not Call memory is not rebuilt`); allowed only with `dry_run=True`. `None`, `dict`, `str` give a `SheetError`, not `AttributeError`. |
+| R3 phone in exception | FIXED | `BlockedError` text is fixed plus a code, e.g. `... blocked: Do Not Call / opt-out [dnc_phone]`; no number. |
+| R4 owner / dry-run | FIXED | `dry_run` must be exactly `True`/`False` (`'no'`, `1`, `0`, `None`, `'True'` refused). Live owner ids refused: the placeholder in any case, `REPLACE_ME`, `test`, `x`, anything under 20 characters or containing placeholder words. The real-shaped id passes. Dry run returns a `DryRunPayload` with `[DRY RUN] ` at the start of the note. |
+| R5 mutable / forged line | FIXED for accidents (see N1, N2 for deliberate use) | `copy.copy`, `deepcopy`, `pickle`, `dataclasses.replace`, `asdict`, `vars()` all fail; hand-built `SheetLine(...)` and an unsealed subclass are refused; no `__dict__`. `rank` (negative, bool, huge-int ok), `run_date` (str, datetime, date subclass) and changed account / contact id after build are refused. |
+| R6 `now` | FIXED | Required live; `now == due` refused; `due - 1 µs` builds; `due + 1 µs` refused; the same instant in another zone is compared correctly; naive or non-datetime `now` raises. Checked on DST days (3 Oct 2026, 2 Apr 2027) and across Sydney midnight (13:30 and 23:30 UTC): all `dueAt` after `now`, all `now == due` refused. |
+| R7 account mismatch | FIXED | `resolved prospect belongs to a different account`. |
+| R8 scrub | MOSTLY FIXED | Now redacted: `1300`/`1800`/`13 xx xx`, `ph 9999-1234`, `jo at example dot com`, `jo[at]example.com`, `jo(at)example(dot)com`, full-width `＠`, `jo @ example.com`, zero-width-split emails. Still not caught: bare 8-digit `9999 1234`, spelled-out digits, letter-spaced `j o @ e x a m p l e . c o m`, `4 1 2 3 ...`. False positive remains: `$1000000000` becomes `$[redacted]`. Opener fields containing any of these forms are refused at prepare time. Accepted limit; document it. |
+| R9 history source | FIXED | email / phone in `ContactHistory.source` no longer appears in facts, JSON, packet text or `repr`. |
+| R10 `asdict` | FIXED | refused. |
+| R11 render options | FIXED | `bucket_limit` -1, `'x'`, `True` raise; stale and future signals are printed under `NOT USABLE AS FACTS (do not quote ...)`. |
+| R12 first names | UNCHANGED (Info) | `Jr Pat Smith` gives `Jr`; `O'Neil Pat` gives `O'Neil`; surname-first names without a comma (`Ng Wei`) cannot be detected. Acceptable. |
+| R13 monkeypatching / duplicates | Info | Unchanged: in-process patching is out of scope; the Phase 3 writer de-dupes on line 1 of the note. |
+
+All earlier findings (M1-M6, L1-L5, L7, L8) re-verified still fixed: junk opener values and `none verified` as OPENER/GATEKEEPER refused, contact data in opener fields refused (including `1300` and `04xx`), markdown escaped, 80/80 skipped names listed with `bucket_limit=None`, `repr(line)` and `repr(sheet)` clean, determinism unchanged.
+
+### Sealing mechanism (how it works and how it can be attacked)
+
+`_SEAL = object()` is a module-level token (`callsheet.py:273`); `SheetLine` is a slotted non-dataclass; `build_sheet` sets `line._sealed = _SEAL` (`:728`); `_check_line` compares `line._sealed is _SEAL` (`:958`) and re-checks rank, `run_date`, scheduling, and that the packet's account key and SF contact id still match the entry.
+- Accidental routes all fail closed: copy, deepcopy, pickle, `replace`, `asdict`, `vars`, plain construction, unsealed subclass.
+- Deliberate forging works: `l._sealed = cs._SEAL`, `object.__new__(SheetLine)` plus `_SEAL`, a subclass plus `_SEAL`, or copying `genuine_line._sealed` all BUILT a payload, and `__class__` assignment to a subclass plus `_SEAL` also built. Replacing `cs._check_line` also built. Python cannot stop in-process code, so this is acceptable: the seal stops accidents, not hostile code. Even a forged line cannot bypass the do-not-contact, state-health, owner, `now` or note checks, which all run on the data.
+- A `RankResult` doctored by hand (a spilled account placed in `ranked`) is turned into a sealed line by `build_sheet`; `RankResult` is the authority by design. Phase 3 should call `build_sheet` only on the object straight from `rank_accounts`.
+
+### New findings (all Low or Info)
+
+- **N1. LOW: the seal token is readable.** `ln._sealed` returns `_SEAL` itself, so any genuine line leaks the token. Optional: keep genuine lines in a `weakref.WeakSet` registry instead and drop the `_sealed` slot.
+- **N2. LOW: due time and priority are read live from shared mutable objects.** `callsheet.py:1010-1030`. Mutating `line.ranked.local_call_time` (+1 day) or `line.ranked.score` after the build changes `dueAt` and `priority` of the payload (verified: due +1 day, priority `low`). `RankedAccount` is a mutable Phase 1 model. Cheap guard: store `due` ISO text and priority on the line at seal time and use (or compare) those.
+- **N3. LOW: the case-insensitive DNC scan only lower-cases and trims.** `callsheet.py:1013-1018`. A state entry with a zero-width suffix (`'ABC-123-DEF​'`) or a casefold edge (`'İD-1'` vs `'id-1'`) is not matched (both BUILT). State ids come from Nooks and should be plain, so use `NFKC` + `casefold` + zero-width removal on both sides for robustness.
+- **N4. LOW: owner-id check is a substring list.** `callsheet.py:899-920`. It can refuse a genuine id that happens to contain `test`, `demo`, `none`, `your`, etc. (fail closed, about 1 in 10,000 random ids), and accepts `'a'*20`. Best: Phase 3 reads the real id from env or config and compares exactly.
+- **N5. INFO: `DryRunPayload` marker behaviour.**
+  - `json.dumps` writes a plain object; the marker survives only in the note.
+  - `dict(p)`, `{**p}`, `p.copy()` and a JSON round trip give a plain `dict`. `copy.copy` and `deepcopy` keep the type.
+  - The `[DRY RUN] ` note prefix survives in all of those, and the anchored tag regex `^\[apac-callsheet ... #n\]$` does not match a dry-run first line, so de-dupe will not count it.
+  - `dry_run=True` with a real owner id builds a marked payload. Recommendation: allow it (useful for rehearsal; dry runs still run the DNC and line checks and refuse a DNC id), and make the Phase 3 writer the single gate: refuse if `isinstance(p, DryRunPayload)` or `p["note"].startswith(DRY_RUN_PREFIX)`, with a test for each.
+  - The prefix counts toward the 2,000-character cap, so a dry run is 10 characters stricter than live.
+- **N6. INFO: performance.** Case-insensitive DNC scan: 40 lines against 50,000 DNC ids take 0.25 s (6 ms per line); one line against 500,000 ids takes 0.11 s. No concern.
+
+Still UNVERIFIED (no connector): the real Nooks note limit, `prospectId` / `ownerId` formats and case behaviour, and whether resolved prospects carry `crmId`.
