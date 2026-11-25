@@ -22,6 +22,7 @@ UTC = timezone.utc
 NOW = datetime(2026, 11, 25, 3, 0, tzinfo=UTC)          # Wed 14:00 AEDT
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 PHONE_RE = re.compile(r"\+\d{8,}|\b04\d{8}\b")
+NID = "NK-RESOLVED-0001"
 OPENER = {"opener": "Saw the new product lead. Who owns the app roadmap?", "fact_1": "Fact one (source: x)",
           "fact_2": "none verified", "gatekeeper": "Who looks after your app team?", "trigger": "Exec move"}
 
@@ -566,7 +567,7 @@ def test_markdown_explains_each_account(sheet):
 def test_json_roundtrip(sheet):
     d = json.loads(cs.sheet_to_json(sheet))
     assert len(d["lines"]) == 8 and d["run_date"] == "2026-11-25"
-    assert d["lines"][0]["prospect_id"].startswith("FAKE-NK-P")
+    assert d["lines"][0]["nooks_prospect_id"].startswith("FAKE-NK-P") and d["lines"][0]["sf_contact_id"].startswith("003FAKE")
     assert "email" not in cs.sheet_to_json(sheet).lower().replace("email address", "")
 
 
@@ -634,10 +635,10 @@ def test_build_does_not_mutate_inputs(config, parts):
 
 # ---------------------------------------------------------------- nooks payload
 def test_payload_exact_shape(sheet):
-    p = cs.nooks_task_payload(sheet.lines[0], OPENER)
+    p = cs.nooks_task_payload(sheet.lines[0], OPENER, NID)
     assert set(p) == {"action", "dueAt", "ownerId", "prospectId", "priority", "note"}
     assert p["action"] == "call" and p["ownerId"] == cs.OWNER_ID_PLACEHOLDER
-    assert p["prospectId"] == sheet.lines[0].prospect.nooks_id
+    assert p["prospectId"] == NID
 
 
 def test_owner_placeholder_matches_nooks_pattern():
@@ -645,12 +646,12 @@ def test_owner_placeholder_matches_nooks_pattern():
 
 
 def test_owner_id_override(sheet):
-    assert cs.nooks_task_payload(sheet.lines[0], OPENER, owner_id="abc123")["ownerId"] == "abc123"
+    assert cs.nooks_task_payload(sheet.lines[0], OPENER, NID, owner_id="abc123")["ownerId"] == "abc123"
 
 
 def test_payload_note_layout(sheet):
     ln = sheet.lines[0]
-    lines = cs.nooks_task_payload(ln, OPENER)["note"].split("\n")
+    lines = cs.nooks_task_payload(ln, OPENER, NID)["note"].split("\n")
     assert lines[0] == f"[apac-callsheet 2026-11-25 #{ln.rank}]"
     assert [x.split(":")[0] for x in lines[1:]] == ["OPENER", "FACT 1", "FACT 2", "GATEKEEPER", "TRIGGER"]
     assert lines[1] == "OPENER: " + OPENER["opener"]
@@ -666,22 +667,22 @@ def test_tag_line_format_and_parsable():
 def test_refuses_empty_opener_field(sheet, missing):
     bad = dict(OPENER); bad[missing] = "  "
     with pytest.raises(cs.SheetError, match=missing):
-        cs.nooks_task_payload(sheet.lines[0], bad)
+        cs.nooks_task_payload(sheet.lines[0], bad, NID)
 
 
 def test_refuses_absent_opener_field(sheet):
     bad = dict(OPENER); del bad["fact_2"]
     with pytest.raises(cs.SheetError):
-        cs.nooks_task_payload(sheet.lines[0], bad)
+        cs.nooks_task_payload(sheet.lines[0], bad, NID)
 
 
 def test_refuses_needs_prospect_entry(config, bucket_world):
     accts, signals, prospects, rr = bucket_world
     ra = rr.needs_prospect[0]
     with pytest.raises(cs.SheetError):
-        cs.nooks_task_payload(SheetEntry(ra), OPENER)           # type: ignore[arg-type]
+        cs.nooks_task_payload(SheetEntry(ra), OPENER, NID)           # type: ignore[arg-type]
     with pytest.raises(cs.SheetError):
-        cs.nooks_task_payload(ra, OPENER)                       # type: ignore[arg-type]
+        cs.nooks_task_payload(ra, OPENER, NID)                       # type: ignore[arg-type]
 
 
 def test_refuses_spilled_and_skipped_ranked_accounts(config, parts):
@@ -689,23 +690,16 @@ def test_refuses_spilled_and_skipped_ranked_accounts(config, parts):
     ln = cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines[0]
     ln.ranked.skipped_reason = "below daily cap (rank 41, cap 40)"
     with pytest.raises(cs.SheetError):
-        cs.nooks_task_payload(ln, OPENER)
+        cs.nooks_task_payload(ln, OPENER, NID)
     ln.ranked.skipped_reason = None
     ln.ranked.local_call_time = None
     with pytest.raises(cs.SheetError):
-        cs.nooks_task_payload(ln, OPENER)
-
-
-def test_refuses_without_prospect_id(sheet):
-    ln = sheet.lines[0]
-    ln.entry.prospect = replace(ln.entry.prospect, nooks_id=None)
-    with pytest.raises(cs.SheetError, match="prospect id"):
-        cs.nooks_task_payload(ln, OPENER)
+        cs.nooks_task_payload(ln, OPENER, NID)
 
 
 def test_due_time_in_account_zone_sydney_dst(sheet):
     ln = line_for(sheet, "Alpha Digital Pty Ltd")
-    due = cs.nooks_task_payload(ln, OPENER)["dueAt"]
+    due = cs.nooks_task_payload(ln, OPENER, NID)["dueAt"]
     assert due.endswith("+11:00")
     assert datetime.fromisoformat(due) == ln.local_call_time
 
@@ -714,7 +708,7 @@ def test_due_time_offsets_per_zone(sheet):
     expect = {"Bravo Software Pty Ltd": "+08:00", "Charlie Retail Ltd": "+13:00", "Delta Health Pty Ltd": "+10:00",
               "Golf Media Pty Ltd": "+11:00"}
     for name, off in expect.items():
-        assert cs.nooks_task_payload(line_for(sheet, name), OPENER)["dueAt"].endswith(off), name
+        assert cs.nooks_task_payload(line_for(sheet, name), OPENER, NID)["dueAt"].endswith(off), name
 
 
 def test_due_time_non_dst_period(config):
@@ -722,9 +716,9 @@ def test_due_time_non_dst_period(config):
     accts, signals, prospects = world()
     rr = rank_accounts(accts, signals, prospects, {}, set(), config, june)
     s = cs.build_sheet(rr, accts, signals, prospects, config, june)
-    due = cs.nooks_task_payload(line_for(s, "Alpha Digital Pty Ltd"), OPENER)["dueAt"]
+    due = cs.nooks_task_payload(line_for(s, "Alpha Digital Pty Ltd"), OPENER, NID)["dueAt"]
     assert due.endswith("+10:00")
-    assert cs.nooks_task_payload(line_for(s, "Charlie Retail Ltd"), OPENER)["dueAt"].endswith("+12:00")
+    assert cs.nooks_task_payload(line_for(s, "Charlie Retail Ltd"), OPENER, NID)["dueAt"].endswith("+12:00")
 
 
 def test_due_time_across_dst_change(config):
@@ -733,13 +727,13 @@ def test_due_time_across_dst_change(config):
     accts, signals, prospects = world()
     rr = rank_accounts(accts, signals, prospects, {}, set(), config, now)
     s = cs.build_sheet(rr, accts, signals, prospects, config, now)
-    due = cs.nooks_task_payload(line_for(s, "Alpha Digital Pty Ltd"), OPENER)["dueAt"]
+    due = cs.nooks_task_payload(line_for(s, "Alpha Digital Pty Ltd"), OPENER, NID)["dueAt"]
     assert datetime.fromisoformat(due).date() == date(2027, 4, 5) and due.endswith("+10:00")
 
 
 def test_due_is_aware_and_parses(sheet):
     for ln in sheet.lines:
-        d = datetime.fromisoformat(cs.nooks_task_payload(ln, OPENER)["dueAt"])
+        d = datetime.fromisoformat(cs.nooks_task_payload(ln, OPENER, NID)["dueAt"])
         assert d.utcoffset() is not None
 
 
@@ -751,27 +745,170 @@ def test_priority_bands(score, prio):
 
 def test_priority_values_are_nooks_enum(sheet):
     for ln in sheet.lines:
-        assert cs.nooks_task_payload(ln, OPENER)["priority"] in {"low", "normal", "high", "urgent"}
+        assert cs.nooks_task_payload(ln, OPENER, NID)["priority"] in {"low", "normal", "high", "urgent"}
 
 
 def test_payload_note_collapses_newlines_in_fields(sheet):
     bad = dict(OPENER); bad["opener"] = "line one\nTRIGGER: fake"
-    note = cs.nooks_task_payload(sheet.lines[0], bad)["note"]
+    note = cs.nooks_task_payload(sheet.lines[0], bad, NID)["note"]
     assert note.count("\n") == 5 and "OPENER: line one TRIGGER: fake" in note
 
 
 def test_payload_has_no_contact_data(sheet):
     for ln in sheet.lines:
-        p = json.dumps(cs.nooks_task_payload(ln, OPENER))
+        p = json.dumps(cs.nooks_task_payload(ln, OPENER, NID))
         assert "@" not in p and not PHONE_RE.search(p)
 
 
 def test_payload_builder_is_pure(sheet):
     ln = sheet.lines[0]
-    assert cs.nooks_task_payload(ln, OPENER) == cs.nooks_task_payload(ln, OPENER)
+    assert cs.nooks_task_payload(ln, OPENER, NID) == cs.nooks_task_payload(ln, OPENER, NID)
     assert ln.entry.opener == ""                       # the entry is not filled in by the builder
 
 
 def test_tag_rank_matches_line_rank(sheet):
     for ln in sheet.lines:
-        assert f"#{ln.rank}]" in cs.nooks_task_payload(ln, OPENER)["note"].split("\n")[0]
+        assert f"#{ln.rank}]" in cs.nooks_task_payload(ln, OPENER, NID)["note"].split("\n")[0]
+
+
+# ---------------------------------------------------------------- Phase 3 lazy resolution (nooks_id None in dry run)
+from src.state import State  # noqa: E402
+
+
+def dry_world(config):
+    """Dry-run world: prospects are SF contacts, nooks_id None."""
+    accts, signals, prospects = world()
+    prospects = [replace(p, nooks_id=None) for p in prospects]
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    return accts, signals, prospects, rr, cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+
+
+def test_sheet_works_with_nooks_id_none(config):
+    _, _, _, rr, s = dry_world(config)
+    assert len(rr.ranked) == 8 and len(s.lines) == 8
+    assert all(ln.prospect.nooks_id is None for ln in s.lines)
+
+
+def test_packet_identifies_contact_by_sf_id(config):
+    *_, s = dry_world(config)
+    p = line_for(s, "Alpha Digital Pty Ltd").packet
+    assert p.prospect_sf_contact_id == "003FAKE0001" and p.to_dict()["prospect_sf_contact_id"] == "003FAKE0001"
+    assert "SF contact 003FAKE0001" in cs.render_packet_text(p)
+
+
+def test_dry_run_renderings_have_no_contact_data_and_no_none_id(config):
+    *_, s = dry_world(config)
+    t = all_text(s)
+    assert not EMAIL_RE.findall(t) and not PHONE_RE.search(t)
+    d = json.loads(cs.sheet_to_json(s))
+    assert d["lines"][0]["nooks_prospect_id"] is None and d["lines"][0]["sf_contact_id"]
+    assert "Pat1, Head of Product" in cs.render_sheet_text(s)
+
+
+def test_resolution_list_in_call_order_deduped(config):
+    *_, s = dry_world(config)
+    ids = cs.sheet_needs_prospect_resolution(s)
+    assert ids == [ln.prospect.sf_contact_id for ln in s.lines] and len(set(ids)) == 8
+
+
+def test_resolution_list_empty_when_ids_present(sheet):
+    assert cs.sheet_needs_prospect_resolution(sheet) == []
+
+
+def test_resolution_list_dedupes_shared_contact(config):
+    *_, s = dry_world(config)
+    s.lines[1].entry.prospect = s.lines[0].entry.prospect
+    assert len(cs.sheet_needs_prospect_resolution(s)) == 7
+
+
+def test_line_with_no_ids_flagged_and_not_listed(config):
+    *_, s = dry_world(config)
+    s.lines[0].entry.prospect = replace(s.lines[0].entry.prospect, sf_contact_id=None)
+    assert s.lines[0].entry.prospect.sf_contact_id not in cs.sheet_needs_prospect_resolution(s)
+    assert len(cs.sheet_needs_prospect_resolution(s)) == 7
+
+
+def test_no_contact_id_flag_on_build(config):
+    accts, signals, prospects = world()
+    prospects = [replace(p, nooks_id=None, sf_contact_id=None) for p in prospects]
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW)
+    assert all("no contact id" in ln.flags for ln in s.lines)
+
+
+@pytest.mark.parametrize("bad", [None, "", "   "])
+def test_payload_refuses_missing_nooks_id(sheet, bad):
+    with pytest.raises(cs.SheetError, match="Nooks prospect id"):
+        cs.nooks_task_payload(sheet.lines[0], OPENER, bad)
+
+
+def test_payload_ignores_entry_nooks_id_uses_resolved(config):
+    *_, s = dry_world(config)
+    p = cs.nooks_task_payload(s.lines[0], OPENER, "  NK-9  ")
+    assert p["prospectId"] == "NK-9"
+
+
+def test_payload_requires_the_argument(sheet):
+    with pytest.raises(TypeError):
+        cs.nooks_task_payload(sheet.lines[0], OPENER)         # type: ignore[call-arg]
+
+
+def resolved(ln, **kw):
+    return replace(ln.prospect, nooks_id="NK-RES-1", **kw)
+
+
+def test_recheck_ok(sheet):
+    ln = sheet.lines[0]
+    assert cs.recheck_blocked(ln, resolved(ln), State()) == (True, "")
+
+
+def test_recheck_blocks_dnc_by_nooks_id(sheet):
+    ln = sheet.lines[0]
+    st = State(); st.dnc_prospect_ids.add("NK-RES-1")
+    ok, why = cs.recheck_blocked(ln, resolved(ln), st)
+    assert ok is False and "Do Not Call" in why
+
+
+def test_recheck_blocks_dnc_by_phone(sheet):
+    from src.state import _phone_key
+    ln = sheet.lines[0]
+    st = State(); st.dnc_phones.add(_phone_key(ln.prospect.phone_e164))
+    assert cs.recheck_blocked(ln, resolved(ln), st)[0] is False
+
+
+def test_recheck_blocks_opt_out_and_flag(sheet):
+    ln = sheet.lines[0]
+    assert cs.recheck_blocked(ln, resolved(ln, opted_out_email=True), State())[0] is False
+    assert cs.recheck_blocked(ln, resolved(ln, do_not_call=True), State())[0] is False
+
+
+def test_recheck_refuses_missing_nooks_id(sheet):
+    ln = sheet.lines[0]
+    ok, why = cs.recheck_blocked(ln, replace(ln.prospect, nooks_id=None), State())
+    assert ok is False and "no Nooks id" in why
+
+
+def test_recheck_refuses_wrong_contact(sheet):
+    ln = sheet.lines[0]
+    ok, why = cs.recheck_blocked(ln, resolved(ln, sf_contact_id="003OTHER"), State())
+    assert ok is False and "different contact" in why
+
+
+def test_recheck_allows_resolved_without_sf_id(sheet):
+    ln = sheet.lines[0]
+    assert cs.recheck_blocked(ln, resolved(ln, sf_contact_id=None), State())[0] is True
+
+
+# ---------------------------------------------------------------- ContactHistory sources
+def test_history_matched_by_phone_label(config, parts):
+    accts, signals, prospects, rr = parts
+    key = account_key(next(a for a in accts if a.name == "Delta Health Pty Ltd"))
+    h = {key: cs.ContactHistory(date(2026, 11, 20), "No Answer", 1, matched_by="phone")}
+    p = line_for(cs.build_sheet(rr, accts, signals, prospects, config, NOW, history=h), "Delta Health Pty Ltd").packet
+    assert p.contact_history_source == "Nooks call history (matched by phone)"
+    assert any(f.source == "Nooks call history (matched by phone)" for f in p.available_facts)
+
+
+def test_history_matched_by_prospect_id_label():
+    assert cs.ContactHistory(matched_by="nooks_prospect_id").source_label == "Nooks call history (matched by nooks_prospect_id)"
+    assert cs.ContactHistory().source_label == "Nooks call history"

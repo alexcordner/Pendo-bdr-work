@@ -22,6 +22,7 @@ from src import signals as sigmod
 from src.config import Config, tier_for
 from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, SheetEntry, Signal, SignalKind
+from src.state import State, is_blocked
 from src.ranker import RankResult, account_key, pick_prospect
 
 RUN_DATE_TZ = "Australia/Sydney"          # run_date in the task tag = 'now' in the BDR's home zone
@@ -63,7 +64,14 @@ class ContactHistory:
     last_call_date: date | None = None
     last_outcome: str | None = None          # e.g. 'No Answer', 'Left Voicemail'
     calls_total: int | None = None
+    # How the history was matched to this contact: 'phone' (dry run: contact has no Nooks id yet) or
+    # 'nooks_prospect_id' (after Phase 3 resolution). None = caller did not say.
+    matched_by: str | None = None
     source: str = "Nooks call history"
+
+    @property
+    def source_label(self) -> str:
+        return f"{self.source} (matched by {self.matched_by})" if self.matched_by else self.source
 
     def summary(self) -> str | None:
         if self.last_call_date is None and not self.last_outcome and not self.calls_total:
@@ -115,6 +123,7 @@ class ResearchPacket:
     tier: str | None
     prospect_first_name: str | None
     prospect_title: str | None
+    prospect_sf_contact_id: str | None       # identifies the contact (never email / phone); Nooks id may be None
     local_time: str | None                   # ISO with offset
     window: str | None
     timezone: str | None
@@ -137,7 +146,8 @@ class ResearchPacket:
             "account_key": self.account_key, "account_name": self.account_name, "website": self.website,
             "industry": self.industry, "state": self.state, "city": self.city, "employees": self.employees,
             "tier": self.tier, "prospect_first_name": self.prospect_first_name,
-            "prospect_title": self.prospect_title, "local_time": self.local_time, "window": self.window,
+            "prospect_title": self.prospect_title,
+            "prospect_sf_contact_id": self.prospect_sf_contact_id, "local_time": self.local_time, "window": self.window,
             "timezone": self.timezone, "signals": [s.to_dict() for s in self.signals],
             "has_real_trigger": self.has_real_trigger, "ambiguity_flags": list(self.ambiguity_flags),
             "sdr_target": self.sdr_target, "contact_history": self.contact_history,
@@ -359,6 +369,10 @@ def _flags(ranked: RankedAccount, sigs: list[Signal]) -> list[str]:
     return out
 
 
+def _contact_flags(pr: Prospect) -> list[str]:
+    return ["no contact id"] if not (pr.nooks_id or pr.sf_contact_id) else []
+
+
 # ---------------------------------------------------------------- research packet
 def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], config: Config,
                  history: ContactHistory | None = None) -> ResearchPacket:
@@ -381,7 +395,7 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
         facts.append(FactItem(f"Industry: {industry}", "Salesforce account record"))
     summary = history.summary() if history else None
     if summary:
-        facts.append(FactItem(f"Previous contact: {summary}", history.source))  # type: ignore[union-attr]
+        facts.append(FactItem(f"Previous contact: {summary}", history.source_label))  # type: ignore[union-attr]
     note = ""
     if len(facts) < 2:
         note = (f"Only {len(facts)} verified fact(s) available. Write the missing fact as 'none verified'. "
@@ -391,11 +405,12 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
         state=a.billing_state or a.hq_state, city=a.billing_city, employees=a.employees,
         tier=None if a.size_unknown else tier_for(config, a.employees),
         prospect_first_name=_first_name(prospect.name), prospect_title=prospect.title,
+        prospect_sf_contact_id=prospect.sf_contact_id,
         local_time=ranked.local_call_time.isoformat() if ranked.local_call_time else None, window=ranked.window,
         timezone=a.timezone, signals=psigs, has_real_trigger=bool(sigs),
         ambiguity_flags=[sigmod.AMBIGUOUS_NOTE for s in sigs if sigmod.is_ambiguous(s)],
         sdr_target=a.is_sdr_target,
-        contact_history=summary, contact_history_source=history.source if summary else None,
+        contact_history=summary, contact_history_source=history.source_label if summary else None,
         available_facts=facts, must_not_claim=list(MUST_NOT_CLAIM), facts_note=note)
 
 
@@ -408,7 +423,7 @@ def render_packet_text(p: ResearchPacket) -> str:
     if meta:
         L.append("PROFILE: " + "; ".join(meta))
     L.append(f"CALLING: {p.prospect_first_name or '(name unknown)'}, {p.prospect_title or 'title unknown'}"
-             f" | {p.local_time or 'unscheduled'} ({p.window or '-'}, {p.timezone or '-'})")
+             f" (SF contact {p.prospect_sf_contact_id or 'id unknown'}) | {p.local_time or 'unscheduled'} ({p.window or '-'}, {p.timezone or '-'})")
     if p.sdr_target:
         L.append("SDR TARGET: yes (internal flag, do not mention on the call)")
     if p.signals:
@@ -511,7 +526,7 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
             fn = _first_name(pr.name)
             why.insert(0, f"Prospect: {fn or 'name unknown'}, {pr.title or 'title unknown'}")
             ln = SheetLine(entry=SheetEntry(ranked=ra, prospect=pr), rank=pos, call_no=n, group=label,
-                           run_date=run_date, why_chosen=why, flags=_flags(ra, sigs),
+                           run_date=run_date, why_chosen=why, flags=_flags(ra, sigs) + _contact_flags(pr),
                            packet=build_packet(ra, pr, sigs, config, history.get(pk)))
             glines.append(ln)
             sheet.lines.append(ln)
@@ -609,7 +624,8 @@ def sheet_to_json(sheet: Sheet) -> str:
     def line(ln: SheetLine) -> dict:
         return {
             "call_no": ln.call_no, "rank": ln.rank, "group": ln.group, "account": ln.account.name,
-            "account_key": ln.packet.account_key, "prospect_id": ln.prospect.nooks_id,
+            "account_key": ln.packet.account_key, "sf_contact_id": ln.prospect.sf_contact_id,
+            "nooks_prospect_id": ln.prospect.nooks_id,
             "prospect_first_name": _first_name(ln.prospect.name), "prospect_title": ln.prospect.title,
             "window": ln.ranked.window, "local_call_time": ln.local_call_time.isoformat(),
             "score": ln.score, "score_breakdown": dict(ln.ranked.score_breakdown),
@@ -637,17 +653,20 @@ def task_tag(run_date: date, rank: int) -> str:
     return f"[{TAG_PREFIX} {run_date.isoformat()} #{rank}]"
 
 
-def nooks_task_payload(line: SheetLine, opener_fields: Mapping[str, str], *,
+def nooks_task_payload(line: SheetLine, opener_fields: Mapping[str, str], nooks_prospect_id: str | None, *,
                        owner_id: str = OWNER_ID_PLACEHOLDER) -> dict:
-    """Build the task-create ``data`` dict. Pure: no I/O. Refuses on any empty opener field or when the
-    line is not a genuine callable sheet line (needs_prospect / spilled / skipped are never SheetLines)."""
+    """Build the task-create ``data`` dict. Pure: no I/O. Refuses on any empty opener field, when the
+    line is not a genuine callable sheet line (needs_prospect / spilled / skipped are never SheetLines),
+    or when ``nooks_prospect_id`` is None/blank (the id is resolved lazily in Phase 3, one lookup per
+    contact; the sheet's own prospect may have nooks_id None). Before calling this, the caller MUST have
+    run ``recheck_blocked(line, resolved_prospect, state)`` on the resolved Nooks prospect."""
     if not isinstance(line, SheetLine):
         raise SheetError("payloads are built from sheet lines only")
     ra = line.ranked
     if ra.skipped_reason or ra.local_call_time is None or ra.window is None:
         raise SheetError(f"{line.account.name}: not a scheduled callable account")
-    if line.entry.prospect is None or not line.entry.prospect.nooks_id:
-        raise SheetError(f"{line.account.name}: no Nooks prospect id")
+    if not isinstance(nooks_prospect_id, str) or not nooks_prospect_id.strip():
+        raise SheetError(f"{line.account.name}: no resolved Nooks prospect id (never guess or use None)")
     missing = [f for f in OPENER_FIELDS if not str(opener_fields.get(f, "")).strip()]
     if missing:
         raise SheetError(f"{line.account.name}: empty opener field(s): {', '.join(missing)}")
@@ -659,4 +678,36 @@ def nooks_task_payload(line: SheetLine, opener_fields: Mapping[str, str], *,
         f"OPENER: {f['opener']}", f"FACT 1: {f['fact_1']}", f"FACT 2: {f['fact_2']}",
         f"GATEKEEPER: {f['gatekeeper']}", f"TRIGGER: {f['trigger']}"])
     return {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": owner_id,
-            "prospectId": line.entry.prospect.nooks_id, "priority": priority_for(ra.score), "note": note}
+            "prospectId": nooks_prospect_id.strip(), "priority": priority_for(ra.score), "note": note}
+
+
+# ---------------------------------------------------------------- Phase 3 resolution helpers
+def sheet_needs_prospect_resolution(sheet: Sheet) -> list[str]:
+    """SF contact ids whose Nooks prospect id Phase 3 must look up (one filter_crmId lookup each), in call
+    order, de-duplicated. Lines whose prospect already has a nooks_id need no lookup. A line with neither
+    id cannot be resolved: it is NOT listed here and ``nooks_task_payload`` refuses it (flag 'no contact id')."""
+    out, seen = [], set()
+    for ln in sheet.lines:
+        p = ln.entry.prospect
+        if p is None or p.nooks_id:
+            continue
+        cid = p.sf_contact_id
+        if cid and cid not in seen:
+            seen.add(cid)
+            out.append(cid)
+    return out
+
+
+def recheck_blocked(line: SheetLine, resolved_prospect: Prospect, state: State) -> tuple[bool, str]:
+    """(ok, reason) for a Nooks prospect resolved in Phase 3. ok=False means do NOT build a payload.
+
+    Wraps ``state.is_blocked`` (do-not-call by Nooks prospect id, phone or email, plus email opt-out) run on the
+    RESOLVED prospect, since the dry-run contact had no Nooks id. Also refuses a resolved prospect with no
+    Nooks id or whose SF contact id differs from the sheet's contact (wrong person)."""
+    if not (resolved_prospect.nooks_id or "").strip():
+        return False, "resolved prospect has no Nooks id"
+    want = line.entry.prospect.sf_contact_id if line.entry.prospect else None
+    if want and resolved_prospect.sf_contact_id and want != resolved_prospect.sf_contact_id:
+        return False, f"resolved prospect is a different contact ({resolved_prospect.sf_contact_id} != {want})"
+    blocked, reason = is_blocked(resolved_prospect, state)
+    return (False, reason or "blocked") if blocked else (True, "")

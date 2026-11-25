@@ -13,7 +13,7 @@ Offline, deterministic, no LLM, no I/O. Fixture: `tests/fixtures/callsheet_accou
   - `run_date` = `now` in Australia/Sydney (used in the task tag).
 - `ContactHistory(last_call_date, last_outcome, calls_total, source)`: the caller fills it (`history={account_key: ContactHistory}`).
 - Renderers: `render_sheet_text`, `render_sheet_markdown`, `sheet_to_json`, `render_packet_text`. None of them or the packet ever contain an email or phone; contact first name only (surname never printed).
-- `nooks_task_payload(line, opener_fields, *, owner_id=OWNER_ID_PLACEHOLDER) -> dict` builds the createTask `data` only: `{action:'call', dueAt, ownerId, prospectId, priority, note}`. `dueAt` is the account-zone ISO time with offset (DST-correct). Refuses (`SheetError`) on any empty/missing opener field (`opener, fact_1, fact_2, gatekeeper, trigger`), on non-SheetLine input (needs_prospect / spilled / skipped accounts are never SheetLines), a skipped/unscheduled ranked account, or a missing Nooks prospect id.
+- `nooks_task_payload(line, opener_fields, nooks_prospect_id, *, owner_id=OWNER_ID_PLACEHOLDER) -> dict` builds the task-create `data` only: `{action:'call', dueAt, ownerId, prospectId, priority, note}`. `dueAt` is the account-zone ISO time with offset (DST-correct). Refuses (`SheetError`) on any empty/missing opener field (`opener, fact_1, fact_2, gatekeeper, trigger`), on non-SheetLine input (needs_prospect / spilled / skipped accounts are never SheetLines), a skipped/unscheduled ranked account, or a missing/blank `nooks_prospect_id` argument (the sheet's own prospect may have `nooks_id` None; the id is never taken from the entry or guessed).
 - Note layout: `[apac-callsheet <run_date> #<rank>]` then `OPENER:`, `FACT 1:`, `FACT 2:`, `GATEKEEPER:`, `TRIGGER:` lines (newlines inside a field are collapsed). The tag identifies tasks this tool created.
 - Priority bands (Nooks enum low/normal/high/urgent): score >= 75 urgent, >= 55 high, >= 35 normal, else low (`PRIORITY_BANDS`).
 
@@ -28,3 +28,9 @@ No signal gives "No trigger: ranked on fit only" and a packet with `has_real_tri
 - Nooks `createTask` priority enum is from the tool schema (low, normal, high, urgent); band thresholds are a judgement call for Alex to tune.
 - Task `prospectId` is expected to be a UUID in Nooks; fixtures use FAKE ids, so it is not validated here.
 - `Account` has no industry field today; the packet leaves it None.
+
+## Lazy Nooks prospect resolution (coordinator update)
+Nooks prospects cannot be bulk-fetched, so in the Phase 2 dry run sheet contacts are SALESFORCE CONTACTS and `Prospect.nooks_id` is None. The sheet, packets and renderers work with `nooks_id` None and identify the contact by SF contact id + first name + title (JSON: `sf_contact_id`, `nooks_prospect_id`; packet: `prospect_sf_contact_id`). Phase 3 flow:
+1. `sheet_needs_prospect_resolution(sheet)` -> SF contact ids (call order, de-duplicated) needing one `filter_crmId` lookup each. A line with neither id is flagged `no contact id`, not listed, and cannot produce a payload.
+2. For each resolved Nooks prospect the caller MUST run `recheck_blocked(line, resolved_prospect, state)` -> `(ok, reason)` (wraps `state.is_blocked` on the RESOLVED prospect, channel 'any'; also refuses a missing Nooks id or a different SF contact id). Only when ok build `nooks_task_payload(line, fields, resolved.nooks_id)`.
+3. `ContactHistory.matched_by` is `'phone'` (dry run) or `'nooks_prospect_id'` (after resolution); it appears in the fact source, e.g. `Nooks call history (matched by phone)`.
