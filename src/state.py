@@ -59,6 +59,11 @@ NO_CONTACT = "no_contact"
 DEFAULT_TZ = "Australia/Sydney"   # used when an account timezone is unknown or invalid
 
 
+class StateShrinkError(RuntimeError):
+    """save_state refused to replace a populated file with a State that has less Do Not Call data,
+    fewer accounts, or no rebuild marker (see save_state / allow_shrink)."""
+
+
 class StateResetError(RuntimeError):
     """The state file was unreadable and the caller has not confirmed a rebuild (see require_healthy)."""
 
@@ -79,6 +84,7 @@ class AccountState:
     last_email_date: str | None = None
     nooks_account_id: str | None = None      # alternate keys, when known (for lookups by those ids)
     zoominfo_id: str | None = None
+    tz: str | None = None                    # account timezone seen when the dates were computed
 
 
 @dataclass
@@ -109,6 +115,10 @@ class State:
     # Marker set ONLY by mark_dnc_rebuilt (after a full-history record_calls). Saved in the file.
     dnc_rebuilt_at: str | None = None                                     # iso run date
     dnc_rebuilt_calls: int = 0                                            # calls the rebuild saw
+    dnc_rebuilt_earliest: str | None = None                               # earliest call date seen then
+    dnc_rebuilt_empty: bool = False                                       # rebuilt from a confirmed EMPTY history
+    earliest_call_at: datetime | None = None                              # earliest call ever given to record_calls
+    last_run: dict = field(default_factory=dict)                          # counts from the previous saves (no PII)
     # ---- below: NOT saved
     report: dict[str, dict] = field(default_factory=dict)                 # counts from record_* calls
     was_reset: bool = False                  # True when a state file existed but could not be used
@@ -119,19 +129,44 @@ class State:
 
 def dnc_is_rebuilt(state: State) -> bool:
     """True once mark_dnc_rebuilt has stored its marker (persisted, so it survives save/load)."""
-    return bool(state.dnc_rebuilt_at) and state.dnc_rebuilt_calls > 0
+    return bool(state.dnc_rebuilt_at) and (state.dnc_rebuilt_calls > 0 or state.dnc_rebuilt_empty)
 
 
-def mark_dnc_rebuilt(state: State, run_date: date, calls_seen: int) -> State:
+def mark_dnc_rebuilt(state: State, run_date: date, calls_seen: int, *, reached_last_page: bool,
+                     empty_history_confirmed: bool = False) -> State:
     """Record that Do Not Call was rebuilt from the FULL Nooks call history. Call it only AFTER
-    ``record_calls`` has run over every page of listCalls. ``calls_seen`` is the total number of
-    calls given to record_calls for the rebuild (sum each ``state.report['record_calls']['calls_seen']``
-    over the pages). A rebuild from 0 calls is rejected (ValueError): an empty fetch is
-    indistinguishable from a failed one. Returns a new State; saves nothing."""
-    if not isinstance(calls_seen, int) or isinstance(calls_seen, bool) or calls_seen <= 0:
-        raise ValueError(f"cannot mark Do Not Call as rebuilt from {calls_seen!r} calls (need at least 1)")
-    st = copy.deepcopy(state)
+    ``record_calls`` has run over every page of listCalls.
+
+    * ``calls_seen``: total calls given to record_calls for the rebuild (sum each
+      ``state.report['record_calls']['calls_seen']`` over the pages). Must be >= the number of
+      distinct call ids already in ``state.seen_calls``.
+    * ``reached_last_page``: must be True; the Phase 2a adapter sets it from ``hasMore == false``.
+      A partial history (False) is rejected with ValueError.
+    * ``calls_seen == 0`` is accepted ONLY with ``empty_history_confirmed=True`` (and
+      reached_last_page True), e.g. a brand-new Nooks seat. Otherwise 0 is rejected.
+    * The earliest call date seen is stored in the marker (``dnc_rebuilt_earliest``).
+
+    Returns a new State; saves nothing."""
+    if reached_last_page is not True:
+        raise ValueError("cannot mark Do Not Call as rebuilt: listCalls paging did not reach the last page")
+    if not isinstance(calls_seen, int) or isinstance(calls_seen, bool) or calls_seen < 0:
+        raise ValueError(f"cannot mark Do Not Call as rebuilt from {calls_seen!r} calls")
+    if calls_seen == 0:
+        if empty_history_confirmed is not True:
+            raise ValueError("cannot mark Do Not Call as rebuilt from 0 calls unless empty_history_confirmed=True")
+        if state.seen_calls:
+            raise ValueError("calls_seen is 0 but state already holds recorded calls")
+    else:
+        if calls_seen < len(state.seen_calls):
+            raise ValueError(f"calls_seen ({calls_seen}) is smaller than the {len(state.seen_calls)} distinct "
+                             "calls already recorded: the history looks partial")
+        if state.earliest_call_at is None:
+            raise ValueError("record_calls has not been run on any calls; nothing to rebuild from")
+    st = _clone(state)
     st.dnc_rebuilt_at, st.dnc_rebuilt_calls = run_date.isoformat(), calls_seen
+    st.dnc_rebuilt_empty = calls_seen == 0
+    st.dnc_rebuilt_earliest = state.earliest_call_at.astimezone(timezone.utc).date().isoformat() \
+        if state.earliest_call_at else None
     return st
 
 
@@ -152,6 +187,25 @@ def require_healthy(state: State, live: bool = True) -> None:
 
 
 # ---------------------------------------------------------------- small helpers
+def _clone(state: State) -> State:
+    """Fast copy of a State (much cheaper than copy.deepcopy): entries hold only immutable fields,
+    so a shallow ``replace`` per entry is a full copy. Report/last_run are copied too."""
+    return State(
+        version=state.version,
+        accounts={k: replace(a) for k, a in state.accounts.items()},
+        prospects={k: replace(p) for k, p in state.prospects.items()},
+        seen_calls=dict(state.seen_calls),
+        dnc_prospect_ids=set(state.dnc_prospect_ids), dnc_phones=set(state.dnc_phones),
+        dnc_emails=set(state.dnc_emails),
+        emails={k: {m: dict(v) for m, v in msgs.items()} for k, msgs in state.emails.items()},
+        sheets=[{"run_date": x["run_date"], "account_ids": list(x["account_ids"])} for x in state.sheets],
+        dnc_rebuilt_at=state.dnc_rebuilt_at, dnc_rebuilt_calls=state.dnc_rebuilt_calls,
+        dnc_rebuilt_earliest=state.dnc_rebuilt_earliest, dnc_rebuilt_empty=state.dnc_rebuilt_empty,
+        earliest_call_at=state.earliest_call_at, last_run=copy.deepcopy(state.last_run),
+        report=copy.deepcopy(state.report), was_reset=state.was_reset, reset_reason=state.reset_reason,
+        is_new=state.is_new, load_warnings=list(state.load_warnings))
+
+
 def _sf(v: str | None) -> str | None:
     """Canonical Salesforce id key (15-char); FAKE- ids and None pass through."""
     return normalise_sf_id(v)
@@ -183,15 +237,19 @@ def _norm(s: str | None) -> str:
     return " ".join(re.sub(r"[\W_]+", " ", s or "").casefold().split())
 
 
+def _valid_zone(name) -> ZoneInfo | None:
+    if not name or not isinstance(name, str):
+        return None
+    try:
+        return ZoneInfo(name)
+    except Exception:          # unknown key, bad path chars
+        log.warning("state: invalid timezone %r; using %s", name, DEFAULT_TZ)
+        return None
+
+
 def _tz(acct) -> ZoneInfo:
     """Account's zone, or Australia/Sydney if missing/invalid. Never raises."""
-    name = getattr(acct, "timezone", None)
-    if name:
-        try:
-            return ZoneInfo(name)
-        except Exception:      # unknown key, bad type, bad path chars
-            log.warning("state: invalid timezone %r; using %s", name, DEFAULT_TZ)
-    return ZoneInfo(DEFAULT_TZ)
+    return _valid_zone(getattr(acct, "timezone", None)) or ZoneInfo(DEFAULT_TZ)
 
 
 def _local_date(when: datetime, acct) -> str:
@@ -228,6 +286,23 @@ def _str_or_none(v) -> str | None:
     return v if isinstance(v, str) else None
 
 
+def _summarise_report(report: dict) -> dict:
+    """Counts only (ints, and dicts of ints): no ids, so nothing personal is written."""
+    out = {}
+    for name, rep in (report or {}).items():
+        if not isinstance(rep, dict):
+            continue
+        clean = {}
+        for k, v in rep.items():
+            if isinstance(v, bool) or not isinstance(v, (int, dict)):
+                continue
+            if isinstance(v, dict):
+                v = {kk: vv for kk, vv in v.items() if isinstance(vv, int) and not isinstance(vv, bool)}
+            clean[k] = v
+        out[name] = clean
+    return out
+
+
 def state_to_dict(state: State) -> dict:
     """JSON-ready dict (sorted so files diff cleanly). Report/reset flags are not saved."""
     return {
@@ -238,7 +313,7 @@ def state_to_dict(state: State) -> dict:
                 "last_disposition": a.last_disposition, "last_connect_at": _dt_out(a.last_connect_at),
                 "last_connect_date": a.last_connect_date, "last_email_at": _dt_out(a.last_email_at),
                 "last_email_date": a.last_email_date, "nooks_account_id": a.nooks_account_id,
-                "zoominfo_id": a.zoominfo_id}
+                "zoominfo_id": a.zoominfo_id, "tz": a.tz}
             for k, a in sorted(state.accounts.items())},
         "prospects": {
             k: {"call_count": p.call_count, "connect_count": p.connect_count,
@@ -254,6 +329,10 @@ def state_to_dict(state: State) -> dict:
         "sheets": state.sheets,
         "dnc_rebuilt_at": state.dnc_rebuilt_at,
         "dnc_rebuilt_calls": state.dnc_rebuilt_calls,
+        "dnc_rebuilt_earliest": state.dnc_rebuilt_earliest,
+        "dnc_rebuilt_empty": state.dnc_rebuilt_empty,
+        "earliest_call_at": _dt_out(state.earliest_call_at),
+        "last_run": {**state.last_run, **_summarise_report(state.report)},
     }
 
 
@@ -275,15 +354,18 @@ def _str_list(raw: dict, key: str) -> set[str]:
 
 
 def _local_or_utc(a: dict, field_name: str, instant: datetime | None, key, warn: list) -> str | None:
-    """Stored local date, or (when it is missing/malformed) the UTC date of the stored instant, so a
-    bad date never silently drops a cooldown. A malformed (not merely absent) value adds a warning."""
+    """Stored local date, or (when it is missing/malformed) the date of the stored instant in the
+    ACCOUNT's zone (the stored ``tz``, else Australia/Sydney, same as the main path), so a bad date
+    never silently drops a cooldown or comes out a day short. A malformed (not merely absent) value
+    adds a warning."""
     stored = a.get(field_name)
     if _date_str(stored):
         return stored
+    zone = _valid_zone(a.get("tz")) or ZoneInfo(DEFAULT_TZ)
     if stored is not None:
         warn.append(f"account {key!r}: malformed {field_name} {stored!r}"
-                    + ("; using the UTC date of the stored instant" if instant else ""))
-    return instant.astimezone(timezone.utc).date().isoformat() if instant else None
+                    + (f"; derived from the stored instant in {zone.key}" if instant else ""))
+    return instant.astimezone(zone).date().isoformat() if instant else None
 
 
 def _merge_accounts(x: AccountState, y: AccountState) -> AccountState:
@@ -291,13 +373,14 @@ def _merge_accounts(x: AccountState, y: AccountState) -> AccountState:
     later connect / email, and any alternate ids."""
     base, other = (x, y) if (x.last_call_at or datetime.min.replace(tzinfo=timezone.utc)) >= \
         (y.last_call_at or datetime.min.replace(tzinfo=timezone.utc)) else (y, x)
-    out = copy.deepcopy(base)
+    out = replace(base)
     for at, dt in (("last_connect_at", "last_connect_date"), ("last_email_at", "last_email_date")):
         if getattr(other, at) and (not getattr(out, at) or getattr(other, at) > getattr(out, at)):
             setattr(out, at, getattr(other, at))
             setattr(out, dt, getattr(other, dt))
     out.nooks_account_id = out.nooks_account_id or other.nooks_account_id
     out.zoominfo_id = out.zoominfo_id or other.zoominfo_id
+    out.tz = out.tz or other.tz
     return out
 
 
@@ -322,7 +405,19 @@ def state_from_dict(raw: dict) -> State:
         raise ValueError("'dnc_rebuilt_at' must be an ISO date")      # fail closed: marker not trusted
     if not isinstance(n, int) or isinstance(n, bool):
         raise ValueError("'dnc_rebuilt_calls' must be an integer")
-    st.dnc_rebuilt_at, st.dnc_rebuilt_calls = at, n
+    if n < 0:
+        raise ValueError("'dnc_rebuilt_calls' must not be negative")
+    empty = raw.get("dnc_rebuilt_empty", False)
+    if not isinstance(empty, bool):
+        raise ValueError("'dnc_rebuilt_empty' must be a boolean")
+    st.dnc_rebuilt_at, st.dnc_rebuilt_calls, st.dnc_rebuilt_empty = at, n, empty
+    st.dnc_rebuilt_earliest = _date_str(raw.get("dnc_rebuilt_earliest"))
+    st.earliest_call_at = _dt_in(raw.get("earliest_call_at"))
+    lr = raw.get("last_run")
+    if isinstance(lr, dict):
+        st.last_run = _summarise_report(lr)
+    elif lr is not None:
+        warn.append("malformed last_run")
 
     for k, a in accounts.items():
         if not isinstance(a, dict):
@@ -338,7 +433,8 @@ def state_from_dict(raw: dict) -> State:
             _str_or_none(a.get("last_outcome")), _str_or_none(a.get("last_disposition")),
             conn_at, _local_or_utc(a, "last_connect_date", conn_at, k, warn),
             mail_at, _local_or_utc(a, "last_email_date", mail_at, k, warn),
-            _str_or_none(a.get("nooks_account_id")), _str_or_none(a.get("zoominfo_id")))
+            _str_or_none(a.get("nooks_account_id")), _str_or_none(a.get("zoominfo_id")),
+            a.get("tz") if _valid_zone(a.get("tz")) else None)
         st.accounts[key] = _merge_accounts(st.accounts[key], acc) if key in st.accounts else acc
 
     for k, p in prospects.items():
@@ -423,24 +519,67 @@ def _set_aside(path: Path) -> None:
             return
 
 
-def save_state(state: State, state_dir) -> Path:
+PREV_SUFFIX = ".prev"
+
+
+def _shrinks(old: dict, new: dict) -> list[str]:
+    """Reasons the new serialised state holds LESS than the old one (Do Not Call data, marker, accounts)."""
+    why = []
+    for key, label in (("dnc_prospect_ids", "Do Not Call prospect ids"), ("dnc_phones", "Do Not Call phones"),
+                       ("dnc_emails", "Do Not Call emails"), ("accounts", "accounts")):
+        o, n = old.get(key), new.get(key)
+        if isinstance(o, (list, dict)) and len(o) > len(n or ()):
+            why.append(f"{label}: {len(o)} on disk, {len(n or ())} in the new state")
+    if old.get("dnc_rebuilt_at") and not new.get("dnc_rebuilt_at"):
+        why.append("the Do Not Call rebuild marker would be lost")
+    return why
+
+
+def save_state(state: State, state_dir, *, allow_shrink: bool = False) -> Path:
     """Atomic write: temp file in the same directory, fsync, then rename over the target.
-    On any failure the temp file is removed and the old file is untouched."""
+    On any failure the temp file is removed and the old file is untouched.
+
+    Refuses (StateShrinkError, nothing written) to replace a populated file with a State that has
+    fewer Do Not Call entries, fewer accounts, or no rebuild marker where the file had one, unless
+    ``allow_shrink=True``. Before overwriting an existing readable file it keeps ONE rotating backup,
+    ``state.json.prev`` (replaced each save). An unreadable file on disk is not compared."""
     d = Path(state_dir)
     d.mkdir(parents=True, exist_ok=True)
     path = _state_path(d)
+    new = state_to_dict(state)
+    if path.exists():
+        try:
+            old = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            old = None
+        if isinstance(old, dict) and not allow_shrink:
+            why = _shrinks(old, new)
+            if why:
+                raise StateShrinkError("refusing to overwrite state.json: " + "; ".join(why)
+                                       + " (pass allow_shrink=True to force)")
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".state-", suffix=".tmp")
+    prev_tmp = None
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(state_to_dict(state), f, indent=1, sort_keys=True)
+            json.dump(new, f, indent=1, sort_keys=True)
             f.flush()
             os.fsync(f.fileno())
+        if path.exists():                                   # rotate: keep one copy of the file we replace
+            fd2, prev_tmp = tempfile.mkstemp(dir=d, prefix=".state-prev-", suffix=".tmp")
+            with os.fdopen(fd2, "wb") as f2:
+                f2.write(path.read_bytes())
+                f2.flush()
+                os.fsync(f2.fileno())
+            os.replace(prev_tmp, path.with_name(path.name + PREV_SUFFIX))
+            prev_tmp = None
         os.replace(tmp, path)
     except BaseException:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        for t in (tmp, prev_tmp):
+            if t:
+                try:
+                    os.unlink(t)
+                except OSError:
+                    pass
         raise
     return path
 
@@ -520,11 +659,14 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
     prospect with no known account updates the prospect only. Input order never changes the result
     (latest start wins; equal starts are broken by call id).
 
+    Performance: the State is copied ONCE per call to this function (a fast field copy, not
+    deepcopy), so cost grows with state size per call. Pass all calls at once or pages of >= 1000.
+
     Do Not Call (any past call, matched by normalised name) is sticky and recorded three ways: the
     prospect id, the canonical phone dialled, and the hashed email of that prospect, so a duplicate
     Nooks prospect for the same person stays blocked.
     """
-    st = copy.deepcopy(state)
+    st = _clone(state)
     accounts_by_id = _norm_accounts(accounts_by_id)
     by_id = {p.nooks_id: p for p in prospects if p.nooks_id}
     by_phone: dict[str, list[Prospect]] = {}
@@ -534,6 +676,11 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
 
     rep = {"calls_seen": len(calls), "new": 0, "duplicate": 0, "unmatched": 0, "unmatched_call_ids": [],
            "unmatched_reasons": {}, "no_account": 0, "dnc_added": 0}
+
+    # Earliest call ever offered (matched or not): the rebuild marker records it.
+    for c in calls:
+        if st.earliest_call_at is None or c.started_at < st.earliest_call_at:
+            st.earliest_call_at = c.started_at
 
     # Do Not Call is sticky and does not need an account match: record it first, for every call.
     for c in calls:
@@ -582,10 +729,15 @@ def record_calls(state: State, calls: list[CallRecord], prospects: list[Prospect
         a.nooks_account_id = a.nooks_account_id or getattr(acct_obj, "nooks_account_id", None) \
             or (prospect.nooks_account_id if prospect else None)
         a.zoominfo_id = a.zoominfo_id or getattr(acct_obj, "zoominfo_id", None)
+        if _valid_zone(getattr(acct_obj, "timezone", None)):
+            a.tz = acct_obj.timezone
         _apply_latest(a, c, key, outcome, acct_obj)
 
     rep["unmatched_call_ids"].sort()
     st.report["record_calls"] = rep
+    if rep["no_account"]:
+        log.warning("state: %d call(s) matched a prospect but no Salesforce account; recorded on the "
+                    "prospect only (such accounts cannot be cooled down)", rep["no_account"])
     if rep["unmatched"]:
         log.warning("state: %d call(s) could not be matched to a prospect: %s",
                     rep["unmatched"], rep["unmatched_reasons"])
@@ -705,26 +857,40 @@ def is_in_cooldown(state: State, account_id: str | None, today: date, config: Co
 
 # ---------------------------------------------------------------- sheet history
 def record_sheet(state: State, run_date: date, account_ids: list[str | None]) -> State:
-    """Remember which accounts were on the sheet for ``run_date`` (None ids dropped, order kept, no
-    duplicates). A second record for the same date replaces the first (re-runs are idempotent).
-    Only the newest SHEETS_KEPT sheets are kept."""
-    st = copy.deepcopy(state)
+    """Remember which accounts were on the sheet for ``run_date``. Ids are canonicalised; order is
+    kept; duplicates are dropped. Ids that are None / blank are dropped, counted in
+    ``state.report['record_sheet']['dropped_no_id']`` and logged as a warning (an account with no id
+    cannot be hard-skipped next time). A second record for the same date REPLACES that date's sheet.
+    Only the newest SHEETS_KEPT sheets are kept.
+
+    A DRY RUN MUST NEVER CALL THIS: it would make the next real run on the same date (or the next
+    night) skip accounts that were never actually put on a sheet."""
+    st = _clone(state)
     ids = list(dict.fromkeys(k for a in account_ids if (k := _sf(a))))
+    dropped = sum(1 for a in account_ids if not _sf(a))
     iso = run_date.isoformat()
     st.sheets = [s for s in st.sheets if s["run_date"] != iso] + [{"run_date": iso, "account_ids": ids}]
     st.sheets.sort(key=lambda s: s["run_date"])
     st.sheets = st.sheets[-SHEETS_KEPT:]
+    st.report["record_sheet"] = {"recorded": len(ids), "dropped_no_id": dropped}
+    if dropped:
+        log.warning("state: %d account(s) with no usable id were left out of the sheet history", dropped)
     return st
 
 
-def last_sheet_ids(state: State) -> set[str]:
-    return {k for a in state.sheets[-1]["account_ids"] if (k := _sf(a))} if state.sheets else set()
+def last_sheet_ids(state: State, run_date: date) -> set[str]:
+    """Account ids on the most recent sheet recorded for a date BEFORE ``run_date`` ("last night").
+    A sheet recorded for ``run_date`` itself (or later) is ignored, so a second run on the same night
+    does not treat the first run's sheet as last night's. ``run_date`` is required."""
+    iso = run_date.isoformat()
+    older = [s for s in state.sheets if s["run_date"] < iso]
+    return {k for a in older[-1]["account_ids"] if (k := _sf(a))} if older else set()
 
 
-def was_in_last_sheet(state: State, account_id: str | None) -> bool:
-    """True if the account was on the most recent recorded sheet (so don't serve it twice in a row)."""
+def was_in_last_sheet(state: State, account_id: str | None, run_date: date) -> bool:
+    """True if the account was on the latest sheet before ``run_date`` (don't serve it twice in a row)."""
     key = _sf(account_id)
-    return bool(key) and key in last_sheet_ids(state)
+    return bool(key) and key in last_sheet_ids(state, run_date)
 
 
 # ---------------------------------------------------------------- email history
@@ -738,7 +904,7 @@ def record_sent_emails(state: State, sent: list[SentEmail], prospects: list[Pros
     first_seen + email_cooldown_days (see emailed_recently). Dedupes on message_id; a known date
     replaces an earlier unknown one. The sent date is stored in the account's local zone
     (Australia/Sydney if no account is known)."""
-    st = copy.deepcopy(state)
+    st = _clone(state)
     seen_on = (today or datetime.now(timezone.utc).date()).isoformat()
     accounts_by_id = _norm_accounts(accounts_by_id)
     acct_by_key: dict[str, str] = {}
@@ -747,7 +913,7 @@ def record_sent_emails(state: State, sent: list[SentEmail], prospects: list[Pros
         if k and _sf(p.sf_account_id):
             acct_by_key[k] = _sf(p.sf_account_id)
 
-    rep = {"new": 0, "duplicate": 0, "skipped_no_key": 0, "date_unknown": 0}
+    rep = {"new": 0, "duplicate": 0, "skipped_no_key": 0, "date_unknown": 0, "no_account": 0}
     for s in sent:
         nk = normalise_email_for_match(s.recipient_key) or normalise_email_for_match(s.recipient)
         h = _hash_email(nk)
@@ -769,11 +935,15 @@ def record_sent_emails(state: State, sent: list[SentEmail], prospects: list[Pros
             rep["new"] += 1
         if sent_on is None:
             rep["date_unknown"] += 1
-        elif sf_id:
+        elif not sf_id:
+            rep["no_account"] += 1                 # recorded per recipient only: no account touch date
+        else:
             a = st.accounts.setdefault(sf_id, AccountState())
             if a.last_email_at is None or s.sent_at > a.last_email_at:
                 a.last_email_at, a.last_email_date = s.sent_at, sent_on
     st.report["record_sent_emails"] = rep
+    if rep["no_account"]:
+        log.warning("state: %d dated sent message(s) matched no recipient with a Salesforce account", rep["no_account"])
     return st
 
 

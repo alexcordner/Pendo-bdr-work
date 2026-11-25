@@ -5,7 +5,7 @@ Status key: [ ] todo, [~] in progress, [x] done. Every task ends with a reviewer
 ## Phase 0: Setup [x]
 0a connectors checked | 0b folders, CLAUDE.md, config, ICP, skills drafts, README | 0c Alex review of config and ICP
 
-## Phase 1: Core engine, offline with fixtures
+## Phase 1: Core engine, offline with fixtures [x] (merged to main; 1,213 tests, all reviewed; see docs/phase1_report.md)
 - 1a Discovery spike (read-only, live): which Salesforce field = "I am BDR on this account"; Nooks call disposition names (voicemail / no-answer); shape of listCalls, listProspects, listTasks; can Gmail search see sent mail; ZoomInfo scoop shape. Output: `docs/connector_notes.md` + anonymised fixtures.
 - 1b Models, config loader, fixtures
 - 1c state.py + tests (who was called, when, outcome, cooldowns)
@@ -42,3 +42,10 @@ Status key: [ ] todo, [~] in progress, [x] done. Every task ends with a reviewer
 ## Working loop per task
 Coordinator writes brief -> Worker builds on a branch, runs tests -> Reviewer (fresh context, sees only the diff + brief) reviews -> findings go back to Worker if needed -> Coordinator reports to Alex -> Alex approves -> merge.
 Independent tasks (e.g. 1c, 1d, 1e) run in parallel. Anything that writes to Nooks or Gmail needs Alex's explicit go.
+
+
+## Backlog carried into Phase 2 (from reviews)
+- 2a: page Nooks listCalls to the LAST page (hasMore == false) before mark_dnc_rebuilt(reached_last_page=True); log any DNC call whose `to` is not E.164; SOQL for Assigned_SDR accounts without HQ_Country__c in WHERE (textarea): filter in Python.
+- 2c: pass cooldown_until + call_date to accounts; call mark_do_not_call right before ranking; write tasks ONLY for `ranked`; never record_sheet in a dry run; spilled / needs_prospect / skipped never become tasks.
+- 2b: pull people-move scoops over 90 days; eyeball real verdict reasons; 1e parked fixes (investor verbs, former/board, CIO funds, hiring negatives) were done in 1e-fixes; re-measure on real scoops.
+- Alex decisions: persona list (Product Owner, Engineering Manager, CIO, Director of Engineering), call pacing (3-min slot, calls per window), whether an email opt-out should also block calls.

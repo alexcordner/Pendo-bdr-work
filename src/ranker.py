@@ -4,19 +4,28 @@ Entry point: ``rank_accounts``. Everything else is a small helper that is tested
 Fuller notes (contracts, decisions, what is NOT covered): docs/ranker_notes.md.
 
 SCORING TABLE (points; weights come from ``config.signals.weights``; total clamped to 0-100)
-  trigger_strength          weight x combined strength (0-1). Combined = best real signal's strength
-                            + 0.10 per additional real signal, capped at 1.0. SignalKind.NONE = 0.
+  trigger_strength          weight x signals.combined_strength(signals) (0-1): the best signal counts in
+                            full, others are damped (one definition, in src/signals.py). Intent is never
+                            the best signal while a dated real signal exists (signals.best_signal).
+                            SignalKind.NONE = 0.
   icp_fit                   weight x tier factor: tier1 1.0, tier2 0.6, tier3 0.3, size unknown 0.3
                             (a deliberate neutral: 0.3 x 25 = 7.5 points, same as tier 3), known
                             headcount outside every tier 0.0.
   flagged_group_penalty     -3 flat when Account.non_anz_billing_anz_hq (decision 5: flagged group
                             ranks slightly lower, never silently dropped).
-  recency                   weight x (1 - age_days / signals.max_age_days), floored at 0. Age is that
-                            of the best signal. No dated real signal = 0.
+  recency                   weight x (1 - age_days / limit), floored at 0, where limit is
+                            signals.max_age_for(best signal's kind, config) (per-kind, 30-90 days;
+                            config max_age_days only as the fallback). Age is that of the best signal, from signals.age_days(published, call_date) where call
+                            date is the account-LOCAL date of its first usable day (the same function and
+                            'today' semantics as the signals log). No dated real signal = 0.
   named_prospect_with_phone full weight when pick_prospect() finds a callable persona match.
-  cooldown_penalty          the (negative) weight once if the account is in ``cooldown_until`` and the
-                            cooldown is still active on the call date (see contract below).
+  (no cooldown component)   an account whose cooldown is still active on ITS OWN zone call date is
+                            SKIPPED, not penalised (see CONTRACTS), so no score ever carries a cooldown
+                            penalty; signals.weights.cooldown_penalty is therefore unused here.
   sdr_target_boost          weight when Account.is_sdr_target. A boost, never a filter.
+  confidence_ceiling_adjustment  only present when it bites: accounts with Account.confidence 'low'
+                            (zoominfo-only / nooks-only / flagged records) score at most
+                            LOW_CONFIDENCE_CEILING (60). Applied before the 0-100 clamp.
   clamp_adjustment          only present when the raw sum falls outside 0-100; it is the difference,
                             so score_breakdown always sums to score.
 
@@ -38,9 +47,11 @@ CONTRACTS
                    Signal.source).
   cooldown_until   Mapping[id, date]. Value = the FIRST date the account may be called again,
                    inclusive, as a ``date`` in the account's LOCAL timezone. Keyed by sf, zoominfo or
-                   nooks id. Active (-30) while value > call date, where call date is the account-local
-                   date of its first open window (never the UTC date). A ``datetime`` is converted with
-                   .date(); any other type raises ValueError up front.
+                   nooks id. Active while value > call date, where call date is the account-local date
+                   of its first usable day IN ITS OWN TIMEZONE (never the UTC date, never another zone's
+                   date). An active cooldown SKIPS the account with 'In cooldown until <date>
+                   (account-local)' (needs_prospect accounts too): never ranked, never a task. A
+                   ``datetime`` is converted with .date(); any other type raises ValueError up front.
   last_sheet_ids   set of ids (sf / zoominfo / nooks). A HARD skip ('on last sheet'): never the same
                    account twice in a row.
 
@@ -63,13 +74,14 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.config import Config, next_working_windows, tier_for
+from src import signals as sigmod
 from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, Signal, SignalKind
 
 # --- documented constants ---------------------------------------------------------------------
 TIER_FACTORS = {"tier1": 1.0, "tier2": 0.6, "tier3": 0.3}
 SIZE_UNKNOWN_FACTOR = 0.3          # neutral value for unknown headcount
-EXTRA_SIGNAL_BONUS = 0.10          # added to combined strength per additional real signal
+LOW_CONFIDENCE_CEILING = 60.0      # Account.confidence == 'low' can never score above this
 FLAGGED_GROUP_PENALTY = -3.0       # non-ANZ billing / ANZ HQ accounts
 MIN_SLOT_MINUTES = 3               # minimum wall-clock gap between two calls in one timezone
 LEAD_MINUTES = 1                   # first slot = now rounded up to a whole minute + this lead
@@ -238,42 +250,44 @@ def _ts(sig: Signal) -> float:
 
 
 def _best_signal(sigs: list[Signal]) -> Signal | None:
-    """Strongest signal; ties go to the newest, then to source text (deterministic)."""
-    if not sigs:
-        return None
-    return sorted(sigs, key=lambda s: (-s.strength, -_ts(s),
-                                       s.source))[0]
+    """The single definition lives in src/signals.py (intent never beats a dated real signal)."""
+    return sigmod.best_signal(sigs)
 
 
-def _age_days(sig: Signal, now: datetime) -> int | None:
+def _ordered(sigs: list[Signal], best: Signal | None) -> list[Signal]:
+    """Signals for RankedAccount.signals: the best one FIRST (so signals[0] matches the reason), then the
+    rest by strength."""
+    rest = sorted((x for x in sigs if x is not best), key=lambda x: (-x.strength, x.source))
+    return ([best] if best is not None else []) + rest
+
+
+def _age_days(sig: Signal, call_date: date) -> int | None:
+    """Whole days from the signal's publish date to the account-local call date (signals.age_days)."""
     if sig.source_date is None:
         return None
-    when = sig.source_date
-    if when.tzinfo is None:                 # contract says aware UTC; treat naive as UTC, never crash
-        when = when.replace(tzinfo=timezone.utc)
-    return max(0, (now - when).days)
+    return sigmod.age_days(sig.source_date, call_date)
 
 
-def _in_cooldown(account: Account, cooldown_until: Mapping[str, date], call_date: date) -> bool:
-    """Active while the first-callable date is later than the account-local call date."""
-    return any(i in cooldown_until and cooldown_until[i] > call_date for i in _ids(account))
+def _active_cooldown(account: Account, cooldown_until: Mapping[str, date], call_date: date) -> date | None:
+    """The latest first-callable date still ahead of the account-local call date, else None."""
+    ahead = [cooldown_until[i] for i in _ids(account) if i in cooldown_until and cooldown_until[i] > call_date]
+    return max(ahead) if ahead else None
 
 
 def _on_last_sheet(account: Account, last_sheet_ids: set[str]) -> bool:
     return any(i in last_sheet_ids for i in _ids(account))
 
 
-def score_account(account: Account, sigs: list[Signal], has_prospect: bool, in_cooldown: bool,
-                  config: Config, now: datetime) -> tuple[float, dict[str, float]]:
-    """Return (score 0-100, breakdown). Breakdown values sum to score (see module docstring)."""
+def score_account(account: Account, sigs: list[Signal], has_prospect: bool,
+                  config: Config, call_date: date) -> tuple[float, dict[str, float]]:
+    """Return (score 0-100, breakdown). Breakdown values sum to score (see module docstring).
+
+    ``call_date`` is the account-local date of its first usable day (used for signal age)."""
     w = config.signals.weights
     best = _best_signal(sigs)
 
-    # trigger strength: best + a small bonus per extra signal, capped at 1.
-    if best is None:
-        trigger = 0.0
-    else:
-        trigger = min(1.0, best.strength + EXTRA_SIGNAL_BONUS * (len(sigs) - 1))
+    # trigger strength: ONE definition, signals.combined_strength (0 when there is no real signal).
+    trigger = sigmod.combined_strength(sigs) if best is not None else 0.0
 
     # icp fit
     if account.size_unknown:
@@ -284,36 +298,42 @@ def score_account(account: Account, sigs: list[Signal], has_prospect: bool, in_c
     # recency of the best signal
     recency = 0.0
     if best is not None:
-        age = _age_days(best, now)
+        age = _age_days(best, call_date)
         if age is not None:
-            recency = max(0.0, 1.0 - age / config.signals.max_age_days)
+            recency = max(0.0, 1.0 - age / sigmod.max_age_for(best.kind, config))
 
     parts = {
         "trigger_strength": w.trigger_strength * trigger,
         "icp_fit": w.icp_fit * factor,
         "recency": w.recency * recency,
         "named_prospect_with_phone": w.named_prospect_with_phone if has_prospect else 0.0,
-        "cooldown_penalty": w.cooldown_penalty if (in_cooldown) else 0.0,
         "sdr_target_boost": w.sdr_target_boost if account.is_sdr_target else 0.0,
         "flagged_group_penalty": FLAGGED_GROUP_PENALTY if account.non_anz_billing_anz_hq else 0.0,
     }
     breakdown = {k: round(v, 2) for k, v in parts.items()}
     raw = round(sum(breakdown.values()), 2)
+    # Low-confidence records (zoominfo-only, nooks-only, flagged) can never top the sheet.
+    if account.confidence == "low" and raw > LOW_CONFIDENCE_CEILING:
+        breakdown["confidence_ceiling_adjustment"] = round(LOW_CONFIDENCE_CEILING - raw, 2)
+        raw = LOW_CONFIDENCE_CEILING
     score = min(100.0, max(0.0, raw))
     if score != raw:                       # clamp: record it so the breakdown still sums to the score
         breakdown["clamp_adjustment"] = round(score - raw, 2)
     return score, breakdown
 
 
+_FLAG_HINTS = {"noise_location": "check this is a real company"}
+
+
 def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect: Prospect | None,
-             in_cooldown: bool, config: Config, now: datetime) -> list[str]:
+             config: Config, call_date: date) -> list[str]:
     out = []
     if best is None:
         out.append("No trigger: ranked on fit only")
     else:
         label = _KIND_LABELS.get(best.kind, best.kind.value)
         noun = "scoop" if best.source.startswith("zoominfo_scoop") else "signal"
-        age = _age_days(best, now)
+        age = _age_days(best, call_date)
         out.append(f"{label} {noun} {age} day{'s' if age != 1 else ''} ago" if age is not None
                    else f"{label} {noun} (date unknown)")
         if len(sigs) > 1:
@@ -327,12 +347,14 @@ def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect
         out.append(f"{tier.replace('tier', 'Tier ')} fit ({account.employees} employees)" if tier
                    else f"Outside size tiers ({account.employees} employees)")
     out.append(f"Prospect: {prospect.name} ({prospect.title})" if prospect else "No callable persona with a phone")
-    if in_cooldown:
-        out.append("In cooldown")
     if account.non_anz_billing_anz_hq:
         out.append("Non-ANZ billing, ANZ HQ (small penalty)")
     if account.timezone_guessed:
         out.append("Timezone guessed (country default)")
+    if account.confidence == "low":
+        out.append(f"Low-confidence record (score capped at {LOW_CONFIDENCE_CEILING:g})")
+    for f in account.flags:
+        out.append(f"Flag: {f} - {_FLAG_HINTS.get(f, 'check before calling')}")
     return out
 
 
@@ -435,16 +457,21 @@ def rank_accounts(accounts: list[Account], signals: Mapping[str, list[Signal]], 
         #    MIN_SLOT_MINUTES left does not count). Never the UTC date.
         days = days_for(a.timezone)
         call_date = days[0][0][1].date() if days else now.astimezone(ZoneInfo(a.timezone)).date()
+        # 5. cooldown on THIS zone's call date is a skip, not a penalty (an early zone can still be
+        #    inside its cooldown on a day the later zones are not).
+        until = _active_cooldown(a, cooldowns, call_date)
+        if until is not None:
+            skipped.append(_skip(a, f"In cooldown until {until.isoformat()} (account-local)", sigs))
+            continue
         chosen = pick_prospects(mine, config)
         if chosen and not days:
             skipped.append(_skip(a, "no call window in the next 14 days", sigs))
             continue
-        cool = _in_cooldown(a, cooldowns, call_date)
-        score, breakdown = score_account(a, sigs, bool(chosen), cool, config, now)
+        score, breakdown = score_account(a, sigs, bool(chosen), config, call_date)
         best = _best_signal(sigs)
         ra = RankedAccount(a, score=score, score_breakdown=breakdown,
-                           reasons=_reasons(a, sigs, best, chosen[0] if chosen else None, cool, config, now),
-                           signals=sorted(sigs, key=lambda s: (-s.strength, s.source)))
+                           reasons=_reasons(a, sigs, best, chosen[0] if chosen else None, config, call_date),
+                           signals=_ordered(sigs, best))
         if chosen:
             callable_.append((ra, best, chosen, call_date))
         else:
@@ -570,8 +597,22 @@ def _place(items: list, timelines: dict, first_day_only: bool) -> list:
 
 
 # --- run log ----------------------------------------------------------------------------------
-def summarise(result: RankResult) -> str:
-    """Plain-text summary for the run log: counts, windows, skip reasons, top accounts."""
+def _name_list(label: str, items: list[tuple[str, str]], limit: int) -> list[str]:
+    """'  label (N):' then up to ``limit`` '    - name: reason' lines and an 'and M more' tail."""
+    if not items:
+        return []
+    lines = [f"  {label} ({len(items)}):"]
+    lines += [f"    - {name}: {why}" for name, why in items[:limit]]
+    if len(items) > limit:
+        lines.append(f"    ... and {len(items) - limit} more")
+    return lines
+
+
+def summarise(result: RankResult, top_n: int = 15, list_limit: int = 25) -> str:
+    """Plain-text summary for the run log (hard rule 5: say what was skipped and why).
+
+    Counts, then the top ``top_n`` ranked accounts, then every skipped / needs_prospect / spilled
+    account by NAME with its reason (up to ``list_limit`` each, with the total and an 'and N more' tail)."""
     lines = [f"Ranked {len(result.ranked)} accounts; skipped {len(result.skipped)}; "
              f"needs prospect {len(result.needs_prospect)}; spilled {len(result.spilled)}."]
     for name, items in result.by_window.items():
@@ -589,9 +630,17 @@ def summarise(result: RankResult) -> str:
         lines.append(f"  needs prospect (NOT callable, no task) - {c}: {codes[c]}")
     no_trigger = sum(1 for r in result.ranked if any(x.startswith("No trigger") for x in r.reasons))
     lines.append(f"  no real trigger (ranked on fit only): {no_trigger}")
-    for i, r in enumerate(result.ranked[:10], 1):
+    for i, r in enumerate(result.ranked[:top_n], 1):
         when = r.local_call_time.strftime("%a %H:%M %Z") if r.local_call_time else "unscheduled"
         lines.append(f"  {i:>2}. {r.account.name} score={r.score:g} {r.window} {when} | {'; '.join(r.reasons)}")
-    for i, r in enumerate(result.needs_prospect[:5], 1):
-        lines.append(f"  P{i}. {r.account.name} score={r.score:g} | {'; '.join(r.reasons)}")
+    if len(result.ranked) > top_n:
+        lines.append(f"      ... and {len(result.ranked) - top_n} more ranked")
+    lines += _name_list("SKIPPED accounts", [(r.account.name, r.skipped_reason or "unknown") for r in result.skipped],
+                        list_limit)
+    lines += _name_list("NEEDS PROSPECT (no task)",
+                        [(r.account.name, f"{result.needs_prospect_codes.get(account_key(r.account), '?')}, "
+                                          f"score {r.score:g}") for r in result.needs_prospect], list_limit)
+    lines += _name_list("SPILLED (held, no task tonight)",
+                        [(r.account.name, f"score {r.score:g}, intended {r.local_call_time:%a %d %b %H:%M}"
+                          if r.local_call_time else f"score {r.score:g}") for r in result.spilled], list_limit)
     return "\n".join(lines)

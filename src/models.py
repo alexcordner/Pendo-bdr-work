@@ -200,8 +200,9 @@ class RankedAccount:
     score_breakdown: dict[str, float] = field(default_factory=dict)  # weight name -> points
     window: str | None = None            # call window name from config ("morning" / "afternoon")
     # Suggested dial time: an aware datetime in Account.timezone, falling inside ``window`` on the
-    # next working day (see config.next_working_windows). Default is the window start; the ranker
-    # should push it later inside the window when ``account.timezone_guessed``. None if unscheduled.
+    # first usable working day for the account's zone (see config.next_working_windows). The ranker
+    # spreads accounts evenly over that day's windows (>= 3 min apart, first slot >= now + 1 min).
+    # None if unscheduled (needs_prospect / skipped / spilled accounts never become tasks).
     local_call_time: datetime | None = None
     reasons: list[str] = field(default_factory=list)
     skipped_reason: str | None = None    # set when the account is excluded; score is then irrelevant

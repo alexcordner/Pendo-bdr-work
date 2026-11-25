@@ -7,7 +7,7 @@ Conventions: datetimes are timezone-aware (UTC for source times). Phones are E.1
 ## src/models.py
 | Model | Key fields |
 |---|---|
-| `Account` (mutable) | `sf_account_id, name, website, country_raw, country, billing_state, billing_city, hq_state, hq_country_raw, employees, is_customer, is_sdr_target, zoominfo_id, nooks_account_id, non_anz_billing_anz_hq, source_salesforce/nooks/zoominfo, timezone, timezone_guessed, days_since_last_activity, prospecting_priority, notes: list[str]`; property `size_unknown` |
+| `Account` (mutable) | `sf_account_id, name, website, country_raw, country, billing_state, billing_city, hq_state, hq_country_raw, employees, is_customer, is_sdr_target, zoominfo_id, nooks_account_id, non_anz_billing_anz_hq, source_salesforce/nooks/zoominfo, timezone, timezone_guessed, days_since_last_activity, prospecting_priority, notes: list[str], flags: list[str], confidence ('normal' | 'low')`; property `size_unknown` |
 | `Prospect` (frozen) | `nooks_id, sf_contact_id, sf_account_id, nooks_account_id, name, title, email, phone_e164, opted_out_email, do_not_call` |
 | `CallRecord` (frozen) | `nooks_id, prospect_id (None if unlinked), disposition_name, duration_s, started_at, to_e164, disposition_id, call_outcome, owner_id` |
 | `TaskRecord` (frozen) | `nooks_id, action, status, completed, due_at, prospect_id, sequence_id, email_id, owner_id`; properties `is_manual_email` (old backlog, never touch), `in_sequence` |
@@ -16,6 +16,7 @@ Conventions: datetimes are timezone-aware (UTC for source times). Phones are E.1
 | `SignalKind` (Enum) | `funding, exec_move, new_hire, ma, product_launch, partnership, project_pain, hiring_plan, none` |
 | `Signal` (frozen) | `sf_account_id, kind: SignalKind, strength (0.0-1.0, validated), source, source_date, evidence, zoominfo_id` |
 | `RankedAccount` (mutable) | `account, score (0-100), score_breakdown: dict[str,float], window, local_call_time, reasons, skipped_reason, signals` |
+| `RankResult` (ranker) | `ranked` (callable, on the first usable day, the ONLY accounts that may become Nooks tasks), `needs_prospect` (+ `needs_prospect_codes`), `spilled` (held for a later day), `skipped` (with reasons), `by_window`, `prospects`. Never write tasks for needs_prospect / spilled / skipped; never record them in sheet history. |
 | `SheetEntry` (mutable) | `ranked, prospect, opener, fact_1, fact_2, gatekeeper, trigger` (opener fields empty until Phase 2d) |
 
 **Join keys.** `Prospect.sf_contact_id` = Nooks `crmId`; `Prospect.sf_account_id` = `Account.sf_account_id`; `Prospect.nooks_account_id` = `Account.nooks_account_id`; `Scoop.company_id` = `Account.zoominfo_id`. For signals, `sf_account_id` wins; if None, join on `zoominfo_id`.
@@ -50,7 +51,7 @@ Raise `LoaderError` (subclass of ValueError) on malformed rows: `account_from_sf
 7. **SDR target** (`signals.weights.sdr_target_boost`, 10) is a score boost, never a filter.
 8. **Phone** prefers SF `MobilePhone`, then `Phone`. `prospecting_priority` is `SDR_Prospecting_Priority__c`, falling back to `Prospecting_Priority__c`.
 9. **Gmail sent date** key is UNVERIFIED: `sent_emails_from_gmail` tries `internalDate` (epoch ms), `date`, `sentAt`; the fixture has none, so `sent_at=None`. 1c must treat None as "sent, date unknown".
-10. **Persona matching** has no helper yet: 1f owns it (case-insensitive substring of `config.personas` titles, primary before secondary).
+10. **Persona matching** is owned by 1f (`src/ranker.py`): whole-word, case-insensitive matching of `config.personas` titles after normalisation (punctuation and the words of/the/and dropped, plural s allowed on the last word, hyphenated words stay whole), with an `ALIASES` table for equivalent titles (CTO / Chief Technology Officer, VP Product / Vice President Product, Head of CX, ...). Stale titles (Former / Ex- / Past) never match. The match with the most words wins, then primary before secondary, then config order.
 
 ## Worked examples
 **1c state.py** (who was called, cooldowns, DNC):
