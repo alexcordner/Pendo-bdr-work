@@ -2549,3 +2549,76 @@ def test_same_deal_note_still_matches_with_names_only():
 
 def test_note_prefixes_constant_is_gone():
     assert not hasattr(S, "NOTE_PREFIXES")
+
+
+# ============================================================ fix-triggers3: scheme wording, percentage without 'stake'
+@pytest.mark.parametrize("d", [
+    "Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.",
+    "Acme shareholders approve a scheme for Bigco to acquire Acme.",
+    "Acme gets approval from FIRB for Bigco to acquire Acme.",
+    "Acme's board recommends a scheme of arrangement for Bigco to acquire all shares in Acme.",
+    "Acme secures court approval for Bigco and Cargo to acquire the company.",
+])
+def test_scheme_and_regulator_wording_makes_the_company_the_target(d):
+    assert S.ma_role(d, "Acme Holdings") == "target"
+
+
+@pytest.mark.parametrize("name", ["Bigco Ltd"])
+def test_scheme_buyer_side_is_the_acquirer(name):
+    assert S.ma_role("Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.", name) == "acquirer"
+    assert S.ma_role("Acme gets approval from FIRB for Bigco to acquire Acme.", name) == "acquirer"
+
+
+def test_scheme_target_weight_and_reason(config):
+    v = one(config, "Mergers & Acquisitions (M&A)", "Acme shareholders vote on a scheme of arrangement for Bigco to acquire Acme.",
+            name="Acme Holdings")
+    assert v.factor == 1.0 and v.notes == (S.MA_TARGET_NOTE,)
+
+
+@pytest.mark.parametrize("d,name,role", [
+    ("Acme signs agreement with Bigco to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme gets approval from the ACCC to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme, supported by an agreement with Bigco to acquire Zeta, expands.", "Acme Holdings", "acquirer"),
+    ("Acme seeks approval for the deal to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme raised funds for growth and plans to acquire Zeta.", "Acme Holdings", "acquirer"),
+    ("Acme won approval for its plan to acquire Zeta.", "Acme Holdings", "acquirer"),
+])
+def test_existing_acquirer_cases_still_hold_after_the_for_change(d, name, role):
+    assert S.ma_role(d, name) == role
+
+
+def test_for_span_needs_a_named_company():
+    assert S.ma_role("Acme secures approval for it to acquire Zeta.", "Acme Holdings") == "acquirer"
+    assert S.ma_role("Acme secures approval for Bigco to acquire Zeta.", "Acme Holdings") == "target"
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 30% of Acme.", "Bigco acquires 19.9% of Acme.", "Bigco has agreed to buy 49.9% of Acme.",
+    "Bigco to acquire 5% of Acme.",
+])
+def test_percentage_without_the_word_stake_is_a_minority_target(d, config):
+    assert S.classify_ma(d, "Acme Holdings") == ("target", 0.35, S.MA_TARGET_MINORITY_NOTE)
+    v = one(config, "Mergers & Acquisitions (M&A)", d, name="Acme Holdings")
+    assert v.factor == pytest.approx(0.7) and v.notes == (S.MA_TARGET_MINORITY_NOTE,)
+
+
+@pytest.mark.parametrize("d", [
+    "Bigco to acquire 50% of Acme.", "Bigco to acquire 51% of Acme.", "Bigco to acquire 100% of Acme.",
+    "Bigco to acquire all of Acme.", "Bigco to acquire the remaining 49% of Acme.",
+    "Bigco to acquire the remaining 30% of Acme in a full takeover.", "Bigco to acquire Acme.",
+])
+def test_half_or_more_all_full_remaining_stay_half_weight_targets(d):
+    assert S.classify_ma(d, "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_acquirer_side_is_still_minority():
+    assert S.classify_ma("Bigco to acquire 30% of Acme.", "Bigco Ltd")[:2] == ("acquirer", 0.25)
+
+
+def test_growth_percentages_do_not_make_a_minority_target():
+    assert S.classify_ma("Acme, up 30% in revenue, to be acquired by Bigco.", "Acme Holdings")[:2] == ("target", 0.5)
+    assert S.classify_ma("Revenue grew 30% as Bigco agreed to acquire Acme.", "Acme Holdings")[:2] == ("target", 0.5)
+
+
+def test_percentage_of_with_the_stake_word_unchanged():
+    assert S.classify_ma("Goodman Group to acquire a 9.9% stake in NEXTDC.", "NEXTDC Ltd")[:2] == ("target", 0.35)

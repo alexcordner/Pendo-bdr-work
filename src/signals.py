@@ -500,6 +500,7 @@ _DEAL_ACTIVE = re.compile(
 _TARGET_WORDING = _DEAL_PASSIVE
 _MONEY_RECEIVED = re.compile(r"(?<!\w)(?:raised|raises|secured|secures|received|receives|closed|closes|series\s+[a-z]|seed)(?!\w)", _FLAGS)
 _PERCENT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?%")
+_PERCENT_OF = re.compile(r"\d{1,3}(?:\.\d+)?\s?%\s+of(?!\w)", _FLAGS)
 _STAKE = re.compile(r"(?<!\w)(?:stake|shareholding|minority\s+interest)(?!\w)", _FLAGS)
 _MAJORITY = re.compile(r"(?<!\w)(?:majority|controlling|100\s?%|full|all\s+of|outright|wholly|remaining)(?!\w)", _FLAGS)
 _DIGITAL_BUSINESS = re.compile(
@@ -520,10 +521,13 @@ def _mentions(text: str, name: str) -> bool:
 
 
 # "agreement for X to acquire", "deal for X to buy", "allows X to acquire": X is the buyer, not the company named earlier.
+# The buyer span follows ANY 'for' ('a scheme of arrangement for Bigco to acquire Acme', 'approval from FIRB for Bigco to
+# acquire Acme', 'agreement for X to acquire'), or allow / enable / permit. A 'for' phrase only counts when the span
+# names a company (a capitalised word): 'approval for the deal to acquire Zeta' has no third-party buyer.
 _THIRD_PARTY_SUBJECT = re.compile(
-    r"(?<!\w)(?:(?:agreement|deal|offer|proposal|bid|approval)\s+for"
-    r"|allow|allows|allowed|allowing|enable|enables|enabling|permit|permits)"
+    r"(?<!\w)(?:for|allow|allows|allowed|allowing|enable|enables|enabling|permit|permits)"
     r"\s+(?P<subject>(?:(?!\bto\b)[^.;]){1,100}?)\s*$", _FLAGS)
+_CAPITALISED_WORD = re.compile(r"(?<!\w)[A-Z][\w&-]*")
 # NOT third-party: 'agreement with Bigco to acquire X', 'approval from the ACCC to acquire X' (Bigco / the ACCC are
 # counterparties or regulators; the company named earlier is still the buyer).
 
@@ -546,6 +550,8 @@ def ma_role(description: str, company_name: str) -> str:
     if m is pas:
         return "acquirer" if _mentions(after, name) and not _mentions(before, name) else "target"
     third = _THIRD_PARTY_SUBJECT.search(before)
+    if third and not _CAPITALISED_WORD.search(third.group("subject")):
+        third = None
     if third:
         # 'NEXTDC has entered into an agreement for Goodman and Digital Realty to acquire a 9.9% stake in the company':
         # the buyers are named between 'for' / 'allow' / 'enable' and 'to acquire'; the company named BEFORE that is the target
@@ -563,6 +569,9 @@ def _is_minority_stake(description: str) -> bool:
     pct = _PERCENT.search(text)
     pct_val = float(pct.group(1)) if pct else None
     if pct_val is not None and pct_val < 50 and _STAKE.search(text):
+        return True
+    # '30% of Acme', '19.9% of Acme' (no word 'stake'); 'the remaining 49% of Acme' / 'all' / 'full' stay full acquisitions
+    if pct_val is not None and pct_val < 50 and _PERCENT_OF.search(text) and not _MAJORITY.search(text):
         return True
     if re.search(r"(?<!\w)minority(?!\w)", text, _FLAGS):
         return True
