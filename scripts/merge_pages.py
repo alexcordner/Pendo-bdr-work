@@ -158,7 +158,7 @@ def _zoominfo_complete(pages: list) -> bool:
     """Every ``meta.page`` sequence in the pages (one per type fetched) must be complete: page numbers run
     1..total without a gap, the last page of each sequence has number == total, and (when ``meta.totalResults`` is
     given) the rows of the sequence add up to it. The FINAL page must end a sequence."""
-    expected, seq_rows, seq_total, ok = None, 0, None, True
+    expected, seq_rows, seq_total, seq_pages_total, ok = None, 0, None, None, True
     for n, raw in enumerate(pages, 1):
         pg = _page_dict(raw)
         meta = pg.get("meta") if isinstance(pg.get("meta"), dict) else {}
@@ -167,10 +167,12 @@ def _zoominfo_complete(pages: list) -> bool:
         if not isinstance(num, int) or not isinstance(total, int):
             raise MergeError(f"cannot derive reached_last_page: page {n} has no meta.page.number / total")
         rows = len(extract_rows(pg))
+        if expected is not None and num != 1 and (total != seq_pages_total or meta.get("totalResults") != seq_total):
+            raise MergeError(f"page {n}: meta.page.total / meta.totalResults changed within one sequence")
         if num == 1:
             if expected is not None:               # a new sequence began before the old one ended
                 ok = False
-            expected, seq_rows, seq_total = 1, 0, meta.get("totalResults")
+            expected, seq_rows, seq_total, seq_pages_total = 1, 0, meta.get("totalResults"), total
         elif expected is None or num != expected:
             ok = False
         seq_rows += rows
@@ -182,7 +184,22 @@ def _zoominfo_complete(pages: list) -> bool:
     return ok and expected is None
 
 
-def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000) -> bool:
+def _ascending(pages: list, key_names: tuple[str, ...], what: str) -> None:
+    """Row ids must be strictly ascending across the WHOLE manifest (Nooks and Salesforce keyset paging order by
+    id): a duplicated page, a reordered page or a repeated terminal page breaks that."""
+    prev = None
+    for n, raw in enumerate(pages, 1):
+        for row in extract_rows(raw):
+            v = next((str(row[k]) for k in key_names if row.get(k) not in (None, "")), None)
+            if v is None:
+                continue
+            if prev is not None and v <= prev:
+                raise MergeError(f"{what}: ids are not strictly ascending at page {n} (duplicated, reordered or "
+                                 "overlapping pages)")
+            prev = v
+
+
+def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000, expect_pages: int | None = None) -> bool:
     """reached_last_page from the pages themselves (in page order), per source:
       nooks / auto  FINAL page ``links.next`` is null (Nooks has NO hasMore); a cursor means NOT reached.
                     ``hasMore`` is used when a page has that instead.
@@ -194,13 +211,28 @@ def derive_last_page(pages: list, kind: str = "auto", sf_limit: int = 2000) -> b
         raise MergeError(f"unknown paging kind {kind!r}")
     if not pages:
         raise MergeError("no pages: cannot derive reached_last_page")
+    if expect_pages is not None and len(pages) != expect_pages:
+        raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {expect_pages}: "
+                         "a page is missing or extra")
     if kind == "zoominfo":
         return _zoominfo_complete(pages)
     last = _page_dict(pages[-1])
     if kind == "salesforce":
         if not isinstance(last.get("done"), bool):
             raise MergeError("cannot derive reached_last_page: the final page has no 'done' field")
+        for n, raw in enumerate(pages[:-1], 1):                  # every non-final keyset page must be FULL
+            rows = len(extract_rows(raw))
+            if rows != sf_limit:
+                raise MergeError(f"page {n} of {len(pages)} holds {rows} rows, not {sf_limit}: only the final "
+                                 "Salesforce page may be short (a middle page is missing or truncated)")
+        _ascending(pages, ("Id", "id"), "salesforce")
         return last["done"] and len(extract_rows(last)) < sf_limit
+    for n, raw in enumerate(pages[:-1], 1):                      # every non-final page must point at a next page
+        pg = _page_dict(raw)
+        if _nooks_end(pg) is not False:
+            raise MergeError(f"page {n} of {len(pages)} has no next cursor (links.next is null / missing) but more "
+                             "pages follow: the manifest is out of order or has a stray page")
+    _ascending(pages, ("id", "Id"), "nooks")
     end = _nooks_end(last)
     if end is None:
         raise MergeError("cannot derive reached_last_page: the final page has neither links.next nor hasMore; "
@@ -280,6 +312,16 @@ def load_pages(entries: list[dict]) -> list:
     return pages
 
 
+def read_meta_json(path: Path) -> dict:
+    try:
+        d = json.loads(decode_text(Path(path).read_bytes()))
+    except (OSError, ValueError) as e:
+        raise MergeError(f"cannot read --meta-json {path}: {e}") from e
+    if not isinstance(d, dict):
+        raise MergeError("--meta-json must hold a JSON object")
+    return d
+
+
 def build_dump(rows: list, stats: dict, *, source_tool: str, query: str, reached_last_page: bool | None,
                fetched_at: str | None = None, paged: bool = True) -> dict:
     """The ``{"meta", "rows"}`` object that intake.load_raw reads. ``reached_last_page`` None means
@@ -320,6 +362,12 @@ def main(argv: list[str] | None = None) -> int:
                     help="rule for --derive-last-page: nooks (links.next null), salesforce (done and a short page), "
                          "zoominfo (meta.page sequences complete); auto = nooks")
     ap.add_argument("--sf-limit", type=int, default=2000, help="LIMIT used for Salesforce keyset pages")
+    ap.add_argument("--expect-pages", type=int, default=None,
+                    help="number of pages the session fetched (its own call count); a different manifest length "
+                         "is an error. Detects a missing middle page, which the pages themselves cannot show")
+    ap.add_argument("--meta-json", type=Path, default=None,
+                    help="JSON object whose keys are added to meta (e.g. window_days, searched_address_hashes, "
+                         "hash_salt); it can never replace the keys this script computes")
     ap.add_argument("--id-field", default="id")
     ap.add_argument("--rows-key", default=None)
     ap.add_argument("--allow-no-id", action="store_true")
@@ -336,13 +384,18 @@ def main(argv: list[str] | None = None) -> int:
         if args.derive_last_page and args.last_page_reached not in (None, "auto"):
             raise MergeError("--derive-last-page cannot be combined with --last-page-reached true/false")
         if args.derive_last_page or args.last_page_reached == "auto":
-            args.last_page_reached = derive_last_page(pages, args.paging, args.sf_limit)
+            args.last_page_reached = derive_last_page(pages, args.paging, args.sf_limit, args.expect_pages)
+        elif args.expect_pages is not None and args.expect_pages != len(pages):
+            raise MergeError(f"the manifest has {len(pages)} pages but --expect-pages says {args.expect_pages}")
+        extra = read_meta_json(args.meta_json) if args.meta_json else {}
     except MergeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
     dump = build_dump(rows, stats, source_tool=args.source_tool, query=args.query,
                       reached_last_page=args.last_page_reached, fetched_at=args.fetched_at,
                       paged=args.last_page_reached is not None)
+    for k, v in extra.items():
+        dump["meta"].setdefault(k, v)
     args.raw_dir.mkdir(parents=True, exist_ok=True)
     out = args.raw_dir / f"{args.name}.json"
     tmp = out.with_suffix(".json.tmp")

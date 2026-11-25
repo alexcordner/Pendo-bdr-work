@@ -34,8 +34,9 @@ from zoneinfo import ZoneInfo
 from src import accounts as acc_mod
 from src import ranker, signals as sig_mod, state as st_mod
 from src.config import Config, load_config, next_working_windows
-from src.intake import (IntakeReport, RawData, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
-                        last_sheet_from_tasks, load_raw, nooks_account_rows, scrub)
+from src.intake import (MAX_UNTIED_RECENT_SHARE, RECENT_CALL_DAYS, IntakeReport, RawData, address_hash, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
+                        last_sheet_from_tasks, load_raw, nooks_account_rows, scrub, untied_recent_calls)
+from src.intake import DEFAULT_ADDRESS_SALT
 from src.loaders import parse_utc
 from src.models import Prospect, Signal
 
@@ -49,7 +50,14 @@ SURROGATE = "sfc:"        # internal state key for a Contact with no Nooks prosp
 DNC_NOTE = ("DNC visibility: Nooks-dialer calls only (Outreach-sourced calls have no Do Not Call disposition); calls "
             "fetched with the owner filter; dry-run DNC match is by phone/email hash, Nooks prospect id after lazy "
             "resolution in Phase 3. Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id before "
-            "writing any task.")
+            "writing any task (hard precondition, see PHASE 3 PRECONDITIONS in the RESULT section).")
+PHASE3_PRECONDITIONS = (
+    "Phase 3 HARD PRECONDITION: after resolving Nooks prospect ids (listProspects filter_crmId), RE-RUN the Do Not Call "
+    "and opt-out check BY NOOKS PROSPECT ID for every chosen prospect (state.is_blocked(prospect, state, 'call')) "
+    "before writing any task: a Do Not Call recorded on a Nooks id that matches no Contact is invisible to this run.",
+    "Phase 3 HARD PRECONDITION: every chosen prospect of the final ranked set must be covered by gmail_sent.json "
+    "(re-run until the ranked set is stable and fully covered).",
+)
 MIN_FIRST_RUN_CALLS = 5   # a first-ever run with fewer calls than this is suspicious (truncated history?)
 _LOG_NATIONAL = re.compile(r"(?<![\w])0[2-478][\d ]{8,10}(?![\w])")
 
@@ -89,6 +97,7 @@ class PipelineResult:
     sheet_recorded: bool = False
     log_path: Path | None = None
     unmatched_scoops: list = field(default_factory=list)
+    gmail_uncovered: list[str] = field(default_factory=list)      # salted hashes of ranked prospects not yet Gmail-searched
 
 
 # ------------------------------------------------------------------ log helpers
@@ -147,7 +156,7 @@ def _dnc_phone_issues(raw: RawData, cfg: Config) -> tuple[int, list[str]]:
     raw_to = {r.get("id"): r.get("to") for r in raw.nooks_calls}
     lines, n = [], 0
     for c in raw.calls:
-        if not st_mod._is_dnc(c, cfg):          # same name test state.py uses for the Do Not Call list
+        if not st_mod.is_dnc_call(c, cfg):          # same name test state.py uses for the Do Not Call list
             continue
         t = raw_to.get(c.nooks_id)
         if c.to_e164 is None:
@@ -157,6 +166,21 @@ def _dnc_phone_issues(raw: RawData, cfg: Config) -> tuple[int, list[str]]:
             n += 1
             lines.append(f"  DNC call {c.nooks_id}: 'to' was not E.164 in the source (normalised for the block)")
     return n, lines
+
+
+def _dnc_unmatched(raw: RawData, prospects: list[Prospect], cfg: Config) -> int:
+    """Do Not Call calls tied to no Contact: no prospect carries the call's Nooks id and no prospect has the dialled
+    number. This run cannot block anyone for them; the Phase 3 re-check by Nooks prospect id must."""
+    ids = {p.nooks_id for p in prospects if p.nooks_id}
+    phones = {p.phone_e164 for p in prospects if p.phone_e164}
+    n = 0
+    for c in raw.calls:
+        if not st_mod.is_dnc_call(c, cfg):
+            continue
+        if (c.prospect_id and c.prospect_id in ids) or (c.to_e164 and c.to_e164 in phones):
+            continue
+        n += 1
+    return n
 
 
 def _list_dropped(res: "acc_mod.AccountListResult", bulk_limit: int = 25) -> list[str]:
@@ -259,6 +283,19 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     by_sf = {a.sf_account_id: a for a in first.accounts if a.sf_account_id}
     by_nooks = {a.nooks_account_id: a for a in first.accounts if a.nooks_account_id}
     prospects = infer_prospect_ids_from_calls(raw, build_prospects(raw, by_sf, by_nooks))
+    recent = untied_recent_calls(raw, prospects, now)
+    rep.stats["recent_calls_total"], rep.stats["recent_calls_not_tied_to_account"] = recent["total"], recent["untied"]
+    rep.stats["recent_calls_unlinkable"] = recent["unlinkable"]
+    rep.stats["recent_call_prospect_ids_to_resolve"] = len(recent["ids_to_resolve"])
+    log.append(f"recent calls not tied to an account: {recent['untied']} of {recent['total']} "
+               f"(last {RECENT_CALL_DAYS} days; {recent['unlinkable']} more have no prospect and no usable number and "
+               f"cannot be tied; {len(recent['ids_to_resolve'])} Nooks prospect ids still to resolve with listProspects "
+               f"filter_id; live is blocked above {MAX_UNTIED_RECENT_SHARE:.0%})")
+    if recent["share"] > MAX_UNTIED_RECENT_SHARE:
+        rep.warn(f"{recent['untied']} of {recent['total']} recent calls are not tied to an account: cooldowns for those "
+                 "accounts are lost")
+        rep.block_live(f"more than {MAX_UNTIED_RECENT_SHARE:.0%} of the last {RECENT_CALL_DAYS} days of calls are not "
+                       "tied to an account (fetch their prospects into nooks_prospects.json)")
     task_last_ids = last_sheet_from_tasks(raw, prospects, run_date)
     rep.stats["last_sheet_accounts_from_tasks"] = len(task_last_ids)
     email_window = rep.stats.get("gmail_window_days")
@@ -310,6 +347,9 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     n_bad_dnc, dnc_lines = _dnc_phone_issues(raw, cfg)
     log.append(f"Do Not Call calls whose 'to' is not E.164 in the source: {n_bad_dnc}")
     log += dnc_lines
+    n_dnc_unmatched = _dnc_unmatched(raw, prospects, cfg)
+    rep.stats["dnc_calls_not_matched_to_contact"] = n_dnc_unmatched
+    log.append(f"DNC calls not matched to any contact: {n_dnc_unmatched} (re-checked by Nooks prospect id in Phase 3)")
     # Search results carry no dates: a hit means "sent inside the query window". The undated rule in state.py then
     # blocks until first_seen + email_cooldown_days; first_seen is the day the SEARCH ran (the window's anchor), so
     # the block lasts exactly until the window could have elapsed.
@@ -370,6 +410,20 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     if unsafe:
         stop([f"{len(unsafe)} blocked prospects were chosen by the ranker (bug): refusing to continue"])
 
+    # 9b. Gmail coverage of the chosen prospects (hashes only: the session maps them back) -----------------
+    salt = raw.gmail_salt or DEFAULT_ADDRESS_SALT
+    chosen = [p for ps in result.prospects.values() for p in ps]
+    no_email = sum(1 for p in chosen if not address_hash(p.email, salt))
+    uncovered = sorted({h for p in chosen if (h := address_hash(p.email, salt)) and h not in raw.gmail_searched})
+    rep.stats["gmail_ranked_prospects"] = len(chosen)
+    rep.stats["gmail_ranked_prospects_without_email"] = no_email
+    rep.stats["gmail_ranked_prospects_uncovered"] = len(uncovered)
+    log.append(f"Gmail coverage: {len(chosen) - no_email - len(uncovered)} of {len(chosen) - no_email} ranked prospects with "
+               f"an email were searched; {len(uncovered)} still need a Gmail search; {no_email} have no email")
+    if live and uncovered:
+        stop([f"live refused: {len(uncovered)} ranked prospects have not been Gmail-searched (search them, merge with "
+              "their address hashes in meta.searched_address_hashes, re-run until the ranked set is covered)"], LiveRefused)
+
     # 10. sheet history: live only, ranked only ---------------------------------------------------
     sheet_recorded = False
     if do_sheet:
@@ -386,9 +440,10 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     stats["calls_to_external"], stats["calls_to_not_e164_other"] = _to_stats(raw)
     stats.update({k: v for k, v in rep.stats.items() if isinstance(v, int) and k not in stats})
     log += _log_body(raw, res, result, verdicts, batch, stats, run_date, call_date, sheet_recorded, live)
+    log += ["", "== PHASE 3 PRECONDITIONS =="] + [f"  {t}" for t in PHASE3_PRECONDITIONS]
     path = write_log(log, log_dir, now) if log_dir else None
     return PipelineResult(res, verdicts, signals, result, marked, st, rep, log, stats, rep.zoominfo_credits_used,
-                          now, run_date, call_date, live, sheet_recorded, path, list(batch.unmatched))
+                          now, run_date, call_date, live, sheet_recorded, path, list(batch.unmatched), uncovered)
 
 
 def _json(d: dict) -> str:
@@ -492,6 +547,8 @@ def main(argv: list[str] | None = None) -> int:
         print("LIVE REFUSED. Nothing was written to Nooks, Gmail or Salesforce. Reasons:", file=sys.stderr)
         for r in e.reasons:
             print(f"  - {r}", file=sys.stderr)
+        for t in PHASE3_PRECONDITIONS:
+            print(f"  ! {t}", file=sys.stderr)
         print("Run without --live for a dry run.", file=sys.stderr)
         return 2
     except PipelineStopped as e:
@@ -503,6 +560,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.live:
         print("\nAll live preconditions hold. Phase 3 (nooks_writer) owns writing tasks: this command wrote "
               "nothing to Nooks, Gmail or Salesforce and recorded no sheet history.")
+        for t in PHASE3_PRECONDITIONS:
+            print(f"  ! {t}")
     else:
         print("\nDry run: nothing written to Nooks, Gmail or Salesforce; no sheet history recorded.")
     return 0

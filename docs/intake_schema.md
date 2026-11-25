@@ -116,3 +116,11 @@ A hit for `in:sent to:<addr> newer_than:7d` means "sent inside the window". `sen
 - `state.json` was reset (corrupt) and the tasks file has no tagged tasks to recover the last sheet from: live is blocked.
 - Files are read as UTF-8 (BOM allowed) or UTF-16; anything else is a report error (`IntakeError`), never an exception.
 - `Sales_Opt_Out_Email__c` is fetched and counted (`N contacts with Sales_Opt_Out_Email__c (meaning unverified, NOT used to block)` in the log); it never blocks until Alex decides.
+
+## Review round 3 additions (N1 to N6)
+
+- **Gmail coverage.** `gmail_sent.json` meta carries `searched_address_hashes` (salted, normalised hashes, 32 hex characters; never raw addresses: an `@` in a hash is an error) and `hash_salt` (default `apac-callsheet-v1`). `scripts/gmail_queue.py` produces the queue and the hashes. The pipeline reports `PipelineResult.gmail_uncovered` (hashes) and stats `gmail_ranked_prospects`, `gmail_ranked_prospects_uncovered`, `gmail_ranked_prospects_without_email`; live is refused while any ranked prospect with an email is uncovered. Missing hashes in meta = nothing covered (warning).
+- **Recent calls tied to accounts.** Calls from the last 14 days whose Nooks prospect id (or, with no id, a unique phone) cannot be tied to a Contact with an account lose their cooldown. The log line `recent calls not tied to an account: X of Y` is always written; live is blocked above `MAX_UNTIED_RECENT_SHARE` (5%, `src/intake.py`). Calls with no prospect and no usable number cannot be tied by any means and are counted separately, not held against the threshold. `scripts/recent_call_ids.py` lists the ids to resolve (batches of 25 for `listProspects filter_id`), the rows go into `nooks_prospects.json`.
+- **Do Not Call not matched to a contact.** Log line `DNC calls not matched to any contact: N (re-checked by Nooks prospect id in Phase 3)`. The Phase 3 re-check by Nooks prospect id and the Gmail coverage are HARD PRECONDITIONS: they are in the log header's DNC note, the `PHASE 3 PRECONDITIONS` log section and the `--live` output.
+- **Task tags.** A note with several tags uses the NEWEST tag date.
+- **Manifest checks and `--expect-pages`** are described in `docs/fetch_runbook.md` section 8.
