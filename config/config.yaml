@@ -99,7 +99,7 @@ signals:
 
 filters:
   drop_name_patterns: ["CBD", "Sydney", "Melbourne", "Brisbane", "Auckland", "Perth", "Adelaide"]  # only dropped when the whole name is just a place
-  drop_if_no_domain: true
+  drop_if_no_domain: false   # ZoomInfo free search returns no domain, so true would drop every ZoomInfo row; SF/Nooks accounts are Alex's book and are never dropped for this
 
 paths:
   state_dir: "state"

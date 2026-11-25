@@ -58,6 +58,11 @@ class Account:
     days_since_last_activity: int | None = None
     prospecting_priority: str | None = None   # SDR_Prospecting_Priority__c (optional tie-breaker)
     notes: list[str] = field(default_factory=list)   # human-readable audit trail (why dropped, guesses...)
+    # Review-driven (1d): machine-readable flags for Alex to review (e.g. 'noise_location',
+    # 'country_unknown', 'possible_duplicate', 'flagged_non_anz_billing_anz_hq'). Accounts that come
+    # from Alex's own Salesforce/Nooks book are FLAGGED, never dropped, for noise-type reasons.
+    flags: list[str] = field(default_factory=list)
+    confidence: str = "normal"           # "normal" | "low" (flagged, zoominfo-only, nooks-only ...)
 
     @property
     def size_unknown(self) -> bool:
@@ -124,6 +129,7 @@ class SignalKind(str, Enum):
     PARTNERSHIP = "partnership"
     PROJECT_PAIN = "project_pain"
     HIRING_PLAN = "hiring_plan"
+    INTENT = "intent"                    # ZoomInfo intent topic (UNVERIFIED connector shape, capped strength)
     NONE = "none"
 
 
