@@ -129,3 +129,75 @@ Small, commented, stdlib plus PyYAML, Python 3.11 syntax, frozen vs mutable choi
 
 ## What I could not verify
 No live data, so the real shapes in docs/connector_notes.md are taken on trust. The `Do Not Call` and `Left Voicemail` names are assumed from fixtures. I did not test on Windows or with another tzdata version.
+
+---
+
+# Re-review of fixes (worker commit 8af7fb7, merged into this branch)
+
+Reviewer: same independent session. Offline, read-only on worker files, no connector calls, synthetic fixtures only. Probe scripts were in the scratchpad.
+
+## Verdict: FINAL PASS (two low items noted, none blocking)
+
+## 1. Test runs
+- `python -m pytest tests -q`: **142 passed**.
+- `python -W error -m pytest tests -q`: **142 passed**, no warnings.
+- mypy (informational): 5 real complaints, all in src/config.py and all typing-only: line 326 (`int <= int | None`, `Tier.max_employees` is Optional) and lines 342-344 (loop variables `a`/`b`/`w` reused with different types from the tiers loop). Runtime is fine. Low. Plus the missing `types-PyYAML` stub note.
+- `src/` still has no network imports, no real ids (grep for owner id and `disp-` found none in `src/`), no writes.
+- The real `config/config.yaml` (now with `working_days`, `dispositions`, `no_contact_max_duration_s`, `sdr_target_boost`) loads with the strict validator.
+
+## 2. My original findings
+| # | Finding | Status | Evidence |
+|---|---|---|---|
+| 1 | `+61 (0)4...` gave `+610400000001` | **FIXED** | `normalise_phone` now drops the trunk 0 (src/loaders.py:93-94). `+61 (0)4 0000 0001` gives `+61400000001`; so do `61 (0)400 000 001` and `+610 400 000 001`. |
+| 2 | US `WA` billing state read as Perth on ANZ-HQ accounts | **FIXED** | src/loaders.py:176-182 ignores billing state and city when `non_anz_billing_anz_hq`. US WA + HQ Victoria gives Melbourne (guessed False); US WA with no HQ state gives Sydney with `guessed=True`. |
+| 3 | extensions, `0011`, zeros, `+0...` | **FIXED** | `ext 12`, `x123`, `;ext=1`, `ext. 5`, `Ext 5`, `EXT:5` are cut; `0011 61 ...` gives `+61400000001`; `0000000000`, `+0061400000001`, `61000000000`, `+0 400...` give None. AU is length and first-digit checked (src/loaders.py:43-49). |
+| 4 | thin config validation | **FIXED** | Unknown keys, non-positive limits, positive `cooldown_penalty`, tier min > max, tier overlap, missing tiers, misspelled state keys, bad sources, call-window overlap are all rejected (src/config.py:260-420). Real config still loads. |
+| 5 | interface gaps | **FIXED** (see section 5 for residual items) | New loaders, models, `match_account`, `window_bounds`, `next_working_windows`, `tier_for`, `SignalKind` all exist and run. |
+| 6 | low items | **FIXED** | `LoaderError` wrapper replaces raw KeyError/AttributeError; `disposition_id_for_name` now case/whitespace-insensitive; `canonical_country("New  Zealand")` works; non-string billing no longer raises; `.gitignore` has `*.egg-info/`. |
+
+### Phone edge cases re-run (result, verdict)
+| Input | Result |
+|---|---|
+| `tel:+61400000001`, `tel:0400000001` [AU] | `+61400000001` pass |
+| `+61` + NBSP / tabs between groups, NBSP padding | `+61400000001` pass |
+| `0061 400 000 001` | `+61400000001` pass |
+| `+64 21 123 4567`, `021 123 4567` [NZ] | `+64211234567` pass |
+| `+64 21 123 456`, `021 123 456` (9-digit NZ mobile) | `+6421123456` pass |
+| `09 123 4567` [NZ], `+64 9 123 4567` | `+6491234567` pass (8-digit NZ landline) |
+| `9 123 4567` [NZ], `123 4567` [NZ] (no area code) | None, conservative, pass |
+| `0800 123 456`, `0508 123 456` [NZ] | `+64800123456`, `+64508123456` pass |
+| `1300 000 000`, `1800 123 456`, `13 12 34`, `131234` [AU] | None pass (not dialable as mobile/E.164) |
+| `+61 1300 000 000` | None pass |
+| `CALL-NOW`, `1-800-CALL-NOW`, `0400 CALL NOW`, `+61 4 CALL` | None pass (no digit guessing) |
+| `0400 000 001 extension 5`, `0400 000 001 ex 5` | None. Safe (not a wrong number), arguably too strict; fine. |
+| `0400000001 or 0400000002` | None pass |
+| `0400 000 001 (mobile)`, `M: 0400 000 001` | `+61400000001` pass |
+| `+61 5 9000 0001`, `+6140000000` | None pass |
+| `+65 9000 0109`, `+44 20 7946 0958`, `+1 415 555 0100` | kept as E.164, pass |
+No wrong numbers found in 55 cases.
+
+## 3. New code review
+No correctness bugs found. Specifics:
+- **`window_bounds` / `next_working_windows` (src/config.py:~440-475):** checked by running. Friday after close in Sydney goes to Monday 08:45 +11:00; Saturday goes to Monday; Friday late morning keeps both windows. Same instant 2026-11-27 07:00Z: Sydney goes to Monday, Perth still has Friday afternoon (13:30 +08:00), NZ goes to Monday (+13:00). DST: Sydney Fri 2 Oct is +10:00 and Mon 5 Oct is +11:00; Fri 3 Apr +11:00, Mon 6 Apr +10:00. NZ vs AU DST mismatch week (Mon 28 Sep 2026): NZ +13, Sydney +10, a 3h gap, handled correctly by zoneinfo. Non-working day gives `[]`; naive `now` raises ValueError; unknown tz raises `ZoneInfoNotFoundError` (a raw error, fine for a programming error). A window cannot cross midnight (config validator requires start < end) and none of the windows can land in a DST gap (shifts are Sunday 2-3am; windows are Mon-Fri), so `datetime.combine(..., tzinfo=)` is safe.
+- **`tier_for`:** 19 and 0 give None; 20-49 tier3; 50-199 tier2; 200-2000 tier1; 2001 None. Correct and boundary-safe.
+- **`SignalKind` / `Signal`:** string kinds and strength outside 0-1 raise ValueError. Good.
+- **`normalise_email_for_match`:** dots removed from the local part only; `a@b@c`, `@x.com`, `a@` give None. It also strips dots for non-Gmail domains and keeps `+tag`: fine for a comparison key, collisions improbable.
+- **`sent_emails_from_gmail`:** matches the fixture (dot-stripped recipient equals the real dotted address after normalising); handles `internalDate` epoch ms, `date` in RFC 2822 and ISO, missing date gives `sent_at=None`; a message without `id` raises `LoaderError`.
+- **`account_from_nooks` / `account_from_zoominfo` / `task_from_nooks` / `match_account`:** all run on the fixtures. `size_unknown` note is set; nooks rows get `sf_account_id` only from the argument.
+- **Over-strictness:** every row in `sf_accounts_my_book.json` (12) loads; the three ZoomInfo company rows and the nooks task rows load; real config loads. Nothing legitimate rejected that I could find. Strict `tiers` still cannot express an open-ended top tier (low, matches the current config).
+- **`_guard`:** catching ValueError also wraps a deliberate `ValueError`; fine since `LoaderError` is a ValueError subclass.
+
+## 4. Wrong-number disposition name
+**Agree** with keeping the real `Bad Number / Wrong Number`. It is what the fixture list (modelled on the live list in connector notes) holds; resolution is by name, so a shortened name would silently never match and the test `config disposition names all in fixture` (I re-ran the same check: all five names present) would catch drift. Residual: nothing validates the names against the live `listCallDispositions` result at run time; 1c should log and stop if a configured name is absent (CLAUDE.md rule 6).
+
+## 5. docs/interfaces.md: sufficient and consistent? Yes, with minor items
+I ran every worked example against the fixtures. All execute and give sensible output (DNC prospect flagged, `quick` rule, email cooldown match True, Nooks account joins SF account by id, nooks-only prospect joins by `nooks_account_id`, signal builds, windows and tier work). Residual doc items, all low:
+1. 1c example: `quick = c.disposition_name ...` uses `c` outside the comprehension (illustrative only). `dnc_ids` contains `None` for unlinked DNC calls (match those on `to_e164`); `prospect.nooks_id in dnc_ids` would wrongly flag a prospect whose `nooks_id` is None (loader never produces that, but guard it).
+2. 1f example: `windows[0]` crashes if `windows` is empty (no working day in 14 days, or `working_days` empty); and `next_working_windows(cfg, None, ...)` raises TypeError, so the doc's "skip if `acct.timezone is None`" must come first.
+3. `local_call_time` default is the window start, but when `now` falls inside a window `next_working_windows` returns that window with its start already in the past (checked: Sydney 09:30 returns the 08:45 morning window). 1f should clamp to `max(start, now)`; say so in the doc.
+4. Exact-name compare (`disposition_name == cfg.dispositions.x`) is case-sensitive while `disposition_id_for_name` is not; harmless while names come from the same list.
+5. `match_account` returns the first match only; merging duplicates is 1d's job (doc could say so).
+6. mypy typing nits in src/config.py:326 and 342-344 (rename loop variables).
+
+## Final result
+**FINAL PASS.** No failing items. Open low items: 5 above plus the mypy nits; none block 1c-1f.
