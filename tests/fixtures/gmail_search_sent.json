@@ -1,0 +1,21 @@
+{
+  "_note": "search_threads view=THREAD_VIEW_METADATA_ONLY. Returned addresses have DOTS STRIPPED from the local part (alex.cordner -> alexcordner). Query with the real dotted address.",
+  "query": "in:sent to:first.last@example.com newer_than:7d",
+  "resultCountEstimate": "1",
+  "threads": [
+    {
+      "id": "thread-id",
+      "messageCount": 1,
+      "messages": [
+        {
+          "id": "msg-id",
+          "sender": "firstlast@pendo.example",
+          "threadId": "thread-id",
+          "toRecipients": [
+            "firstlast@example.com"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "_note": "SOQL: Account WHERE Assigned_SDR__c=<SF user id> AND Current_Customer__c=false AND BillingCountry IN (AU,NZ) AND SDR_Target__c=true. Real company names, IDs shortened.",
+  "records": [
+    {
+      "Id": "001-EXAMPLE-1",
+      "Name": "Phocas Software",
+      "Website": "www.phocassoftware.com",
+      "Type": "2.0",
+      "BillingCountry": "Australia",
+      "BillingState": "New South Wales",
+      "ZoomInfo_Employee_Count__c": 215,
+      "ROE_count__c": 215,
+      "Current_Customer__c": false,
+      "SDR_Target__c": true,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "Prospect_Account_Type__c": "Active",
+      "Assigned_Sales_Segment__c": "Commercial",
+      "DOZISF__ZoomInfo_Id__c": "347001511",
+      "Days_Since_Last_Activity__c": 47
+    },
+    {
+      "Id": "001-EXAMPLE-2",
+      "Name": "Catapult",
+      "Website": "www.catapultsports.com",
+      "Type": "2.0",
+      "BillingCountry": "Australia",
+      "BillingState": "Victoria",
+      "ZoomInfo_Employee_Count__c": 671,
+      "ROE_count__c": 671,
+      "Current_Customer__c": false,
+      "SDR_Target__c": true,
+      "SDR_Prospecting_Priority__c": null,
+      "Prospecting_Priority__c": null,
+      "Prospect_Account_Type__c": "Active",
+      "Assigned_Sales_Segment__c": "Commercial",
+      "DOZISF__ZoomInfo_Id__c": "347667386",
+      "Days_Since_Last_Activity__c": 21
+    },
+    {
+      "Id": "001-EXAMPLE-3",
+      "Name": "Acquire",
+      "Website": "www.acquire.com.au",
+      "Type": "2.0",
+      "BillingCountry": "Australia",
+      "BillingState": "Western Australia",
+      "ZoomInfo_Employee_Count__c": 145,
+      "ROE_count__c": 145,
+      "Current_Customer__c": false,
+      "SDR_Target__c": true,
+      "SDR_Prospecting_Priority__c": "A",
+      "Prospecting_Priority__c": "High",
+      "Prospect_Account_Type__c": "None",
+      "Assigned_Sales_Segment__c": "Commercial",
+      "DOZISF__ZoomInfo_Id__c": "2412997",
+      "Days_Since_Last_Activity__c": 790
+    }
+  ]
+}

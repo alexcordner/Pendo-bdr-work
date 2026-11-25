@@ -1,0 +1,113 @@
+{
+  "_note": "listCalls filter_owner_id + filter_time_gte. Last 7d (since 2026-11-18): 40 calls. Duration is seconds (can be fractional). prospect=null and from='external' for manually logged calls.",
+  "data": [
+    {
+      "id": "call-1",
+      "source": "nooks_sep",
+      "duration": 23,
+      "from": "+61400000000",
+      "to": "+61400000001",
+      "direction": "outgoing",
+      "recordingUrl": "https://recording.nooks.in/<redacted>.wav",
+      "prospect": {
+        "id": "prospect-uuid",
+        "_href": "/v1/prospects/prospect-uuid"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "d957dd2b-a8fb-496b-ae99-cd2adffebd96",
+        "_href": "/v1/callDispositions/d957dd2b-a8fb-496b-ae99-cd2adffebd96"
+      },
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:50:36.486Z",
+      "createdAt": "2026-11-24T03:50:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "call-2",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "+61400000000",
+      "to": "+61400000001",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "prospect-uuid",
+        "_href": "/v1/prospects/prospect-uuid"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "c106af3d-dc2f-471f-868c-017e9836979d",
+        "_href": "/v1/callDispositions/c106af3d-dc2f-471f-868c-017e9836979d"
+      },
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "rep",
+      "time": "2026-11-24T03:50:36.486Z",
+      "createdAt": "2026-11-24T03:50:52.721Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "call-3",
+      "source": "nooks_sep",
+      "duration": 262,
+      "from": "+61400000000",
+      "to": "+61400000001",
+      "direction": "outgoing",
+      "recordingUrl": "https://recording.nooks.in/<redacted>.wav",
+      "prospect": {
+        "id": "prospect-uuid",
+        "_href": "/v1/prospects/prospect-uuid"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "d919eb47-ce5a-4a6f-bcee-20a64dc8f606",
+        "_href": "/v1/callDispositions/d919eb47-ce5a-4a6f-bcee-20a64dc8f606"
+      },
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": "prospect",
+      "time": "2026-11-24T03:50:36.486Z",
+      "createdAt": "2026-11-24T03:50:52.721Z",
+      "hasTranscript": true
+    },
+    {
+      "id": "call-4",
+      "source": "nooks_sep",
+      "duration": 0,
+      "from": "external",
+      "to": "+61400000001",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "c106af3d-dc2f-471f-868c-017e9836979d",
+        "_href": "/v1/callDispositions/c106af3d-dc2f-471f-868c-017e9836979d"
+      },
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "dialingMode": "one-off",
+      "hungUpBy": null,
+      "time": "2026-11-24T03:50:36.486Z",
+      "createdAt": "2026-11-24T03:50:52.721Z",
+      "hasTranscript": false
+    }
+  ],
+  "links": {
+    "next": null
+  }
+}

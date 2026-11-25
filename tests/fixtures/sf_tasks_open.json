@@ -1,0 +1,16 @@
+{
+  "_note": "SOQL Task WHERE OwnerId=<SF user id> AND IsClosed=false. 30 rows total; these are stale 'BDR Meeting Booked' tasks, WhatId null. Names removed.",
+  "records": [
+    {
+      "Id": "00T-EXAMPLE-1",
+      "Subject": "<Contact Name> - BDR Meeting Booked",
+      "Status": "Not Started",
+      "Type": "BDR Meeting Booked",
+      "TaskSubtype": "Task",
+      "ActivityDate": null,
+      "WhatId": null,
+      "WhoId": "003-EXAMPLE-A",
+      "CreatedDate": "2026-03-05T04:49:51.000+0000"
+    }
+  ]
+}

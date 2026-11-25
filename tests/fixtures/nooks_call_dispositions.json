@@ -1,0 +1,117 @@
+{
+  "_note": "Current source=nooks_sep dispositions (only these are valid for createCall). Other sources (outreach, salesforce, csv) exist but are legacy.",
+  "data": [
+    {
+      "id": "c106af3d-dc2f-471f-868c-017e9836979d",
+      "name": "No Answer",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "d957dd2b-a8fb-496b-ae99-cd2adffebd96",
+      "name": "Left Voicemail",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "31bec2be-6544-4a77-92ff-4b42689ebc82",
+      "name": "Bad Number / Wrong Number",
+      "source": "nooks_sep",
+      "callOutcome": "No Answer",
+      "archived": false
+    },
+    {
+      "id": "29cd2c61-440e-4634-9547-767d59463bb7",
+      "name": "Gatekeeper",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "2f0d6e22-b502-4284-991c-a89e15840221",
+      "name": "Do Not Call",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "690c1f57-2350-482d-b239-e70b9a39941a",
+      "name": "Wrong Person",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "23633b32-14bf-4b1c-99a4-8c2f23345af2",
+      "name": "Person Left Company",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "1dc13618-b8d3-4807-9468-5acdaf25643d",
+      "name": "Hang Up",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "f82df53c-cb32-45e7-bef8-1fa207ef94ae",
+      "name": "Follow-Up - Keep in Sequence",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "4721466f-899b-4ea2-8986-faaeda250b9c",
+      "name": "Follow-Up - Remove from Sequence",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "743925cb-ce5f-4cb7-b29d-3daeb92c654e",
+      "name": "Meeting Scheduled",
+      "source": "nooks_sep",
+      "callOutcome": "Meeting",
+      "archived": false
+    },
+    {
+      "id": "74b565c7-bb2e-4224-9a2b-475989eca985",
+      "name": "Objection: Not Interested",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "e36a9d31-dd3c-43d7-bce8-8cd940be8aa7",
+      "name": "Objection: Not a Priority",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "539f3ee8-fadb-4369-9cb2-105c03c5dcc1",
+      "name": "Objection: Budget",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "6e5a1e10-8936-4753-92b0-dd0280127b1b",
+      "name": "Objection: Already Have a Solution",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    },
+    {
+      "id": "d919eb47-ce5a-4a6f-bcee-20a64dc8f606",
+      "name": "Objection: Bad fit",
+      "source": "nooks_sep",
+      "callOutcome": "Connect",
+      "archived": false
+    }
+  ]
+}

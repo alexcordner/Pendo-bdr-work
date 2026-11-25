@@ -1,0 +1,62 @@
+{
+  "_note": "listTasks. Existing tasks are all SEQUENCE tasks (sequence/sequenceState set). 'call' tasks have email:null; manual_email tasks carry an email ref. 1+ page of 100 open manual_email tasks (97/100 in one sequence), due dates Jun-Oct 2026 = stale backlog. Do not touch.",
+  "data": [
+    {
+      "id": "task-uuid",
+      "action": "call",
+      "completed": false,
+      "dueAt": "2026-09-09T01:45:15.356Z",
+      "note": "",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "prospect": {
+        "id": "prospect-uuid"
+      },
+      "sequence": {
+        "id": "seq-A"
+      },
+      "sequenceState": {
+        "id": "ss-uuid"
+      },
+      "sequenceStep": {
+        "id": "step-uuid"
+      },
+      "email": null,
+      "createdAt": "2026-09-09T01:45:15.078Z",
+      "updatedAt": "2026-09-15T18:54:37.596Z"
+    },
+    {
+      "id": "task-uuid",
+      "action": "manual_email",
+      "completed": false,
+      "dueAt": "2026-09-09T01:45:15.356Z",
+      "note": "",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "5koD9szETWeI1F0DcRTqkoHGPlY2"
+      },
+      "prospect": {
+        "id": "prospect-uuid"
+      },
+      "sequence": {
+        "id": "seq-B"
+      },
+      "sequenceState": {
+        "id": "ss-uuid"
+      },
+      "sequenceStep": {
+        "id": "step-uuid"
+      },
+      "email": {
+        "id": "email-uuid",
+        "_href": "/v1/emails/email-uuid"
+      },
+      "createdAt": "2026-09-09T01:45:15.078Z",
+      "updatedAt": "2026-09-15T18:54:37.596Z"
+    }
+  ]
+}

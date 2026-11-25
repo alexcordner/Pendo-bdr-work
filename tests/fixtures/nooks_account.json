@@ -1,0 +1,10 @@
+{
+  "id": "account-uuid",
+  "name": "Shippit",
+  "domain": "shippit.com",
+  "source": "salesforce",
+  "numEmployees": 155,
+  "linkedInUrl": "https://www.linkedin.com/company/shippit",
+  "description": "<trimmed>",
+  "_note": "No country/state, no crmId in the list row (crmId only usable as a filter). Join to Salesforce via filter_crmId=<SF Account Id>."
+}

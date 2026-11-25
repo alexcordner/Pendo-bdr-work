@@ -1,0 +1,19 @@
+{
+  "_note": "listProspects/getProspect. NO phone and NO globalOptedOut field is returned by this read. Phone only on call.to; opt-out/phone must come from Salesforce Contact or be probed further.",
+  "id": "prospect-uuid",
+  "type": "salesforce",
+  "name": "<Name>",
+  "firstName": "<First>",
+  "lastName": "<Last>",
+  "title": "Head of Product",
+  "primaryEmail": "<first.last>@example.com.au",
+  "linkedInUrl": "",
+  "crmId": "003-EXAMPLE-A",
+  "account": {
+    "id": "account-uuid",
+    "_href": "/v1/accounts/account-uuid"
+  },
+  "sequenceStates": [],
+  "createdAt": "2025-01-22T06:26:49.295Z",
+  "updatedAt": "2026-11-25T00:02:18.585Z"
+}

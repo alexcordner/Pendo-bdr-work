@@ -1,0 +1,11 @@
+{
+  "_note": "Contact phone/opt-out fields. Mobile matches Nooks call.to. Contact has no DoNotCall column in this org.",
+  "record": {
+    "Id": "003-EXAMPLE-A",
+    "Phone": null,
+    "MobilePhone": "+61 4XX XXX XXX",
+    "HasOptedOutOfEmail": false,
+    "Title": "Head of Product",
+    "MailingCountry": "Australia"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "identity": {
+    "displayName": "<BDR name>",
+    "roleName": "Commercial BDR - ANZ",
+    "title": "Sales Development Representative",
+    "userId": "005Pe00000HHNMbIAP",
+    "email": "<owner email>"
+  },
+  "manager": {
+    "identity": {
+      "roleName": "BDR Manager"
+    }
+  },
+  "userTimeAndLocale": {
+    "timeZoneIana": "Europe/London"
+  }
+}

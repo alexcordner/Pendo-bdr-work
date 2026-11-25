@@ -1,0 +1,55 @@
+{
+  "_note": "Noise seen in search_companies. First 6 from companyName='Sydney CBD' (65 hits total); rest from the AU/NZ query.",
+  "location_or_local_business": [
+    {
+      "id": "237109546",
+      "name": "Sydney CBD"
+    },
+    {
+      "id": "539330659",
+      "name": "Sydney CBD Florist"
+    },
+    {
+      "id": "1266627972",
+      "name": "The Co-op Sydney CBD"
+    },
+    {
+      "id": "1285001473",
+      "name": "Lighthouse Early Learning Centre (Sydney CBD"
+    },
+    {
+      "id": "1267039974",
+      "name": "CBD Quality Used Office Furniture Sydney"
+    },
+    {
+      "id": "345782576",
+      "name": "Sydney Cbd Plumbing"
+    }
+  ],
+  "government_or_non_company": [
+    {
+      "id": "5000579851",
+      "name": "Office of the Victorian Information Commissioner"
+    },
+    {
+      "id": "11584508",
+      "name": "Government of Western Australia Department of Health"
+    }
+  ],
+  "wrong_country_leak": [
+    {
+      "id": "430236854",
+      "name": "Petrobangla"
+    },
+    {
+      "id": "372149255",
+      "name": "Shinsho"
+    }
+  ],
+  "vague_name": [
+    {
+      "id": "350661969",
+      "name": "Funds"
+    }
+  ]
+}

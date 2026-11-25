@@ -1,0 +1,158 @@
+{
+  "_note": "search_scoops shape. contacts[] present only on person-based scoops (anonymised). link/linkText only on news-sourced scoops.",
+  "data": [
+    {
+      "attributes": {
+        "company": {
+          "id": "449780860",
+          "name": "WearOptimo"
+        },
+        "description": "WearOptimo has secured $5.14 million in additional funding.",
+        "id": "18338395",
+        "link": "https://example.com/news",
+        "linkText": "See details",
+        "originalPublishedDate": "2026-11-24T08:00:00Z",
+        "publishedDate": "2026-11-24T08:00:00Z",
+        "topics": [
+          {
+            "id": "117",
+            "topic": "Funding"
+          }
+        ],
+        "types": [
+          {
+            "id": "2",
+            "type": "Funding"
+          }
+        ]
+      },
+      "id": "18338395",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "191414491",
+          "name": "SCEE"
+        },
+        "contacts": [
+          {
+            "firstName": "<First>",
+            "id": 0,
+            "lastName": "<Last>"
+          }
+        ],
+        "description": "<Person> will join as Chief Executive Officer.",
+        "id": "18340208",
+        "originalPublishedDate": "2026-11-23T00:00:00Z",
+        "publishedDate": "2026-11-23T00:00:00Z",
+        "topics": [
+          {
+            "id": "14",
+            "topic": "Executive Moves"
+          },
+          {
+            "id": "17",
+            "topic": "New Hire"
+          }
+        ],
+        "types": [
+          {
+            "id": "13",
+            "type": "New Hire"
+          },
+          {
+            "id": "19",
+            "type": "Executive Move"
+          }
+        ]
+      },
+      "id": "18340208",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "111838047",
+          "name": "The iGroup"
+        },
+        "description": "The iGroup, according to an internal source in advertising & promotion, is planning to remediate challenges related to customer retention.",
+        "id": "18351734",
+        "originalPublishedDate": "2026-11-25T00:00:00Z",
+        "publishedDate": "2026-11-25T00:00:00Z",
+        "topics": [
+          {
+            "id": "10",
+            "topic": "Pain Point"
+          },
+          {
+            "id": "247",
+            "topic": "Customer Retention & Development"
+          }
+        ],
+        "types": [
+          {
+            "id": "20",
+            "type": "Pain Point"
+          },
+          {
+            "id": "21",
+            "type": "Project"
+          }
+        ]
+      },
+      "id": "18351734",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "1334331904",
+          "name": "Iren"
+        },
+        "description": "Iren has announced that its headcount has tripled...",
+        "id": "18331107",
+        "originalPublishedDate": "2026-11-24T00:00:00Z",
+        "topics": [
+          {
+            "id": "33",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "11",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "18331107",
+      "type": "Scoop"
+    },
+    {
+      "attributes": {
+        "company": {
+          "id": "557821160",
+          "name": "Dijiwa Sanctuaries"
+        },
+        "description": "Dijiwa Sanctuaries has more open roles in Medical & Health than it has had at any time in the past 12 months.",
+        "id": "18335939",
+        "originalPublishedDate": "2026-11-22T00:00:00Z",
+        "topics": [
+          {
+            "id": "33",
+            "topic": "Hiring Plans"
+          }
+        ],
+        "types": [
+          {
+            "id": "11",
+            "type": "Hiring Plans"
+          }
+        ]
+      },
+      "id": "18335939",
+      "type": "Scoop"
+    }
+  ]
+}
