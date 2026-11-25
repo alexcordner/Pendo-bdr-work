@@ -1,0 +1,2133 @@
+{
+ "meta": {
+  "top_sydney": 1,
+  "no_signal": 4,
+  "dnc_by_history": 5,
+  "dnc_by_dup_email": 6,
+  "dnc_by_phone": 7,
+  "touched_2d": 8,
+  "last_sheet": 10,
+  "needs_no_prospects": 11,
+  "needs_no_phone": 12,
+  "flagged": 14,
+  "zi_only": 15,
+  "nooks_only": 16,
+  "noise_in_book": 17,
+  "noise_zi_only": 18,
+  "size_unknown": 19,
+  "sheet_last_night": [
+   "001FAKE00000010"
+  ]
+ },
+ "sf_rows": [
+  {
+   "Id": "001FAKE00000001",
+   "Name": "Alpha Digital Pty Ltd",
+   "Website": "www.fake1.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 400,
+   "ROE_count__c": 400,
+   "Current_Customer__c": false,
+   "SDR_Target__c": true,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0001",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000002",
+   "Name": "Bravo Software Pty Ltd",
+   "Website": "www.fake2.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Western Australia",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 120,
+   "ROE_count__c": 120,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0002",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000003",
+   "Name": "Charlie Cloud Ltd",
+   "Website": "www.fake3.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "New Zealand",
+   "BillingState": null,
+   "BillingCity": null,
+   "HQ_Country__c": "New Zealand",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 80,
+   "ROE_count__c": 80,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0003",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000004",
+   "Name": "Delta Apps Pty Ltd",
+   "Website": "www.fake4.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Queensland",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0004",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000005",
+   "Name": "Echo DNC Holdings Pty Ltd",
+   "Website": "www.fake5.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 900,
+   "ROE_count__c": 900,
+   "Current_Customer__c": false,
+   "SDR_Target__c": true,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0005",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000006",
+   "Name": "Foxtrot Duplicate Pty Ltd",
+   "Website": "www.fake6.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Victoria",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 500,
+   "ROE_count__c": 500,
+   "Current_Customer__c": false,
+   "SDR_Target__c": true,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0006",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000007",
+   "Name": "Golf Switchboard Pty Ltd",
+   "Website": "www.fake7.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 250,
+   "ROE_count__c": 250,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0007",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000008",
+   "Name": "Hotel Recent Pty Ltd",
+   "Website": "www.fake8.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0008",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000009",
+   "Name": "India Old Connect Pty Ltd",
+   "Website": "www.fake9.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 150,
+   "ROE_count__c": 150,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0009",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000010",
+   "Name": "Juliet Lastsheet Pty Ltd",
+   "Website": "www.fake10.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 600,
+   "ROE_count__c": 600,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0010",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000011",
+   "Name": "Kilo Noprospect Pty Ltd",
+   "Website": "www.fake11.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 200,
+   "ROE_count__c": 200,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0011",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000012",
+   "Name": "Lima Nophone Pty Ltd",
+   "Website": "www.fake12.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Victoria",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 200,
+   "ROE_count__c": 200,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0012",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000013",
+   "Name": "Mike Adelaide Pty Ltd",
+   "Website": "www.fake13.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "South Australia",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 60,
+   "ROE_count__c": 60,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0013",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000014",
+   "Name": "November Flagged Pty Ltd",
+   "Website": "www.fake14.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "United States",
+   "BillingState": "Washington",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": "Victoria",
+   "ZoomInfo_Employee_Count__c": 250,
+   "ROE_count__c": 250,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0014",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000017",
+   "Name": "Sydney CBD",
+   "Website": "www.fake17.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 100,
+   "ROE_count__c": 100,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0017",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000019",
+   "Name": "Romeo Nosize Pty Ltd",
+   "Website": "www.fake19.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": null,
+   "ROE_count__c": null,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0019",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000020",
+   "Name": "Sierra Customer Pty Ltd",
+   "Website": "www.fake20.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": true,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0020",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000021",
+   "Name": "Tango Giant Pty Ltd",
+   "Website": "www.fake21.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 5000,
+   "ROE_count__c": 5000,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0021",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000022",
+   "Name": "Uniform Tiny Pty Ltd",
+   "Website": "www.fake22.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 5,
+   "ROE_count__c": 5,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0022",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000023",
+   "Name": "Victor Unknowncountry Pty Ltd",
+   "Website": "www.fake23.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Oz",
+   "BillingState": null,
+   "BillingCity": null,
+   "HQ_Country__c": "Oz",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 100,
+   "ROE_count__c": 100,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0023",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000024",
+   "Name": "Whiskey Optout Pty Ltd",
+   "Website": "www.fake24.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 100,
+   "ROE_count__c": 100,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0024",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000025",
+   "Name": "Xray Nopersona Pty Ltd",
+   "Website": "www.fake25.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Queensland",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 100,
+   "ROE_count__c": 100,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0025",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000026",
+   "Name": "Yankee Darwin Pty Ltd",
+   "Website": "www.fake26.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Northern Territory",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 150,
+   "ROE_count__c": 150,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0026",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000027",
+   "Name": "Zulu Brisbane Pty Ltd",
+   "Website": "www.fake27.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Queensland",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 150,
+   "ROE_count__c": 150,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0027",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000028",
+   "Name": "Alpha Two Pty Ltd",
+   "Website": "www.fake28.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Victoria",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0028",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000029",
+   "Name": "Bravo Two Pty Ltd",
+   "Website": "www.fake29.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "Victoria",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0029",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Name": "No Id Pty Ltd",
+   "BillingCountry": "Australia"
+  }
+ ],
+ "nooks_accounts": [
+  {
+   "id": "FAKE-NK-ACCT-0001",
+   "name": "Alpha Digital Pty Ltd",
+   "domain": "fake1.example.com",
+   "numEmployees": 400,
+   "_sf_account_id": "001FAKE00000001"
+  },
+  {
+   "id": "FAKE-NK-ACCT-0002",
+   "name": "Bravo Software Pty Ltd",
+   "domain": "fake2.example.com",
+   "numEmployees": 120,
+   "_sf_account_id": "001FAKE00000002"
+  },
+  {
+   "id": "FAKE-NK-ACCT-0003",
+   "name": "Charlie Cloud Ltd",
+   "domain": "fake3.example.com",
+   "numEmployees": 80,
+   "_sf_account_id": "001FAKE00000003"
+  },
+  {
+   "id": "FAKE-NK-ACCT-0016",
+   "name": "Papa Nooksonly Pty Ltd",
+   "domain": "fake16.example.com",
+   "numEmployees": 215
+  },
+  {
+   "id": "FAKE-NK-ACCT-0027",
+   "name": "Zulu Brisbane Pty Ltd",
+   "domain": "fake27.example.com",
+   "numEmployees": 150,
+   "_sf_account_id": "001FAKE00000027"
+  }
+ ],
+ "zoominfo_rows": [
+  {
+   "id": "FAKE-ZI-0001",
+   "type": "Company",
+   "attributes": {
+    "name": "Alpha Digital Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0002",
+   "type": "Company",
+   "attributes": {
+    "name": "Bravo Software Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0003",
+   "type": "Company",
+   "attributes": {
+    "name": "Charlie Cloud Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0004",
+   "type": "Company",
+   "attributes": {
+    "name": "Delta Apps Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0005",
+   "type": "Company",
+   "attributes": {
+    "name": "Echo DNC Holdings Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0006",
+   "type": "Company",
+   "attributes": {
+    "name": "Foxtrot Duplicate Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0007",
+   "type": "Company",
+   "attributes": {
+    "name": "Golf Switchboard Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0008",
+   "type": "Company",
+   "attributes": {
+    "name": "Hotel Recent Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0009",
+   "type": "Company",
+   "attributes": {
+    "name": "India Old Connect Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0010",
+   "type": "Company",
+   "attributes": {
+    "name": "Juliet Lastsheet Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0011",
+   "type": "Company",
+   "attributes": {
+    "name": "Kilo Noprospect Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0012",
+   "type": "Company",
+   "attributes": {
+    "name": "Lima Nophone Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0013",
+   "type": "Company",
+   "attributes": {
+    "name": "Mike Adelaide Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0014",
+   "type": "Company",
+   "attributes": {
+    "name": "November Flagged Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0015",
+   "type": "Company",
+   "attributes": {
+    "name": "Oscar Analytics Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0017",
+   "type": "Company",
+   "attributes": {
+    "name": "Sydney CBD"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0018",
+   "type": "Company",
+   "attributes": {
+    "name": "Melbourne CBD"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0019",
+   "type": "Company",
+   "attributes": {
+    "name": "Romeo Nosize Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0020",
+   "type": "Company",
+   "attributes": {
+    "name": "Sierra Customer Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0021",
+   "type": "Company",
+   "attributes": {
+    "name": "Tango Giant Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0022",
+   "type": "Company",
+   "attributes": {
+    "name": "Uniform Tiny Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0023",
+   "type": "Company",
+   "attributes": {
+    "name": "Victor Unknowncountry Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0024",
+   "type": "Company",
+   "attributes": {
+    "name": "Whiskey Optout Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0025",
+   "type": "Company",
+   "attributes": {
+    "name": "Xray Nopersona Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0026",
+   "type": "Company",
+   "attributes": {
+    "name": "Yankee Darwin Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0027",
+   "type": "Company",
+   "attributes": {
+    "name": "Zulu Brisbane Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0028",
+   "type": "Company",
+   "attributes": {
+    "name": "Alpha Two Pty Ltd"
+   }
+  },
+  {
+   "id": "FAKE-ZI-0029",
+   "type": "Company",
+   "attributes": {
+    "name": "Bravo Two Pty Ltd"
+   }
+  }
+ ],
+ "contacts": [
+  {
+   "Id": "003FAKE00010001",
+   "AccountId": "001FAKE00000001",
+   "Phone": null,
+   "MobilePhone": "+61400000001",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person1.1@fake1.example.com"
+  },
+  {
+   "Id": "003FAKE00020001",
+   "AccountId": "001FAKE00000002",
+   "Phone": null,
+   "MobilePhone": "+61400000002",
+   "HasOptedOutOfEmail": false,
+   "Title": "VP Product",
+   "Email": "person2.1@fake2.example.com"
+  },
+  {
+   "Id": "003FAKE00030001",
+   "AccountId": "001FAKE00000003",
+   "Phone": null,
+   "MobilePhone": "+64200000003",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Digital",
+   "Email": "person3.1@fake3.example.com"
+  },
+  {
+   "Id": "003FAKE00040001",
+   "AccountId": "001FAKE00000004",
+   "Phone": null,
+   "MobilePhone": "+61400000004",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person4.1@fake4.example.com"
+  },
+  {
+   "Id": "003FAKE00050001",
+   "AccountId": "001FAKE00000005",
+   "Phone": null,
+   "MobilePhone": "+61400000005",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person5.1@fake5.example.com"
+  },
+  {
+   "Id": "003FAKE00050002",
+   "AccountId": "001FAKE00000005",
+   "Phone": null,
+   "MobilePhone": "+61400000006",
+   "HasOptedOutOfEmail": false,
+   "Title": "Product Manager",
+   "Email": "person5.2@fake5.example.com"
+  },
+  {
+   "Id": "003FAKE00060001",
+   "AccountId": "001FAKE00000006",
+   "Phone": null,
+   "MobilePhone": "+61400000007",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "fran.one@fake6.example.com"
+  },
+  {
+   "Id": "003FAKE00060002",
+   "AccountId": "001FAKE00000006",
+   "Phone": null,
+   "MobilePhone": "+61400000008",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "Fran.One@fake6.example.com"
+  },
+  {
+   "Id": "003FAKE00070001",
+   "AccountId": "001FAKE00000007",
+   "Phone": null,
+   "MobilePhone": "+61400000009",
+   "HasOptedOutOfEmail": false,
+   "Title": "CTO",
+   "Email": "person7.1@fake7.example.com"
+  },
+  {
+   "Id": "003FAKE00070002",
+   "AccountId": "001FAKE00000007",
+   "Phone": null,
+   "MobilePhone": "+61400000009",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person7.2@fake7.example.com"
+  },
+  {
+   "Id": "003FAKE00070003",
+   "AccountId": "001FAKE00000007",
+   "Phone": null,
+   "MobilePhone": "+61400000010",
+   "HasOptedOutOfEmail": false,
+   "Title": "Product Manager",
+   "Email": "person7.3@fake7.example.com"
+  },
+  {
+   "Id": "003FAKE00080001",
+   "AccountId": "001FAKE00000008",
+   "Phone": null,
+   "MobilePhone": "+61400000011",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person8.1@fake8.example.com"
+  },
+  {
+   "Id": "003FAKE00090001",
+   "AccountId": "001FAKE00000009",
+   "Phone": null,
+   "MobilePhone": "+61400000012",
+   "HasOptedOutOfEmail": false,
+   "Title": "Director of Product",
+   "Email": "person9.1@fake9.example.com"
+  },
+  {
+   "Id": "003FAKE00100001",
+   "AccountId": "001FAKE00000010",
+   "Phone": null,
+   "MobilePhone": "+61400000013",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person10.1@fake10.example.com"
+  },
+  {
+   "Id": "003FAKE00120001",
+   "AccountId": "001FAKE00000012",
+   "Phone": null,
+   "MobilePhone": null,
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person12.1@fake12.example.com"
+  },
+  {
+   "Id": "003FAKE00130001",
+   "AccountId": "001FAKE00000013",
+   "Phone": null,
+   "MobilePhone": "+61400000014",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Customer Success",
+   "Email": "person13.1@fake13.example.com"
+  },
+  {
+   "Id": "003FAKE00140001",
+   "AccountId": "001FAKE00000014",
+   "Phone": null,
+   "MobilePhone": "+61400000015",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person14.1@fake14.example.com"
+  },
+  {
+   "Id": "003FAKE00160001",
+   "AccountId": null,
+   "Phone": null,
+   "MobilePhone": "+61400000016",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person16.1@fake16.example.com"
+  },
+  {
+   "Id": "003FAKE00170001",
+   "AccountId": "001FAKE00000017",
+   "Phone": null,
+   "MobilePhone": "+61400000017",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person17.1@fake17.example.com"
+  },
+  {
+   "Id": "003FAKE00190001",
+   "AccountId": "001FAKE00000019",
+   "Phone": null,
+   "MobilePhone": "+61400000018",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person19.1@fake19.example.com"
+  },
+  {
+   "Id": "003FAKE00240001",
+   "AccountId": "001FAKE00000024",
+   "Phone": null,
+   "MobilePhone": "+61400000019",
+   "HasOptedOutOfEmail": true,
+   "Title": "Head of Product",
+   "Email": "person24.1@fake24.example.com"
+  },
+  {
+   "Id": "003FAKE00250001",
+   "AccountId": "001FAKE00000025",
+   "Phone": null,
+   "MobilePhone": "+61400000020",
+   "HasOptedOutOfEmail": false,
+   "Title": "Receptionist",
+   "Email": "person25.1@fake25.example.com"
+  },
+  {
+   "Id": "003FAKE00260001",
+   "AccountId": "001FAKE00000026",
+   "Phone": null,
+   "MobilePhone": "+61400000021",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person26.1@fake26.example.com"
+  },
+  {
+   "Id": "003FAKE00270001",
+   "AccountId": "001FAKE00000027",
+   "Phone": null,
+   "MobilePhone": "+61400000022",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "person27.1@fake27.example.com"
+  },
+  {
+   "Id": "003FAKE00270002",
+   "AccountId": null,
+   "Phone": null,
+   "MobilePhone": "+61400000023",
+   "HasOptedOutOfEmail": false,
+   "Title": "Product Manager",
+   "Email": "person27.2@fake27.example.com"
+  },
+  {
+   "Id": "003FAKE00280001",
+   "AccountId": "001FAKE00000028",
+   "Phone": null,
+   "MobilePhone": "+61400000024",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "amy.mailed@fake28.example.com"
+  },
+  {
+   "Id": "003FAKE00290001",
+   "AccountId": "001FAKE00000029",
+   "Phone": null,
+   "MobilePhone": "+61400000025",
+   "HasOptedOutOfEmail": false,
+   "Title": "Head of Product",
+   "Email": "ben.mailed@fake29.example.com"
+  }
+ ],
+ "nooks_prospects": [
+  {
+   "id": "FAKE-NK-P-0001-1",
+   "type": "salesforce",
+   "name": "Person 1-1",
+   "firstName": "Person",
+   "lastName": "1-1",
+   "title": "Head of Product",
+   "primaryEmail": "person1.1@fake1.example.com",
+   "crmId": "003FAKE00010001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0001"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0002-1",
+   "type": "salesforce",
+   "name": "Person 2-1",
+   "firstName": "Person",
+   "lastName": "2-1",
+   "title": "VP Product",
+   "primaryEmail": "person2.1@fake2.example.com",
+   "crmId": "003FAKE00020001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0002"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0003-1",
+   "type": "salesforce",
+   "name": "Person 3-1",
+   "firstName": "Person",
+   "lastName": "3-1",
+   "title": "Head of Digital",
+   "primaryEmail": "person3.1@fake3.example.com",
+   "crmId": "003FAKE00030001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0003"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0004-1",
+   "type": "salesforce",
+   "name": "Person 4-1",
+   "firstName": "Person",
+   "lastName": "4-1",
+   "title": "Head of Product",
+   "primaryEmail": "person4.1@fake4.example.com",
+   "crmId": "003FAKE00040001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0004"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0005-1",
+   "type": "salesforce",
+   "name": "Dana Dnc",
+   "firstName": "Dana",
+   "lastName": "Dnc",
+   "title": "Head of Product",
+   "primaryEmail": "person5.1@fake5.example.com",
+   "crmId": "003FAKE00050001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0005"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0005-2",
+   "type": "salesforce",
+   "name": "Pat Callable",
+   "firstName": "Pat",
+   "lastName": "Callable",
+   "title": "Product Manager",
+   "primaryEmail": "person5.2@fake5.example.com",
+   "crmId": "003FAKE00050002",
+   "account": {
+    "id": "FAKE-NK-ACCT-0005"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0006-1",
+   "type": "salesforce",
+   "name": "Fran One",
+   "firstName": "Fran",
+   "lastName": "One",
+   "title": "Head of Product",
+   "primaryEmail": "fran.one@fake6.example.com",
+   "crmId": "003FAKE00060001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0006"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0006-2",
+   "type": "salesforce",
+   "name": "Fran Dup",
+   "firstName": "Fran",
+   "lastName": "Dup",
+   "title": "Head of Product",
+   "primaryEmail": "Fran.One@fake6.example.com",
+   "crmId": "003FAKE00060002",
+   "account": {
+    "id": "FAKE-NK-ACCT-0006"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0007-1",
+   "type": "salesforce",
+   "name": "Gus Dnc",
+   "firstName": "Gus",
+   "lastName": "Dnc",
+   "title": "CTO",
+   "primaryEmail": "person7.1@fake7.example.com",
+   "crmId": "003FAKE00070001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0007"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0007-2",
+   "type": "salesforce",
+   "name": "Gail Shared",
+   "firstName": "Gail",
+   "lastName": "Shared",
+   "title": "Head of Product",
+   "primaryEmail": "person7.2@fake7.example.com",
+   "crmId": "003FAKE00070002",
+   "account": {
+    "id": "FAKE-NK-ACCT-0007"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0007-3",
+   "type": "salesforce",
+   "name": "Gil Own",
+   "firstName": "Gil",
+   "lastName": "Own",
+   "title": "Product Manager",
+   "primaryEmail": "person7.3@fake7.example.com",
+   "crmId": "003FAKE00070003",
+   "account": {
+    "id": "FAKE-NK-ACCT-0007"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0008-1",
+   "type": "salesforce",
+   "name": "Person 8-1",
+   "firstName": "Person",
+   "lastName": "8-1",
+   "title": "Head of Product",
+   "primaryEmail": "person8.1@fake8.example.com",
+   "crmId": "003FAKE00080001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0008"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0009-1",
+   "type": "salesforce",
+   "name": "Person 9-1",
+   "firstName": "Person",
+   "lastName": "9-1",
+   "title": "Director of Product",
+   "primaryEmail": "person9.1@fake9.example.com",
+   "crmId": "003FAKE00090001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0009"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0010-1",
+   "type": "salesforce",
+   "name": "Person 10-1",
+   "firstName": "Person",
+   "lastName": "10-1",
+   "title": "Head of Product",
+   "primaryEmail": "person10.1@fake10.example.com",
+   "crmId": "003FAKE00100001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0010"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0012-1",
+   "type": "salesforce",
+   "name": "Person 12-1",
+   "firstName": "Person",
+   "lastName": "12-1",
+   "title": "Head of Product",
+   "primaryEmail": "person12.1@fake12.example.com",
+   "crmId": "003FAKE00120001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0012"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0013-1",
+   "type": "salesforce",
+   "name": "Person 13-1",
+   "firstName": "Person",
+   "lastName": "13-1",
+   "title": "Head of Customer Success",
+   "primaryEmail": "person13.1@fake13.example.com",
+   "crmId": "003FAKE00130001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0013"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0014-1",
+   "type": "salesforce",
+   "name": "Person 14-1",
+   "firstName": "Person",
+   "lastName": "14-1",
+   "title": "Head of Product",
+   "primaryEmail": "person14.1@fake14.example.com",
+   "crmId": "003FAKE00140001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0014"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0016-1",
+   "type": "salesforce",
+   "name": "Person 16-1",
+   "firstName": "Person",
+   "lastName": "16-1",
+   "title": "Head of Product",
+   "primaryEmail": "person16.1@fake16.example.com",
+   "crmId": "003FAKE00160001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0016"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0017-1",
+   "type": "salesforce",
+   "name": "Person 17-1",
+   "firstName": "Person",
+   "lastName": "17-1",
+   "title": "Head of Product",
+   "primaryEmail": "person17.1@fake17.example.com",
+   "crmId": "003FAKE00170001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0017"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0019-1",
+   "type": "salesforce",
+   "name": "Person 19-1",
+   "firstName": "Person",
+   "lastName": "19-1",
+   "title": "Head of Product",
+   "primaryEmail": "person19.1@fake19.example.com",
+   "crmId": "003FAKE00190001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0019"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0024-1",
+   "type": "salesforce",
+   "name": "Person 24-1",
+   "firstName": "Person",
+   "lastName": "24-1",
+   "title": "Head of Product",
+   "primaryEmail": "person24.1@fake24.example.com",
+   "crmId": "003FAKE00240001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0024"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0025-1",
+   "type": "salesforce",
+   "name": "Person 25-1",
+   "firstName": "Person",
+   "lastName": "25-1",
+   "title": "Receptionist",
+   "primaryEmail": "person25.1@fake25.example.com",
+   "crmId": "003FAKE00250001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0025"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0026-1",
+   "type": "salesforce",
+   "name": "Person 26-1",
+   "firstName": "Person",
+   "lastName": "26-1",
+   "title": "Head of Product",
+   "primaryEmail": "person26.1@fake26.example.com",
+   "crmId": "003FAKE00260001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0026"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0027-1",
+   "type": "salesforce",
+   "name": "Person 27-1",
+   "firstName": "Person",
+   "lastName": "27-1",
+   "title": "Head of Product",
+   "primaryEmail": "person27.1@fake27.example.com",
+   "crmId": "003FAKE00270001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0027"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0027-2",
+   "type": "salesforce",
+   "name": "Person 27-2",
+   "firstName": "Person",
+   "lastName": "27-2",
+   "title": "Product Manager",
+   "primaryEmail": "person27.2@fake27.example.com",
+   "crmId": "003FAKE00270002",
+   "account": {
+    "id": "FAKE-NK-ACCT-0027"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0028-1",
+   "type": "salesforce",
+   "name": "Person 28-1",
+   "firstName": "Person",
+   "lastName": "28-1",
+   "title": "Head of Product",
+   "primaryEmail": "amy.mailed@fake28.example.com",
+   "crmId": "003FAKE00280001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0028"
+   }
+  },
+  {
+   "id": "FAKE-NK-P-0029-1",
+   "type": "salesforce",
+   "name": "Person 29-1",
+   "firstName": "Person",
+   "lastName": "29-1",
+   "title": "Head of Product",
+   "primaryEmail": "ben.mailed@fake29.example.com",
+   "crmId": "003FAKE00290001",
+   "account": {
+    "id": "FAKE-NK-ACCT-0029"
+   }
+  }
+ ],
+ "calls": [
+  {
+   "id": "FAKE-CALL-000001",
+   "source": "nooks_sep",
+   "duration": 25,
+   "to": "+61400000001",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0001-1"
+   },
+   "callDisposition": {
+    "id": "disp-voicemail"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2025-10-21T03:00:00Z",
+   "createdAt": "2025-10-21T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000002",
+   "source": "nooks_sep",
+   "duration": 30,
+   "to": "+61400000005",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0005-1"
+   },
+   "callDisposition": {
+    "id": "disp-do-not-call"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-05-09T03:00:00Z",
+   "createdAt": "2026-05-09T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000003",
+   "source": "nooks_sep",
+   "duration": 20,
+   "to": "+61400000007",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0006-1"
+   },
+   "callDisposition": {
+    "id": "disp-do-not-call"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-06-28T03:00:00Z",
+   "createdAt": "2026-06-28T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000004",
+   "source": "nooks_sep",
+   "duration": 25,
+   "to": "+61400000009",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0007-1"
+   },
+   "callDisposition": {
+    "id": "disp-do-not-call"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-08-27T03:00:00Z",
+   "createdAt": "2026-08-27T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000005",
+   "source": "nooks_sep",
+   "duration": 35,
+   "to": "+61400000011",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0008-1"
+   },
+   "callDisposition": {
+    "id": "disp-no-answer"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-11-23T00:36:00Z",
+   "createdAt": "2026-11-23T00:36:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000006",
+   "source": "nooks_sep",
+   "duration": 120,
+   "to": "+61400000012",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0009-1"
+   },
+   "callDisposition": {
+    "id": "disp-objection-not-interested"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-11-05T03:00:00Z",
+   "createdAt": "2026-11-05T03:00:00Z"
+  },
+  {
+   "id": "FAKE-CALL-000007",
+   "source": "nooks_sep",
+   "duration": 30,
+   "to": "+61400000025",
+   "direction": "outgoing",
+   "prospect": {
+    "id": "FAKE-NK-P-0029-1"
+   },
+   "callDisposition": {
+    "id": "disp-no-answer"
+   },
+   "owner": {
+    "id": "FAKE-NOOKS-USER-ALEX"
+   },
+   "time": "2026-11-15T03:00:00Z",
+   "createdAt": "2026-11-15T03:00:00Z"
+  }
+ ],
+ "scoops": [
+  {
+   "id": "FAKE-SCOOP-00001",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00001",
+    "company": {
+     "id": "FAKE-ZI-0001",
+     "name": "Co 1"
+    },
+    "description": "Alpha has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00002",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00002",
+    "company": {
+     "id": "FAKE-ZI-0002",
+     "name": "Co 2"
+    },
+    "description": "Bravo has raised $12 million in Series B funding.",
+    "publishedDate": "2026-11-15T03:00:00Z",
+    "originalPublishedDate": "2026-11-15T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00003",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00003",
+    "company": {
+     "id": "FAKE-ZI-0003",
+     "name": "Co 3"
+    },
+    "description": "Charlie launched a new mobile banking app for customers.",
+    "publishedDate": "2026-11-20T03:00:00Z",
+    "originalPublishedDate": "2026-11-20T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Launch"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Product Launch"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00004",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00004",
+    "company": {
+     "id": "FAKE-ZI-0005",
+     "name": "Co 5"
+    },
+    "description": "Echo has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-24T03:00:00Z",
+    "originalPublishedDate": "2026-11-24T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00005",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00005",
+    "company": {
+     "id": "FAKE-ZI-0006",
+     "name": "Co 6"
+    },
+    "description": "Foxtrot has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-23T03:00:00Z",
+    "originalPublishedDate": "2026-11-23T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00006",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00006",
+    "company": {
+     "id": "FAKE-ZI-0007",
+     "name": "Co 7"
+    },
+    "description": "Golf raised $8 million in funding.",
+    "publishedDate": "2026-11-21T03:00:00Z",
+    "originalPublishedDate": "2026-11-21T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00007",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00007",
+    "company": {
+     "id": "FAKE-ZI-0008",
+     "name": "Co 8"
+    },
+    "description": "Hotel raised $20 million in funding.",
+    "publishedDate": "2026-11-23T03:00:00Z",
+    "originalPublishedDate": "2026-11-23T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00008",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00008",
+    "company": {
+     "id": "FAKE-ZI-0009",
+     "name": "Co 9"
+    },
+    "description": "India raised $5 million in funding.",
+    "publishedDate": "2026-11-19T03:00:00Z",
+    "originalPublishedDate": "2026-11-19T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00009",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00009",
+    "company": {
+     "id": "FAKE-ZI-0010",
+     "name": "Co 10"
+    },
+    "description": "Juliet has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-24T03:00:00Z",
+    "originalPublishedDate": "2026-11-24T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00010",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00010",
+    "company": {
+     "id": "FAKE-ZI-0011",
+     "name": "Co 11"
+    },
+    "description": "Kilo raised $9 million in funding.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00011",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00011",
+    "company": {
+     "id": "FAKE-ZI-0014",
+     "name": "Co 14"
+    },
+    "description": "November launched a new customer app.",
+    "publishedDate": "2026-11-21T03:00:00Z",
+    "originalPublishedDate": "2026-11-21T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Launch"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Product Launch"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00012",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00012",
+    "company": {
+     "id": "FAKE-ZI-0015",
+     "name": "Co 15"
+    },
+    "description": "Oscar has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-23T03:00:00Z",
+    "originalPublishedDate": "2026-11-23T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00013",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00013",
+    "company": {
+     "id": "FAKE-ZI-0019",
+     "name": "Co 19"
+    },
+    "description": "Romeo raised $3 million in funding.",
+    "publishedDate": "2026-11-20T03:00:00Z",
+    "originalPublishedDate": "2026-11-20T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00014",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00014",
+    "company": {
+     "id": "FAKE-ZI-0026",
+     "name": "Co 26"
+    },
+    "description": "Yankee has appointed a new Head of Product to lead its digital product team.",
+    "publishedDate": "2026-11-20T03:00:00Z",
+    "originalPublishedDate": "2026-11-20T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Product Management"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Executive Move"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00015",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00015",
+    "company": {
+     "id": "FAKE-ZI-0027",
+     "name": "Co 27"
+    },
+    "description": "Zulu raised $4 million in funding.",
+    "publishedDate": "2026-11-19T03:00:00Z",
+    "originalPublishedDate": "2026-11-19T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00016",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00016",
+    "company": {
+     "id": "FAKE-ZI-0004",
+     "name": "Co 4"
+    },
+    "description": "Delta has more open roles in Medical & Health.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Customer Experience"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Hiring Plans"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00017",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00017",
+    "company": {
+     "id": "FAKE-ZI-0013",
+     "name": "Co 13"
+    },
+    "description": "Mike opened a new warehouse.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Real Estate"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Facilities"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00018",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00018",
+    "company": {
+     "id": "FAKE-ZI-0002",
+     "name": "Co 2"
+    },
+    "description": "Bravo raised funding long ago.",
+    "publishedDate": "2026-05-09T03:00:00Z",
+    "originalPublishedDate": "2026-05-09T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-00019",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-00019",
+    "company": {
+     "id": "FAKE-ZI-9999",
+     "name": "Co 99"
+    },
+    "description": "Nobody Pty Ltd raised funding.",
+    "publishedDate": "2026-11-22T03:00:00Z",
+    "originalPublishedDate": "2026-11-22T03:00:00Z",
+    "topics": [
+     {
+      "id": "T0",
+      "topic": "Funding"
+     }
+    ],
+    "types": [
+     {
+      "id": "Y1",
+      "type": "Funding"
+     }
+    ]
+   }
+  },
+  {
+   "id": "FAKE-SCOOP-BAD",
+   "type": "Scoop",
+   "attributes": {
+    "id": "FAKE-SCOOP-BAD",
+    "company": {
+     "id": "FAKE-ZI-0001"
+    },
+    "description": "no date",
+    "types": [],
+    "topics": []
+   }
+  }
+ ],
+ "sent_threads": [
+  {
+   "id": "FAKE-THR-FAKE-MSG-28",
+   "messages": [
+    {
+     "id": "FAKE-MSG-28",
+     "threadId": "FAKE-THR-FAKE-MSG-28",
+     "toRecipients": [
+      "amymailed@fake28.example.com"
+     ],
+     "internalDate": 1795489200000
+    }
+   ]
+  },
+  {
+   "id": "FAKE-THR-FAKE-MSG-29",
+   "messages": [
+    {
+     "id": "FAKE-MSG-29",
+     "threadId": "FAKE-THR-FAKE-MSG-29",
+     "toRecipients": [
+      "benmailed@fake29.example.com"
+     ],
+     "internalDate": 1795489200000
+    }
+   ]
+  }
+ ],
+ "dispositions": [
+  {
+   "id": "disp-no-answer",
+   "name": "No Answer",
+   "source": "nooks_sep",
+   "callOutcome": "No Answer",
+   "archived": false
+  },
+  {
+   "id": "disp-voicemail",
+   "name": "Left Voicemail",
+   "source": "nooks_sep",
+   "callOutcome": "No Answer",
+   "archived": false
+  },
+  {
+   "id": "disp-bad-number",
+   "name": "Bad Number / Wrong Number",
+   "source": "nooks_sep",
+   "callOutcome": "No Answer",
+   "archived": false
+  },
+  {
+   "id": "disp-gatekeeper",
+   "name": "Gatekeeper",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-do-not-call",
+   "name": "Do Not Call",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-wrong-person",
+   "name": "Wrong Person",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-left-company",
+   "name": "Person Left Company",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-hang-up",
+   "name": "Hang Up",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-follow-up-keep-in-sequence",
+   "name": "Follow-Up - Keep in Sequence",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-follow-up-remove-from-sequence",
+   "name": "Follow-Up - Remove from Sequence",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-meeting",
+   "name": "Meeting Scheduled",
+   "source": "nooks_sep",
+   "callOutcome": "Meeting",
+   "archived": false
+  },
+  {
+   "id": "disp-objection-not-interested",
+   "name": "Objection: Not Interested",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-objection-not-a-priority",
+   "name": "Objection: Not a Priority",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-objection-budget",
+   "name": "Objection: Budget",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-objection-already-have-a-solution",
+   "name": "Objection: Already Have a Solution",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  },
+  {
+   "id": "disp-objection-bad-fit",
+   "name": "Objection: Bad fit",
+   "source": "nooks_sep",
+   "callOutcome": "Connect",
+   "archived": false
+  }
+ ]
+}

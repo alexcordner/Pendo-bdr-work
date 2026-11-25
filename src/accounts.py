@@ -256,23 +256,36 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
                        touched: Mapping[str, date], today: date,
                        blocked_account_ids: set[str] = frozenset(),
                        cooldown_days: int | None = None,
-                       cooldown_until: Mapping[str, date] | None = None) -> AccountListResult:
+                       cooldown_until: Mapping[str, date] | None = None,
+                       call_date: date | None = None) -> AccountListResult:
     """Merge the three sources and apply the drop rules. See the module docstring.
 
-    ``cooldown_until`` (optional, id -> date, e.g. from 1c state) takes precedence over
-    ``touched`` + ``cooldown_days`` for the ids it covers: dropped while ``today < cooldown_until``.
+    COOLDOWN (prefer ``cooldown_until``): callers should pass ``cooldown_until`` (id -> first date
+    the account may be called again, from 1c state: ``state.cooldown_until`` / ``cooldown_until_by``).
+    When ``cooldown_until`` is given (even as ``{}``), ``touched`` is IGNORED for cooldown
+    purposes, so an email-only touch never drops an account (emails do not start call cooldowns).
+    ``touched`` + ``cooldown_days`` is the legacy path, kept for tests and callers without state.
+    An account is dropped while ``cooldown_until`` is after the reference date; equal is eligible.
+    ``call_date`` is the first date the account would be called (account-local semantics are the
+    caller's job, 2c passes it). The reference date is ``call_date`` when given, else ``today``;
+    so a night run on Wed (today=Wed) with call_date=Thu keeps an account whose cooldown ends Thu.
     ``touched`` maps an account id (sf_account_id, or zoominfo/nooks id for non-SF accounts) to the
     date it was last touched (``date``, ``datetime`` or ISO string). ``cooldown_days`` overrides
     ``limits.cooldown_days_no_answer``. A Nooks row may carry the optional key ``_sf_account_id``
     (set by the caller when it was fetched with ``listAccounts filter_crmId=<SF id>``) so it
-    merges into the Salesforce account. Salesforce ids are compared as given (15 vs 18 char forms
-    are NOT normalised: callers must use one form).
+    merges into the Salesforce account. Salesforce ids are normalised to the canonical 15-char form
+    (``normalise_sf_id``) in the rows and in the keys of ``touched``, ``cooldown_until``,
+    ``blocked_account_ids`` and ``_sf_account_id``, so 15- and 18-char forms match.
     """
     cooldown = config.limits.cooldown_days_no_answer if cooldown_days is None else cooldown_days
     # Salesforce ids may arrive as 15 or 18 chars: key everything on the canonical form (the raw
     # key is kept too, so ZoomInfo/Nooks ids are unaffected).
     touched = _with_normalised_keys(touched)
+    use_until = cooldown_until is not None      # state-based cooldown: touched is then ignored
     cooldown_until = _with_normalised_keys(cooldown_until or {})
+    if use_until:
+        touched = {}
+    ref_date = call_date or today
     blocked_account_ids = set(blocked_account_ids) | {normalise_sf_id(b) for b in blocked_account_ids} - {None}
     prio = {s: i for i, s in enumerate(config.sources)}
     result = AccountListResult()
@@ -351,7 +364,7 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     kept: list[Account] = []
     for a in merged:
         _annotate(a, config)
-        drop = _drop_reason(a, config, touched, today, blocked_account_ids, cooldown, cooldown_until)
+        drop = _drop_reason(a, config, touched, ref_date, blocked_account_ids, cooldown, cooldown_until)
         if drop:
             reason, detail = drop
             result.dropped.append(Dropped(a.name, a.sf_account_id or a.zoominfo_id or a.nooks_account_id,
@@ -427,7 +440,7 @@ def _touch_date(a: Account, touched: Mapping[str, date]) -> date | None:
     return max(dates) if dates else None
 
 
-def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today: date,
+def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today: date,   # today = reference date
                  blocked: set[str], cooldown: int,
                  cooldown_until: Mapping[str, date] | None = None) -> tuple[str, str] | None:
     """First matching drop rule as (reason, detail), or None to keep."""
@@ -452,9 +465,9 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
         if a.employees < config.company_size.min_employees:
             return R_UNDER_MIN, f"{a.employees} employees < min {config.company_size.min_employees}"
     until = _touch_date(a, cooldown_until or {})
-    if until is not None:        # explicit cooldown_until (from state) wins over touched + cooldown
+    if until is not None:        # explicit cooldown_until (from state); touched was cleared by the caller
         if today < until:
-            return R_TOUCHED, f"cooldown_until {until.isoformat()} is after today ({today.isoformat()})"
+            return R_TOUCHED, f"cooldown_until {until.isoformat()} is after {today.isoformat()}"
         return None
     last = _touch_date(a, touched)
     if last is not None and (today - last).days < cooldown:
@@ -464,6 +477,17 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
 
 
 # ---------------------------------------------------------------- helpers for callers
+def group_by_zoominfo_id(accounts: Iterable[Account]) -> dict[str, list[Account]]:
+    """zoominfo_id -> ALL accounts carrying it (input order). Two SF accounts can share one ZoomInfo
+    id (both are kept, flagged ``possible_duplicate``), so the signals join should attach the same
+    trigger to every account in the list. Accounts without a zoominfo_id are left out."""
+    out: dict[str, list[Account]] = defaultdict(list)
+    for a in accounts:
+        if a.zoominfo_id:
+            out[a.zoominfo_id].append(a)
+    return dict(out)
+
+
 def list_flagged(accounts: Iterable[Account]) -> list[Account]:
     """Accounts in the 'non-ANZ billing, ANZ HQ' group, for Alex to review. Config-free."""
     return [a for a in accounts if a.non_anz_billing_anz_hq]

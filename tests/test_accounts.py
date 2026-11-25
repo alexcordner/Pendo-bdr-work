@@ -4,7 +4,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from src.accounts import (AccountListResult, Dropped, build_account_list, confidence, list_flagged,
+from src.accounts import (AccountListResult, Dropped, build_account_list, confidence, group_by_zoominfo_id,
+                          list_flagged,
                           noise_reason, normalise_name, summarise)
 from src.models import Account
 from tests.conftest import load_fixture
@@ -716,10 +717,71 @@ def test_cooldown_until_overrides_touched(config):
     assert len(res.accounts) == 1
 
 
-def test_cooldown_until_only_for_covered_ids_else_touched_applies(config):
+def test_touched_ignored_when_cooldown_until_passed(config):
+    """M1: with cooldown_until given, touched (e.g. an email touch) never drops an account."""
     res = build(sf=[sf_row("S1"), sf_row("S2")], touched={"S2": TODAY},
                 cooldown_until={"S1": TODAY - timedelta(days=5)}, config=config)
+    assert [a.sf_account_id for a in res.accounts] == ["S1", "S2"] and not res.dropped
+
+
+def test_email_only_touch_never_drops_when_cooldown_until_passed(config):
+    # S1 emailed today (touched), no call cooldown: eligible. S2 has a call cooldown: dropped.
+    res = build(sf=[sf_row("S1"), sf_row("S2")], touched={"S1": TODAY, "S2": TODAY},
+                cooldown_until={"S2": TODAY + timedelta(days=2)}, config=config)
     assert [a.sf_account_id for a in res.accounts] == ["S1"] and res.dropped[0].id == "S2"
+
+
+def test_empty_cooldown_until_still_ignores_touched(config):
+    assert len(build(sf=[sf_row("S1")], touched={"S1": TODAY}, cooldown_until={}, config=config).accounts) == 1
+
+
+def test_touched_legacy_path_without_cooldown_until(config):
+    assert build(sf=[sf_row("S1")], touched={"S1": TODAY}, config=config).stats == {"recently_touched": 1}
+
+
+# ------------------------------------------------------------ M2: call_date
+def test_night_run_cooldown_ending_on_call_day_is_kept(config):
+    wed, thu = date(2026, 11, 25), date(2026, 11, 26)
+    kw = dict(sf=[sf_row("S1")], cooldown_until={"S1": thu}, config=config)
+    assert build(**kw).stats == {"recently_touched": 1}                    # today=Wed only: dropped
+    res = build_account_list(list(kw["sf"]), [], [], config, {}, wed, frozenset(), cooldown_until={"S1": thu},
+                             call_date=thu)
+    assert len(res.accounts) == 1 and not res.dropped                      # first call day Thu: eligible
+
+
+def test_call_date_before_cooldown_end_still_drops(config):
+    wed, thu = date(2026, 11, 25), date(2026, 11, 26)
+    res = build_account_list([sf_row("S1")], [], [], config, {}, wed, frozenset(),
+                             cooldown_until={"S1": thu + timedelta(days=1)}, call_date=thu)
+    assert res.stats == {"recently_touched": 1}
+
+
+def test_call_date_applies_to_legacy_touched_path(config):
+    touched_day = TODAY - timedelta(days=config.limits.cooldown_days_no_answer - 1)   # still cooling today
+    assert build(sf=[sf_row("S1")], touched={"S1": touched_day}, config=config).stats == {"recently_touched": 1}
+    res = build_account_list([sf_row("S1")], [], [], config, {"S1": touched_day}, TODAY, frozenset(),
+                             call_date=TODAY + timedelta(days=1))
+    assert len(res.accounts) == 1
+
+
+# ------------------------------------------------------------ L2: group_by_zoominfo_id
+def test_group_by_zoominfo_id_keeps_all_accounts(config):
+    res = build(sf=shared_zi_rows() + [sf_row("A3", "Fake Three Pty Ltd", **{"DOZISF__ZoomInfo_Id__c": "Z3"}),
+                                       sf_row("A4", "Fake Four Pty Ltd")], config=config)
+    groups = group_by_zoominfo_id(res.accounts)
+    assert [a.sf_account_id for a in groups["Z9"]] == ["A1", "A2"]
+    assert all("possible_duplicate" in a.flags for a in groups["Z9"])
+    assert [a.sf_account_id for a in groups["Z3"]] == ["A3"]
+    assert set(groups) == {"Z9", "Z3"}                                      # A4 has no id: left out
+
+
+def test_group_by_zoominfo_id_empty():
+    assert group_by_zoominfo_id([]) == {}
+
+
+def test_docstring_says_ids_are_normalised():
+    doc = build_account_list.__doc__
+    assert "NOT normalised" not in doc and "normalise_sf_id" in doc
 
 
 def test_cooldown_until_accepts_18char_key_and_iso(config):
