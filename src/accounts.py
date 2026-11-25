@@ -75,6 +75,8 @@ FLAG_GROUP = "flagged_non_anz_billing_anz_hq"
 FLAG_POSSIBLE_DUPLICATE = "possible_duplicate"
 FLAG_COUNTRY_UNKNOWN = "country_unknown"
 NOISE_FLAGS = (R_NOISE_LOCATION, R_NOISE_LOCAL_BUSINESS, R_NOISE_GOVERNMENT, R_NOISE_VAGUE)
+FLAG_LARGE_NAME_GROUP = "large_name_group"
+FLAG_LARGE_DOMAIN_GROUP = "large_domain_group"
 STAT_NAME_MERGED = "name_merged"
 STAT_NAME_AMBIGUOUS = "name_merge_ambiguous"
 
@@ -364,7 +366,10 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
                 index(match)
                 _mark_duplicates(match, same_source)
 
-    # 3. flags and drops
+    # 3a. probable same-company groups: flagged, never merged or dropped here
+    flag_probable_duplicates(merged)
+
+    # 3b. flags and drops
     kept: list[Account] = []
     for a in merged:
         _annotate(a, config)
@@ -481,6 +486,206 @@ def _drop_reason(a: Account, config: Config, touched: Mapping[str, date], today:
 
 
 # ---------------------------------------------------------------- helpers for callers
+# ---------------------------------------------------------------- probable-duplicate detector
+# Flags (never merges, never drops) accounts that are probably the same company:
+#   (a) same website registrable domain (shared hosting / social domains ignored),
+#   (b) one name's distinctive tokens are a whole-word sequence inside the other's, after removing
+#       legal suffixes and generic words ("Catapult" vs "Catapult Communications"),
+#   (c) shared ids (sf / zoominfo / nooks).
+# A name group of more than _MAX_GROUP accounts is NOT flagged as duplicates (a common word, not a
+# company): its members get ``large_name_group`` instead. Same for domains (``large_domain_group``).
+_MAX_GROUP = 6
+# Removed from names before comparing: legal suffixes, country words, filler.
+_DROP_WORDS = {"pty", "ltd", "limited", "inc", "incorporated", "llc", "plc", "proprietary", "group",
+               "holdings", "holding", "australia", "australian", "nz", "new", "zealand", "the", "and",
+               "of", "co", "company", "corporation", "corp", "anz", "au"}
+# Too common to prove two names are the same company on their own ("Australia Post" vs "Post
+# Office"): the SHORTER name needs at least one token that is not in this set.
+_WEAK_WORDS = {"post", "office", "bank", "health", "insurance", "energy", "services", "service",
+               "solutions", "systems", "technology", "technologies", "digital", "media", "communications",
+               "university", "council", "finance", "financial", "capital", "partners", "consulting",
+               "software", "international", "global", "national", "general", "first", "state", "city",
+               "community", "trust", "fund", "funds", "network", "networks", "properties", "property",
+               "management", "industries", "resources", "retail", "foods", "care", "education",
+               "college", "school", "hospital", "transport", "logistics", "construction", "mining"}
+# Hosts that many unrelated companies share: never evidence of a duplicate.
+_SHARED_DOMAINS = {"linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com",
+                   "youtube.com", "google.com", "wixsite.com", "wix.com", "weebly.com", "squarespace.com",
+                   "wordpress.com", "blogspot.com", "github.io", "business.site", "linktr.ee",
+                   "medium.com", "godaddysites.com", "myshopify.com", "netlify.app", "herokuapp.com",
+                   "azurewebsites.net", "pages.dev", "tiktok.com", "pinterest.com", "bit.ly"}
+_SLD_PARTS = {"com", "net", "org", "gov", "edu", "co", "ac", "asn", "id", "govt", "org", "nom"}
+
+
+def registrable_domain(website: str | None) -> str | None:
+    """'https://www.Example.com.au/path?x' -> 'example.com.au'; None for blanks or shared hosts."""
+    if not website or not isinstance(website, str):
+        return None
+    host = re.sub(r"^[a-z][a-z0-9+.-]*://", "", website.strip().lower())
+    host = re.split(r"[/?#]", host, maxsplit=1)[0].split("@")[-1].split(":")[0].strip(".")
+    if not host or "." not in host:
+        return None
+    labels = host.split(".")
+    if labels[0] == "www":
+        labels = labels[1:]
+    if len(labels) < 2:
+        return None
+    take = 3 if len(labels) >= 3 and len(labels[-1]) == 2 and labels[-2] in _SLD_PARTS else 2
+    dom = ".".join(labels[-take:])
+    return None if dom in _SHARED_DOMAINS else dom
+
+
+def _core_tokens(name: str) -> tuple[str, ...]:
+    return tuple(t for t in _tokens(name) if t not in _DROP_WORDS)
+
+
+def _contains(big: tuple[str, ...], small: tuple[str, ...]) -> bool:
+    n = len(small)
+    return n > 0 and any(big[i:i + n] == small for i in range(len(big) - n + 1))
+
+
+def _names_match(a: tuple[str, ...], b: tuple[str, ...]) -> bool:
+    """Whole-word containment of the shorter distinctive name in the longer (or equal)."""
+    if not a or not b:
+        return False
+    small, big = (a, b) if len(a) <= len(b) else (b, a)
+    if not any(len(t) >= 2 and t not in _WEAK_WORDS for t in small):
+        return False
+    return _contains(big, small)
+
+
+class _UF:
+    def __init__(self, n: int):
+        self.p = list(range(n))
+
+    def find(self, x: int) -> int:
+        while self.p[x] != x:
+            self.p[x] = self.p[self.p[x]]
+            x = self.p[x]
+        return x
+
+    def union(self, a: int, b: int) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.p[max(ra, rb)] = min(ra, rb)
+
+
+def _components(n: int, edges: Iterable[tuple[int, int]]) -> list[list[int]]:
+    uf = _UF(n)
+    for a, b in edges:
+        uf.union(a, b)
+    comp: dict[int, list[int]] = defaultdict(list)
+    for i in range(n):
+        comp[uf.find(i)].append(i)
+    return [m for m in comp.values() if len(m) > 1]
+
+
+@dataclass
+class _Groups:
+    groups: list[list[int]]                 # duplicate groups (indexes), each >= 2, sorted
+    reasons: list[set[str]]                 # per group: why ('domain', 'name', 'shared id')
+    large_name: list[list[int]]
+    large_domain: list[list[int]]
+
+
+def _detect(accounts: list[Account]) -> _Groups:
+    n = len(accounts)
+    # (a) domain edges
+    by_dom: dict[str, list[int]] = defaultdict(list)
+    for i, a in enumerate(accounts):
+        d = registrable_domain(a.website)
+        if d:
+            by_dom[d].append(i)
+    dom_edges, large_domain = [], []
+    for idxs in by_dom.values():
+        if len(idxs) > _MAX_GROUP:
+            large_domain.append(idxs)
+        else:
+            dom_edges += [(idxs[0], j) for j in idxs[1:]]
+    # (b) name edges via an inverted index on distinctive tokens
+    cores = [_core_tokens(a.name) for a in accounts]
+    bucket: dict[str, list[int]] = defaultdict(list)
+    for i, c in enumerate(cores):
+        for t in set(c):
+            if len(t) >= 2 and t not in _WEAK_WORDS:
+                bucket[t].append(i)
+    name_pairs: set[tuple[int, int]] = set()
+    for idxs in bucket.values():
+        for x in range(len(idxs)):
+            for y in range(x + 1, len(idxs)):
+                if _names_match(cores[idxs[x]], cores[idxs[y]]):
+                    name_pairs.add((idxs[x], idxs[y]))
+    name_comps = _components(n, name_pairs)
+    large_name = [m for m in name_comps if len(m) > _MAX_GROUP]
+    keep_name = {m_i for m in name_comps if len(m) <= _MAX_GROUP for m_i in m}
+    name_edges = [(a, b) for a, b in name_pairs if a in keep_name and b in keep_name]
+    # (c) shared ids
+    id_edges, seen = [], {}
+    for i, a in enumerate(accounts):
+        for kind, v in (("sf", a.sf_account_id), ("zi", a.zoominfo_id), ("nk", a.nooks_account_id)):
+            if v:
+                if (kind, v) in seen:
+                    id_edges.append((seen[(kind, v)], i))
+                else:
+                    seen[(kind, v)] = i
+    all_comps = _components(n, dom_edges + name_edges + id_edges)
+    groups, reasons = [], []
+    for m in sorted(all_comps, key=lambda m: m[0]):
+        mset = set(m)
+        why = set()
+        if any(a in mset and b in mset for a, b in dom_edges):
+            why.add("same website domain")
+        if any(a in mset and b in mset for a, b in name_edges):
+            why.add("name containment")
+        if any(a in mset and b in mset for a, b in id_edges):
+            why.add("shared id")
+        groups.append(sorted(m))
+        reasons.append(why)
+    return _Groups(groups, reasons, sorted(sorted(m) for m in large_name),
+                   sorted(sorted(m) for m in large_domain))
+
+
+def _ref(a: Account) -> str:
+    return f"{a.name!r} ({', '.join(_ids(a)) or 'no id'})"
+
+
+def flag_probable_duplicates(accounts: list[Account]) -> int:
+    """Flag probable same-company groups IN PLACE (flag ``possible_duplicate`` + a note naming the
+    others and a group id; ``large_name_group`` / ``large_domain_group`` for oversized groups).
+    Nothing is merged or dropped. Returns the number of duplicate groups. Deterministic: the result
+    does not depend on the input order (groups are keyed by their smallest id/name)."""
+    order = sorted(range(len(accounts)), key=lambda i: (accounts[i].name.casefold(), _ids(accounts[i]), i))
+    ordered = [accounts[i] for i in order]
+    g = _detect(ordered)
+    for members, why in zip(g.groups, g.reasons):
+        accts = [ordered[i] for i in members]
+        gid = "dup-" + min((_ids(a)[0] if _ids(a) else a.name.casefold()) for a in accts)
+        for a in accts:
+            others = "; ".join(_ref(o) for o in accts if o is not a)
+            _add_flag(a, FLAG_POSSIBLE_DUPLICATE)
+            note = (f"possible_duplicate group {gid} ({', '.join(sorted(why))}): also {others}; "
+                    "not merged, collapse on the sheet")
+            if note not in a.notes:
+                a.notes.append(note)
+    for flag, groups, label in ((FLAG_LARGE_NAME_GROUP, g.large_name, "name"),
+                                (FLAG_LARGE_DOMAIN_GROUP, g.large_domain, "website domain")):
+        for members in groups:
+            for i in members:
+                _add_flag(ordered[i], flag, f"{flag}: shares a {label} with {len(members) - 1} other accounts "
+                          f"(more than {_MAX_GROUP}); a common word, not flagged as duplicates")
+    return len(g.groups)
+
+
+def duplicate_groups(accounts: Iterable[Account]) -> list[list[Account]]:
+    """Groups (size >= 2) of probably-the-same-company accounts, config-free and order-stable: members
+    keep input order, groups are ordered by their first member. For the ranker/sheet step: keep the
+    higher-scoring account of each group and mention the others in the 'why' line. Oversized name or
+    domain groups (> 6) are not returned."""
+    accts = list(accounts)
+    g = _detect(accts)
+    return [[accts[i] for i in m] for m in g.groups]
+
+
 def group_by_zoominfo_id(accounts: Iterable[Account]) -> dict[str, list[Account]]:
     """zoominfo_id -> ALL accounts carrying it (input order). Two SF accounts can share one ZoomInfo
     id (both are kept, flagged ``possible_duplicate``), so the signals join should attach the same
@@ -526,6 +731,15 @@ def summarise(result: AccountListResult) -> str:
         items = by_reason[reason]
         lines.append(f"  {reason}: {len(items)}")
         lines.append("    e.g. " + "; ".join(d.name for d in items[:5]) + (" ..." if len(items) > 5 else ""))
+    groups = duplicate_groups(kept)
+    npairs = sum(len(g) * (len(g) - 1) // 2 for g in groups)
+    lines.append(f"possible duplicate pairs: {npairs} (top 10 listed with names)")
+    for g in sorted(groups, key=lambda g: (-len(g), g[0].name.casefold()))[:10]:
+        lines.append("    " + " ~ ".join(a.name for a in g))
+    for flag in (FLAG_LARGE_NAME_GROUP, FLAG_LARGE_DOMAIN_GROUP):
+        c = sum(1 for a in kept if flag in a.flags)
+        if c:
+            lines.append(f"{flag}: {c} accounts (not flagged as duplicates)")
     lines.append(f"merged by name: {result.stats.get(STAT_NAME_MERGED, 0)}")
     lines.append(f"name_merge_ambiguous (not merged): {result.stats.get(STAT_NAME_AMBIGUOUS, 0)}")
     return "\n".join(lines)

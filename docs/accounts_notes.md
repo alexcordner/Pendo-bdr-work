@@ -57,3 +57,28 @@ Their timezone already starts at the HQ state (loader rule). To exclude them lat
 ## Optional `touched` (N3)
 `build_account_list(sf, nooks, zoominfo, config, touched=None, today=None, ...)`: `touched` is optional (None = no touches, the state-based path never needs it) and ignored whenever `cooldown_until` is passed. `today` may be omitted when `call_date` is given; if both are missing it raises `ValueError("... today or call_date ...")`. Existing positional calls `(..., config, touched, today, ...)` are unchanged.
 
+
+## Probable duplicates (phase2/fix-dupes)
+Two Salesforce records for one company (e.g. "Catapult" and "Catapult Communications") are FLAGGED, never merged or
+dropped: flag `possible_duplicate` plus a note with a group id (`dup-<smallest id>`), the reason and the other
+account's name and ids. Rules (all deterministic, all-accounts, any source):
+- (a) same website registrable domain (`www.`, scheme, path, port removed; `.com.au`/`.co.nz`-style suffixes handled).
+  Shared hosts are ignored: linkedin, facebook, twitter/x, instagram, youtube, google (sites), wix/wixsite, weebly,
+  squarespace, wordpress, blogspot, github.io, business.site, linktr.ee, medium, godaddysites, myshopify, netlify,
+  herokuapp, azurewebsites, pages.dev, tiktok, pinterest, bit.ly.
+- (b) name containment: after removing legal suffixes and filler (pty, ltd, limited, inc, group, holdings,
+  australia/australian, nz/new zealand, the, and, of, co, company, corp...), the shorter name's tokens are a
+  whole-word sequence inside the longer one (or equal). The shorter name needs at least one token of 2+ characters
+  that is not a weak/common word (post, office, bank, health, energy, services, digital, media, ...), so
+  "Australia Post" vs "Post Office" or "Alpha Digital" vs "Beta Digital" do NOT match, while "Catapult" vs
+  "Catapult Communications" and "Westpac" vs "Westpac Institutional Bank" do. Partial words never match.
+- (c) shared sf / zoominfo / nooks id.
+- Cap: a name (or domain) group of more than 6 accounts is a common word, not a company. Its members get
+  `large_name_group` (or `large_domain_group`) and are NOT flagged as duplicates.
+- Groups are connected components over the edges, so a domain link can join a name group. Chains through a
+  distinctive token are possible; the 6-account cap limits the damage. Only flags are set (no model change).
+- `duplicate_groups(accounts) -> list[list[Account]]` (config-free, input order inside a group, groups ordered by
+  first member, oversized groups excluded) is for the sheet step: keep the higher-scoring account, mention the
+  other in the 'why' line. `flag_probable_duplicates(accounts)` does the in-place flagging (idempotent).
+- `summarise()` prints `possible duplicate pairs: N (top 10 listed with names)` and large-group counts.
+- Drops still apply: a dropped twin (e.g. a customer) still appears in its kept twin's note.

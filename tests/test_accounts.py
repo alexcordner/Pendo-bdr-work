@@ -4,8 +4,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from src.accounts import (AccountListResult, Dropped, build_account_list, confidence, group_by_zoominfo_id,
-                          list_flagged,
+from src.accounts import (AccountListResult, Dropped, build_account_list, confidence, duplicate_groups,
+                          flag_probable_duplicates, group_by_zoominfo_id, list_flagged, registrable_domain,
                           noise_reason, normalise_name, summarise)
 from src.models import Account
 from tests.conftest import load_fixture
@@ -823,3 +823,188 @@ def test_call_date_alone_is_enough_as_reference(config):
 def test_today_and_call_date_both_missing_is_a_clear_error(config):
     with pytest.raises(ValueError, match="today or call_date"):
         build_account_list([sf_row("S1")], [], [], config)
+
+
+# ------------------------------------------------------------ probable duplicates (name / domain / ids)
+def dup_names(res):
+    return {a.name for a in res.accounts if "possible_duplicate" in a.flags}
+
+
+def two(config, n1, n2, **kw):
+    return build(sf=[sf_row("S1", n1, **kw.get("a", {})), sf_row("S2", n2, **kw.get("b", {}))], config=config)
+
+
+def test_catapult_pair_flagged_not_merged_not_dropped(config):
+    res = two(config, "Catapult Communications Pty Ltd", "Catapult", a={"ZoomInfo_Employee_Count__c": 400},
+              b={"ZoomInfo_Employee_Count__c": 671})
+    assert len(res.accounts) == 2 and not res.dropped
+    assert dup_names(res) == {"Catapult Communications Pty Ltd", "Catapult"}
+    note = " ".join(res.accounts[0].notes)
+    assert "possible_duplicate group dup-" in note and "name containment" in note and "S1" in note + " ".join(res.accounts[1].notes)
+
+
+def test_note_names_the_other_account(config):
+    res = two(config, "Catapult Communications", "Catapult")
+    by = {a.name: a for a in res.accounts}
+    assert "'Catapult'" in " ".join(by["Catapult Communications"].notes)
+    assert "'Catapult Communications'" in " ".join(by["Catapult"].notes)
+
+
+def test_carsales_pairs_flagged(config):
+    res = build(sf=[sf_row("S1", "Carsales.com Australia Pty Ltd"), sf_row("S2", "Carsales"),
+                    sf_row("S3", "Freelancer Limited"), sf_row("S4", "Freelancer Technology Pty Ltd")], config=config)
+    assert dup_names(res) == {"Carsales.com Australia Pty Ltd", "Carsales", "Freelancer Limited",
+                              "Freelancer Technology Pty Ltd"}
+    assert len(duplicate_groups(res.accounts)) == 2
+
+
+def test_westpac_family_flagged(config):
+    assert len(dup_names(two(config, "Westpac", "Westpac Institutional Bank"))) == 2
+
+
+def test_equal_names_after_suffix_removal_flagged(config):
+    assert len(dup_names(two(config, "Acme Holdings Pty Ltd", "ACME Group Limited"))) == 2
+
+
+@pytest.mark.parametrize("n1,n2", [("Australia Post", "Post Office"), ("Commonwealth Bank", "Bank of Melbourne"),
+                                   ("Health Services Pty Ltd", "Health Partners Pty Ltd"),
+                                   ("Australian Energy Group", "Energy Australia"),
+                                   ("Alpha Digital", "Beta Digital"), ("First State Super", "State Insurance")])
+def test_generic_token_overlap_not_flagged(config, n1, n2):
+    assert dup_names(two(config, n1, n2)) == set()
+
+
+def test_partial_word_is_not_containment(config):
+    assert dup_names(two(config, "Cat", "Catapult Communications")) == set()
+
+
+def test_same_domain_different_name_flagged(config):
+    res = two(config, "Alpha Pty Ltd", "Zeta Trading", a={"Website": "www.shared-co.com.au"},
+              b={"Website": "https://SHARED-CO.com.au/about?x=1"})
+    assert len(dup_names(res)) == 2 and "same website domain" in " ".join(res.accounts[0].notes)
+
+
+def test_different_domains_not_flagged(config):
+    res = two(config, "Alpha Pty Ltd", "Zeta Trading", a={"Website": "alpha.com.au"}, b={"Website": "zeta.com.au"})
+    assert dup_names(res) == set()
+
+
+@pytest.mark.parametrize("site", ["https://www.linkedin.com/company/x", "foo.wixsite.com/bar", "facebook.com/x",
+                                  "sites.google.com/view/x", "twitter.com/x"])
+def test_shared_hosting_domains_ignored(config, site):
+    res = two(config, "Alpha Pty Ltd", "Zeta Trading", a={"Website": site}, b={"Website": site})
+    assert dup_names(res) == set()
+
+
+@pytest.mark.parametrize("raw,want", [("www.Example.com", "example.com"), ("https://www.example.com.au/path", "example.com.au"),
+                                      ("http://example.co.nz:8080/x?y", "example.co.nz"),
+                                      ("shop.example.com.au", "example.com.au"), ("example.org.au", "example.org.au"),
+                                      ("localhost", None), ("", None), (None, None),
+                                      ("foo.wixsite.com", None), ("linkedin.com/company/x", None)])
+def test_registrable_domain(raw, want):
+    assert registrable_domain(raw) == want
+
+
+def test_three_way_group(config):
+    res = build(sf=[sf_row("S1", "Foo"), sf_row("S2", "Foo Labs"), sf_row("S3", "Foo Labs Pty Ltd")], config=config)
+    groups = duplicate_groups(res.accounts)
+    assert len(groups) == 1 and len(groups[0]) == 3
+    assert "pairs: 3" in summarise(res)
+
+
+def test_domain_links_extend_a_name_group(config):
+    res = build(sf=[sf_row("S1", "Foo"), sf_row("S2", "Foo Labs"),
+                    sf_row("S3", "Totally Other", Website="foo.com.au"),
+                    sf_row("S4", "Foo Industries Pty Ltd", Website="www.foo.com.au")], config=config)
+    assert len(duplicate_groups(res.accounts)) == 1 and len(duplicate_groups(res.accounts)[0]) == 4
+
+
+def test_group_of_six_is_flagged_as_duplicates(config):
+    rows = [sf_row("S0", "Zed")] + [sf_row(f"S{i}", f"Zed {chr(64 + i)}x") for i in range(1, 6)]
+    res = build(sf=rows, config=config)
+    assert len(res.accounts) == 6 and len(dup_names(res)) == 6
+
+
+def test_group_over_six_is_large_name_group_not_duplicates(config):
+    rows = [sf_row("S0", "Zed")] + [sf_row(f"S{i}", f"Zed {chr(64 + i)}x") for i in range(1, 7)]
+    res = build(sf=rows, config=config)
+    assert len(res.accounts) == 7 and dup_names(res) == set()
+    assert all("large_name_group" in a.flags for a in res.accounts)
+    assert duplicate_groups(res.accounts) == []
+    assert "large_name_group: 7 accounts" in summarise(res)
+
+
+def test_large_domain_group_not_flagged(config):
+    rows = [sf_row(f"S{i}", f"Unrelated {chr(64 + i)}one", Website="agency-site.com.au") for i in range(1, 9)]
+    res = build(sf=rows, config=config)
+    assert dup_names(res) == set() and all("large_domain_group" in a.flags for a in res.accounts)
+
+
+def test_distinct_companies_not_flagged(config):
+    res = build(sf=[sf_row("S1", "Alpha Pty Ltd"), sf_row("S2", "Beta Pty Ltd"), sf_row("S3", "Gamma Ltd")],
+                config=config)
+    assert dup_names(res) == set() and duplicate_groups(res.accounts) == []
+
+
+def test_duplicates_across_sources_zoominfo_only_flagged(config):
+    res = build(sf=[sf_row("S1", "Catapult Communications")], zi=[{"id": "Z7", "name": "Catapult Group"}], config=config)
+    assert len(res.accounts) == 2 and len(dup_names(res)) == 2        # flagged, not merged
+
+
+def test_duplicate_flags_independent_of_input_order(config):
+    rows = [sf_row("S1", "Catapult Communications"), sf_row("S2", "Catapult"), sf_row("S3", "Westpac"),
+            sf_row("S4", "Westpac Institutional Bank"), sf_row("S5", "Other Co", Website="o.com.au"),
+            sf_row("S6", "Another", Website="www.o.com.au")]
+    a = build(sf=rows, config=config)
+    b = build(sf=list(reversed(rows)), config=config)
+    snap = lambda r: [(x.name, x.flags, x.notes) for x in r.accounts]   # noqa: E731
+    assert snap(a) == snap(b)
+
+
+def test_duplicate_groups_helper_order_and_input_untouched():
+    a = [Account("1", "Zulu"), Account("2", "Catapult"), Account("3", "Alpha"), Account("4", "Catapult Communications"),
+         Account("5", "Zulu Labs")]
+    groups = duplicate_groups(a)
+    assert [[x.sf_account_id for x in g] for g in groups] == [["1", "5"], ["2", "4"]]
+    assert all(x.flags == [] and x.notes == [] for x in a)           # the helper does not flag
+
+
+def test_duplicate_groups_is_config_free_and_accepts_iterators():
+    gen = (Account(str(i), n) for i, n in enumerate(["Catapult", "Catapult Communications"]))
+    assert len(duplicate_groups(gen)) == 1
+
+
+def test_flag_probable_duplicates_returns_group_count_and_is_idempotent():
+    a = [Account("1", "Catapult"), Account("2", "Catapult Communications"), Account("3", "Other")]
+    assert flag_probable_duplicates(a) == 1
+    snap = [(x.flags[:], x.notes[:]) for x in a]
+    flag_probable_duplicates(a)
+    assert snap == [(x.flags, x.notes) for x in a]
+    assert a[2].flags == []
+
+
+def test_summary_lists_duplicate_pairs_with_names(config):
+    res = two(config, "Catapult Communications", "Catapult")
+    text = summarise(res)
+    assert "possible duplicate pairs: 1 (top 10 listed with names)" in text
+    assert "Catapult Communications ~ Catapult" in text or "Catapult ~ Catapult Communications" in text
+
+
+def test_summary_top_ten_cap(config):
+    rows = []
+    for i in range(12):
+        rows += [sf_row(f"A{i}", f"Brand{chr(97 + i)}"), sf_row(f"B{i}", f"Brand{chr(97 + i)} Labs")]
+    text = summarise(build(sf=rows, config=config))
+    assert "possible duplicate pairs: 12" in text
+    assert sum(1 for l in text.splitlines() if l.startswith("    Brand")) == 10
+
+
+def test_summary_no_duplicates_line(config):
+    assert "possible duplicate pairs: 0" in summarise(build(sf=[sf_row()], config=config))
+
+
+def test_dropped_account_still_flags_its_kept_twin(config):
+    res = build(sf=[sf_row("S1", "Catapult", Current_Customer__c=True), sf_row("S2", "Catapult Communications")],
+                config=config)
+    assert [a.name for a in res.accounts] == ["Catapult Communications"] and res.stats == {"customer": 1}
+    assert "possible_duplicate" in res.accounts[0].flags and "'Catapult'" in " ".join(res.accounts[0].notes)
