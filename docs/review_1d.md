@@ -151,3 +151,56 @@ Yes, add a real field. A note tag is a free-text string that can be renamed, and
 - Real SF/Nooks data shapes beyond the synthetic fixtures; ID length behaviour (L3).
 - Whether the ~420-account group should be included (the code includes and flags it; behaviour matches the stated spec).
 - How many real accounts the noise rules would hit in Alex's book; the sweep above is invented, not a measured rate.
+
+---
+
+# Re-review after worker fixes (commit 5d7ce56, merged into this branch as e11f6e3)
+
+Offline, read-only, invented data only.
+
+## Verdict: FINAL PASS
+
+All five earlier findings are fixed. Two follow-ups are recommended (one before 1c integration); neither blocks.
+
+### 1. Tests and determinism
+- `pytest tests -q`: **287 passed**. With `-W error`: **287 passed**. `tests/test_accounts.py` alone: 145 passed (also under PYTHONHASHSEED 3 and 77).
+- Probe script (72 accounts, SF/Nooks/ZI with merges, duplicates, a blocked and a touched id): 6 shuffles of all three inputs gave identical accounts, flags, notes, drops and stats; PYTHONHASHSEED 0 and 5 gave byte-identical output. Inputs, `blocked` set and `touched` dict unchanged.
+- Imports (accounts.py:51-53): `src.config`, `src.loaders`, `src.models` only. No `src.state`, `src.signals`, `src.ranker`. No network.
+
+### 2. Earlier findings
+| Finding | Status | Evidence |
+|---|---|---|
+| H1 noise drops SF book | **FIXED** | The 69 invented names: SF-sourced 0 dropped, Nooks-sourced 0 dropped. ZoomInfo-only 10 dropped, all noise-shaped (see below). Noise in SF/Nooks is now a flag + low confidence (accounts.py:378-382); the drop only runs for ZoomInfo-only rows (:412-417). `Fake Commissioner Software Ltd` as SF gets flag `noise_government` and is kept. |
+| H2 two SF accounts sharing a ZI id collapse | **FIXED** | Same-source rows are never merged (:300-308, 323-324). Probe: `A1`/`A2` sharing `Z9` both kept, both `possible_duplicate`, notes name the other id. `touched` on A2 only drops A2 (`recently_touched`); `blocked` A2 drops A2; `customer` A2 drops A2; A1 unaffected. Two SF rows with the same SF Id both kept and flagged. |
+| M1 name merge ambiguity | **FIXED** | One candidate merges (`name_merged: 1`); two SF candidates or two Nooks candidates leave the ZI row unmerged and flag all `possible_duplicate`, `name_merge_ambiguous: 1`. Both counters appear in `stats` and `summarise()` (:465-466). Merge notes list the merged ids (:215). |
+| M3 unknown SF country | **FIXED** | `''`, whitespace, `Oz`, `Aotearoa`, `Australia (Territory)`, `Australasia`, `Unknown`, `N/A`, null+null: kept with `country_unknown`, confidence low. `United States`, `Fiji`, `Austria`, `Estados Unidos`, `USA`+`?`: dropped `not_anz`. See minor edge cases below. |
+| M4 `(not ANZ)` regex | **FIXED** (restricted) | Now applied to ZoomInfo-only rows only (:413). It is still fixture-only code; deleting it later is fine. |
+
+### 3. Government regex narrowing (accounts.py:91-93)
+Private names stay unflagged and kept as SF rows with no flags: `Public Service Credit Union`, `Ministry of Sound Media`, `Government Services Pty Ltd`, `Department Store Group`, `Governance Software`. Good.
+
+**But it now lets most real government noise through for ZoomInfo-only rows** (the anchor requires the phrase at the START of the name). Probes, all ZoomInfo-only:
+- Caught: `Office of the Victorian Information Commissioner`, `Government of Western Australia Department of Health`, `Department of Transport and Main Roads`, `Fake Shire Council`, `Fake Regional Council`, `Public Service Commission Fake`, `Fake City Council Software Pty Ltd` (this one is a software firm; drop is a false positive for ZI-only, accepted).
+- **Not caught**: `Western Australian Department of Education`, `Queensland Health Department`, `Victorian Department of Health`, `NSW Department of Planning`, `Queensland Department of Education`, `South Australian Ministry of Health`, `NZ Ministry of Education`, `Tasmanian Government`, `State Government of Victoria`, `Australian Taxation Office`, `Health Department of Fake`, `Fake Local Government Authority`.
+
+Finding **R1 (Medium, accounts.py:91-93)**: state-prefixed department names ("Victorian Department of Health") are the common real shape, and they now pass as `zoominfo_only`. No data loss (they are tagged low confidence), but it is exactly the noise the filter exists for. Since SF/Nooks accounts are now flag-only, the anchor is no longer needed to protect Alex's book, so loosen it for ZI-only rows. Suggested: allow up to two leading words, `^(\w+ ){0,2}(department|dept|ministry) of\b`, plus `\bgovernment\b` and `\bcommissioner\b` anywhere. Cost: `Ministry of Sound Media` and `Government Services Pty Ltd` become ZI-only drops; those are exactly the cases where SF/Nooks flagging already protects real accounts. Alternative: leave as is and let the ranker push `zoominfo_only` to the bottom. Alex should choose.
+
+### 4. New code
+- **possible_duplicate** (:228-233, 300-328): works for SF/SF same Id, SF/SF same ZI id, Nooks/Nooks same SF hint, and ambiguous name matches. `touched`, `blocked`, `customer` act per id on each duplicate. One consequence (**R2, Low**): duplicates can share an `sf_account_id` (two kept accounts both with `A1`, e.g. the second Nooks row with `_sf_account_id=A1`). The flag says so, but 1c/1f dicts keyed by `sf_account_id` will collide. Document it in `docs/interfaces.md`, or key downstream by object identity.
+- **country_unknown** (:353-370): behaves as above. Minor edges (**R3, Low**): a lone flag emoji `🇦🇺` is dropped as `not_anz` (reads as a real non-ANZ country); `Fiji` billing with `Oz` HQ is dropped (the alias is only honoured when no real non-ANZ value is seen). Neither matters in practice.
+- **flags / confidence**: `confidence='low'` is set only for: flagged group, `country_unknown`, ZoomInfo-only, Nooks-only, and SF/Nooks accounts with a noise flag. Normal SF accounts, including possible duplicates, stay `normal` (duplicates are flagged but not low; acceptable). `confidence()` returns the field. `src/models.py` change (flags, confidence) is the field I asked for.
+- **summarise()**: readable. Shows totals, low confidence count, size_unknown, a "kept but flagged for review" block with counts and up to 5 names per flag, drops per reason with samples, merge counters. Sample output above checked.
+
+### 5. Items the worker did not fix
+**(a) L3, 15- vs 18-character SF ids: Medium, real silent miss.** Verified with a probe: SF id 18 chars, `touched` keyed by the 15-char form -> not applied (account kept); `blocked` with the 15-char form -> not applied; Nooks `_sf_account_id` in 15-char form -> not merged, a separate `nooks_only` account with the 15-char id appears and is NOT flagged duplicate. SOQL returns 18-char ids; what Nooks `crmId`, `Contact.AccountId` and the Nooks tool filters return in real data is UNVERIFIED (fixtures are synthetic and use neither form), so the real risk depends on 1c's key sources. Recommendation: add `normalise_sf_id(raw) -> str | None` to **`src/loaders.py`** (one place, pure), returning the **15-character prefix** (`raw.strip()[:15]` when length is 15 or 18, case preserved) as the *join key*. Reason: an 18-char id is the 15-char id plus a 3-char case checksum, so comparing 15-char prefixes is exact for case-sensitive ids and needs no checksum code; keep the original string for display. Apply at ingestion: `account_from_sf_row`, `account_from_nooks(sf_account_id)`, `prospect_from_nooks`, and in `build_account_list` to the `touched` keys and `blocked` ids as a defensive step. Warn in the docstring that ids must not be lower-cased. The checksum conversion 15->18 is also fine but adds code for no gain. Not an `accounts.py` helper because 1c and 1f need the same key.
+**(b) L4, `cooldown_days_after_connect`.** The signature is mildly misleading: `config.limits` has two cooldowns, `build_account_list` applies one number to every touched account, and the caller cannot express "this one connected, that one did not". Recommend the cleaner contract: `touched` carries the date the account becomes eligible again (`cooldown_until`), computed by 1c from the outcome, and `accounts.py` drops when `today < cooldown_until`; keep `cooldown_days` only as a fallback for plain dates. Until then, say in the docstring that the caller passes pre-adjusted dates.
+**(c) M2, ZoomInfo-only noise like `Bondi Florist`: acceptable.** The accounts are tagged `zoominfo_only`, low confidence, and cannot be verified further without spending credits. The ranker must give them no `icp_fit` points and an explicit low ceiling. If Alex sees too many, add a small keyword list (florist, plumbing, dental, school) for ZI-only rows later.
+
+### Summary of remaining items
+| ID | Severity | Where | Action |
+|---|---|---|---|
+| R1 | Medium | accounts.py:91-93 | Loosen the government regex for ZI-only rows (state-prefixed departments leak). |
+| L3 | Medium (unverified) | whole module, loaders.py | Add `normalise_sf_id` (15-char join key) before wiring 1c. |
+| L4 | Low | accounts.py:246-256 | Pass `cooldown_until` dates, or document pre-adjusted dates. |
+| R2 | Low | accounts.py:300-328 | Document that duplicates can share an `sf_account_id`. |
+| R3 | Low | accounts.py:353-361 | Optional edge cases (emoji, Oz HQ). |
