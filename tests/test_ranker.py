@@ -1199,3 +1199,185 @@ def test_N5_breakdown_still_sums_and_is_deterministic(config):
     s1, b1 = score_of(config, acct(is_sdr_target=True), sigs)
     s2, b2 = score_of(config, acct(is_sdr_target=True), list(reversed(sigs)))
     assert (s1, b1) == (s2, b2) and sum(b1.values()) == pytest.approx(s1)
+
+
+# ------------------------------------------------------------ persona hygiene (first real dry run)
+from src.ranker import _persona_rank, _title_class, _is_junk_shape, _is_non_buyer, _role_phrase_count  # noqa: E402
+
+EA_TITLE = ("Executive Assistant To Chief Financial Officer, Chief Technology Officer And "
+            "Chief Risk Officer")
+
+
+def test_ea_title_is_long_and_junk_shaped():
+    assert len(EA_TITLE) > 80 and _is_junk_shape(EA_TITLE) and _is_non_buyer(EA_TITLE)
+
+
+def test_ea_title_never_matches_a_persona(config):
+    assert _persona_rank(EA_TITLE, config) is None
+    assert _title_class(EA_TITLE, config)[0] == "junk"
+
+
+def test_ea_title_only_candidate_goes_to_needs_prospect_junk_title(config):
+    r = run([acct()], {"FAKE-A1": [sig()]}, [pros(title=EA_TITLE)], cfg=config)
+    assert not r.ranked and r.needs_prospect_codes["FAKE-A1"] == "junk_title"
+    assert r.needs_prospect[0].local_call_time is None and r.prospects == {}
+    assert r.needs_prospect[0].reasons[0] == "Needs a prospect: junk_title"
+
+
+def test_ea_title_never_chosen_over_clean_title(config):
+    ps = [pros(title=EA_TITLE, name="Aaa"), pros(title="Product Manager", name="Zed")]
+    assert pick_prospect(ps, config).name == "Zed"
+
+
+def test_rank2_scenario_junk_does_not_displace_callable(config):
+    junk = acct("A1", name="JunkCo")
+    ok = acct("A2", name="OkCo", employees=30)
+    r = run([junk, ok], {"FAKE-A1": [sig("A1")]}, [pros("A1", title=EA_TITLE), pros("A2")], cfg=config)
+    assert [x.account.name for x in r.ranked] == ["OkCo"]
+    assert [x.account.name for x in r.needs_prospect] == ["JunkCo"]
+
+
+@pytest.mark.parametrize("title", [
+    "Executive Assistant to the CEO", "Personal Assistant to the Chief Product Officer", "PA to CTO",
+    "EA to the Chief Technology Officer", "Assistant Product Manager", "Secretary to the CTO",
+    "Product Coordinator, Head of Product Office", "IT Administrator, CTO Office", "Product Intern, Head of Product",
+    "Graduate Product Manager", "Trainee Product Manager", "Chief of Staff to the CTO",
+    "Chief of Staff to the Chief Technology Officer", "Former Head of Product", "Ex-CTO", "Past VP Product",
+    "Interim Former Head of Product", "Acting Former CTO"])
+def test_non_buyer_titles_rejected_before_persona_matching(config, title):
+    assert _persona_rank(title, config) is None, title
+    assert pick_prospect([pros(title=title)], config) is None
+
+
+@pytest.mark.parametrize("title", ["Internal Communications Manager", "Head of Product Internals",
+                                   "Head of Product", "Head of Product, reporting to the CTO"])
+def test_non_buyer_words_need_whole_word_match(config, title):
+    if title.startswith("Internal"):
+        assert _persona_rank(title, config) is None          # no persona anyway
+    else:
+        assert _persona_rank(title, config) is not None
+
+
+def test_reporting_to_cto_is_not_a_to_the_title(config):
+    assert _persona_rank("Head of Product, reporting to the CTO", config) == (0, 0, 0)
+    assert not _is_non_buyer("Head of Product, reporting to the CTO")
+
+
+def test_reporting_clause_does_not_create_a_match(config):
+    assert _persona_rank("Program Director Governance, reporting to the Chief Technology Officer", config) is None
+
+
+# ---- junk shape
+def test_long_title_over_80_chars_is_junk(config):
+    t = "Head of Product " + "Digital Experience " * 5
+    assert len(t) > 80
+    assert _title_class(t, config)[0] == "junk"
+    assert pick_prospect([pros(title=t)], config) is None
+
+
+def test_exactly_80_chars_not_junk_by_length():
+    t = "Head of Product" + " x" * 32
+    assert len(t) == 79 or len(t) == 80
+    assert not _is_junk_shape("a" * 80)
+    assert _is_junk_shape("a" * 81)
+
+
+def test_three_roles_listed_is_junk(config):
+    t = "Head of Product, Chief Technology Officer and Chief Risk Officer"
+    assert _role_phrase_count(t) == 3 and _title_class(t, config)[0] == "junk"
+
+
+def test_two_roles_is_fine(config):
+    assert _role_phrase_count("Head of Product and Chief Digital Officer") == 2
+    assert _title_class("Head of Product and Chief Digital Officer", config)[0] == "ok"
+
+
+@pytest.mark.parametrize("title,expected", [("VP, Product & Design", 1), ("Head of Product, Digital", 1),
+                                            ("Vice President and Head of Product Marketing", 2),
+                                            ("Product Manager - Pathology", 1), ("CTO & Co-founder", 2)])
+def test_role_phrase_counts(title, expected):
+    assert _role_phrase_count(title) == expected
+
+
+def test_junk_only_candidate_code_beats_no_persona_match(config):
+    t = "Head of Product, Chief Technology Officer, Chief Risk Officer, Chief Financial Officer"
+    r = run([acct()], {}, [pros(title=t), pros(title="Accountant", name="Acc")], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "junk_title"
+
+
+def test_clean_title_without_phone_beats_junk_in_code(config):
+    t = "Head of Product, Chief Technology Officer, Chief Risk Officer, Chief Financial Officer"
+    r = run([acct()], {}, [pros(title=t), pros(title="CTO", phone=None, name="Nop")], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "persona_match_no_phone"
+
+
+def test_junk_title_unrelated_to_personas_is_no_persona_match(config):
+    t = "Senior Accountant " + "x" * 90
+    r = run([acct()], {}, [pros(title=t)], cfg=config)
+    assert r.needs_prospect_codes["FAKE-A1"] == "no_persona_match"
+
+
+def test_junk_code_listed_and_summarised(config):
+    r = run([acct()], {}, [pros(title=EA_TITLE)], cfg=config)
+    text = summarise(r)
+    assert "junk_title" in text and "NEEDS PROSPECT" in text
+
+
+# ---- head-of-title preference
+def test_head_match_beats_later_segment_match_same_person(config):
+    assert _persona_rank("Strategy Consultant, Head of Product Programs", config) == (0, 0, 1)   # later
+    assert _persona_rank("Head of Product, Digital", config) == (0, 0, 0)                          # head
+
+
+def test_head_title_beats_buried_primary_across_prospects(config):
+    # primary match buried after a comma loses to a secondary match that IS the role.
+    ps = [pros(title="Strategy Consultant, Head of Product Programs", name="Aaa"),
+          pros(title="Product Manager", name="Zed")]
+    assert pick_prospect(ps, config).name == "Zed"
+
+
+def test_head_of_product_digital_beats_program_director_reporting_to_cto(config):
+    ps = [pros(title="Program Director, Digital Transformation Office reporting to the CTO", name="Aaa"),
+          pros(title="Head of Product, Digital", name="Zed")]
+    assert pick_prospect(ps, config).name == "Zed"
+
+
+def test_head_tie_still_primary_then_config_order_then_name(config):
+    ps = [pros(title="Director of Product", name="B"), pros(title="Head of Product", name="C"),
+          pros(title="Head of Product", name="A")]
+    assert pick_prospect(ps, config).name == "A"
+    for _ in range(4):
+        random.shuffle(ps)
+        assert pick_prospect(ps, config).name == "A"
+
+
+def test_vp_comma_product_counts_as_head(config):
+    assert _persona_rank("VP, Product & Design", config) == (0, 1, 0)
+
+
+# ---- the real-shaped titles from the dry run
+@pytest.mark.parametrize("title,expected", [
+    ("Head Of Product - Digital Experience", (0, 0, 0)),
+    ("Vice President and Head of Product Marketing", (0, 0, 0)),
+    ("Program Director Digital Transformation", (0, 4, 0)),      # alias 'director digital' = Head of Digital
+    ("Head of IT, Data Centre Development", (1, 3, 0)),
+    ("VP, Product & Design", (0, 1, 0)),
+    ("Interim Chief Digital Officer", (0, 5, 0)),
+    ("Chief of Staff to the CTO", None),
+    ("Product Manager - Pathology", (1, 0, 0)),                  # function ambiguity handled elsewhere
+    (EA_TITLE, None),
+])
+def test_real_shaped_titles(config, title, expected):
+    assert _persona_rank(title, config) == expected, title
+
+
+def test_hygiene_is_deterministic_under_shuffle(config):
+    titles = [EA_TITLE, "Head Of Product - Digital Experience", "Chief of Staff to the CTO", "Product Manager",
+              "Vice President and Head of Product Marketing", "Strategy Consultant, Head of Product Programs"]
+    ps = [pros(title=t, name=f"P{i}") for i, t in enumerate(titles)]
+    base = pick_prospects(ps, config)
+    rnd = random.Random(8)
+    for _ in range(5):
+        p2 = ps[:]
+        rnd.shuffle(p2)
+        assert pick_prospects(p2, config) == base
