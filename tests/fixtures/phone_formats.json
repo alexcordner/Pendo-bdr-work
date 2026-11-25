@@ -1,42 +1,42 @@
 {
   "_note": "Formats seen (digits masked). SF Contact.Phone/MobilePhone are free text. Nooks call.to is mostly E.164 but sometimes has spaces. Proposed normaliser: strip everything except digits and a leading '+'; '00' prefix -> '+'; leading '+' keep; digits already starting with the country code (61/64) and >=11 digits -> add '+'; leading '0' -> prefix the country calling code (+61 AU, +64 NZ) taken from the PHONE's own context, falling back to the account country only if nothing else. Never override an explicit '+' prefix with the account country (a +61 mobile exists on an NZ account).",
   "sf_examples": [
-    "+61 4XX XXX XXX",
-    "+64 9-XXX XXXX",
-    "0226XXXXXX",
-    "61390XXXXXX",
-    "+64272XXXXXX",
-    "+6496XXXXXX",
-    "0275XXXXXX"
+    "+61 400 000 001",
+    "+64 9-000 0004",
+    "0200000002",
+    "61390000003",
+    "+64200000005",
+    "+6490000006",
+    "0200000007"
   ],
   "nooks_call_to_examples": [
-    "+61409XXXXXX",
-    "+61 474 XXX XXX",
-    "+6590XXXXXX",
-    "+1917XXXXXXX",
-    "+91916XXXXXXX"
+    "+61400000001",
+    "+61 400 000 008",
+    "+6590000009",
+    "+19170000010",
+    "+91910000011"
   ],
   "test_vectors": [
     {
-      "in": "+61 4XX XXX XXX (AU mobile)",
-      "out": "+614XXXXXXXX"
+      "in": "+61 400 000 001 (AU mobile)",
+      "out": "+61400000001"
     },
     {
-      "in": "0226431011 (NZ account)",
-      "out": "+64226431011"
+      "in": "0200000002 (NZ account)",
+      "out": "+64200000002"
     },
     {
-      "in": "61390956533",
-      "out": "+61390956533"
+      "in": "61390000003",
+      "out": "+61390000003"
     },
     {
-      "in": "+64 9-377 9779",
-      "out": "+6493779779"
+      "in": "+64 9-000 0004",
+      "out": "+6490000004"
     },
     {
-      "in": "+61 474 771 228",
-      "out": "+61474771228"
+      "in": "+61 400 000 008",
+      "out": "+61400000008"
     }
   ],
-  "observed_match": "SF MobilePhone '+61 409 074 447' == Nooks call.to '+61409074447' after stripping spaces (one verified pair)."
+  "observed_match": "One SF MobilePhone with spaces ('+61 400 000 001' in this masked form) equalled the Nooks call.to without spaces ('+61400000001') after stripping spaces (one verified real pair; numbers masked here)."
 }

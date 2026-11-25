@@ -51,7 +51,7 @@
       "nooks_prospect": {
         "id": "prospect-uuid-1",
         "crmId": "003Pf00000A2h38IAB",
-        "title": "Head of Product",
+        "title": "<title>",
         "primaryEmail": "<first.last>@example.com"
       },
       "sf_contact": {
@@ -70,7 +70,7 @@
       "nooks_prospect": {
         "id": "prospect-uuid-2",
         "crmId": "0030a00002P01LuAAJ",
-        "title": "Chief Product Officer",
+        "title": "<title>",
         "primaryEmail": "<first.last>@example.com.au"
       },
       "sf_contact": {
