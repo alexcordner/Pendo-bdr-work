@@ -1,0 +1,25 @@
+{
+ "meta": {
+  "source_tool": "listAccounts",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "id": "FAKE-NK-ACCT-0001",
+   "name": "Alpha Digital Pty Ltd",
+   "domain": "fake1.example.com",
+   "numEmployees": 400,
+   "_sf_account_id": "001FAKE00000001"
+  },
+  {
+   "id": "FAKE-NK-ACCT-0002",
+   "name": "Kiwi Software Ltd",
+   "domain": "fake2.example.com",
+   "numEmployees": 120,
+   "_sf_account_id": "001FAKE00000002"
+  }
+ ]
+}

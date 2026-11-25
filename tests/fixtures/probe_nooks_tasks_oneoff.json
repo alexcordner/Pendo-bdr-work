@@ -1,0 +1,33 @@
+{
+  "_note": "SYNTHETIC listTasks with filter_action=call&filter_sequenceState_state=null: one-off tasks have sequence/sequenceState/sequenceStep null, free-text note, owner and prospect refs. Fake values.",
+  "data": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000t1",
+      "action": "call",
+      "completed": false,
+      "dueAt": "2026-10-06T20:48:45.881Z",
+      "note": "[FAKE-TAG] free text note",
+      "status": "ready",
+      "priority": "normal",
+      "owner": {
+        "id": "FAKEOWNER1",
+        "_href": "/v1/users/FAKEOWNER1"
+      },
+      "prospect": {
+        "id": "00000000-0000-4000-8000-0000000000a1",
+        "_href": "/v1/prospects/FAKE"
+      },
+      "sequence": null,
+      "sequenceState": null,
+      "sequenceStep": null,
+      "email": null,
+      "createdAt": "2026-10-06T20:48:54.945Z",
+      "updatedAt": "2026-10-06T20:48:54.945Z"
+    }
+  ],
+  "links": {
+    "first": "/v1/tasks?FAKE",
+    "prev": null,
+    "next": null
+  }
+}

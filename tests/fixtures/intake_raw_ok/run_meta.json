@@ -1,0 +1,27 @@
+{
+ "fetched_at": "2026-11-25T03:00:00Z",
+ "sf_user_id": "FAKE-SF-USER-ALEX",
+ "nooks_user_id": "FAKE-NOOKS-USER-ALEX",
+ "row_counts": {
+  "sf_accounts": 3,
+  "sf_contacts": 2,
+  "nooks_calls": 2,
+  "nooks_dispositions": 16,
+  "nooks_accounts": 2,
+  "zoominfo_scoops": 1,
+  "nooks_prospects": 2,
+  "nooks_tasks": 0,
+  "gmail_sent": 1
+ },
+ "reached_last_page": {
+  "sf_accounts": true,
+  "sf_contacts": true,
+  "nooks_calls": true,
+  "nooks_accounts": true,
+  "zoominfo_scoops": true,
+  "nooks_prospects": true,
+  "nooks_tasks": true
+ },
+ "zoominfo_credits_used": 0,
+ "warnings": []
+}

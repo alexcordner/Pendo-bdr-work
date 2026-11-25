@@ -1,0 +1,14 @@
+{
+ "a": [
+  {
+   "id": "FAKE-CALL-001",
+   "duration": 11
+  }
+ ],
+ "b": [
+  {
+   "id": "FAKE-CALL-002",
+   "duration": 12
+  }
+ ]
+}

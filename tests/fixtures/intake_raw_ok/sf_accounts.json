@@ -1,0 +1,68 @@
+{
+ "meta": {
+  "source_tool": "soqlQuery",
+  "query": "q",
+  "page_count": 1,
+  "reached_last_page": true,
+  "fetched_at": "2026-11-25T03:00:00Z"
+ },
+ "rows": [
+  {
+   "Id": "001FAKE00000001",
+   "Name": "Alpha Digital Pty Ltd",
+   "Website": "www.fake1.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "Australia",
+   "BillingState": "New South Wales",
+   "BillingCity": null,
+   "HQ_Country__c": "Australia",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 400,
+   "ROE_count__c": 400,
+   "Current_Customer__c": false,
+   "SDR_Target__c": true,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0001",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000002",
+   "Name": "Kiwi Software Ltd",
+   "Website": "www.fake2.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "New Zealand",
+   "BillingState": null,
+   "BillingCity": "Auckland",
+   "HQ_Country__c": "New Zealand",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 120,
+   "ROE_count__c": 120,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0002",
+   "Days_Since_Last_Activity__c": 40
+  },
+  {
+   "Id": "001FAKE00000003",
+   "Name": "Gamma Overseas Inc",
+   "Website": "www.fake3.example.com",
+   "Type": "Prospect",
+   "BillingCountry": "United States",
+   "BillingState": null,
+   "BillingCity": null,
+   "HQ_Country__c": "United States",
+   "HQ_State_Province__c": null,
+   "ZoomInfo_Employee_Count__c": 300,
+   "ROE_count__c": 300,
+   "Current_Customer__c": false,
+   "SDR_Target__c": false,
+   "SDR_Prospecting_Priority__c": null,
+   "Prospecting_Priority__c": null,
+   "DOZISF__ZoomInfo_Id__c": "FAKE-ZI-0003",
+   "Days_Since_Last_Activity__c": 40
+  }
+ ]
+}

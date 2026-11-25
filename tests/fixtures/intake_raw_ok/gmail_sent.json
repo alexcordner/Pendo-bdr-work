@@ -1,0 +1,25 @@
+{
+ "meta": {
+  "source_tool": "search_threads",
+  "query": "in:sent to:<addr> newer_than:7d",
+  "page_count": 1,
+  "reached_last_page": null,
+  "fetched_at": "2026-11-25T03:00:00Z",
+  "window_days": 7
+ },
+ "rows": [
+  {
+   "id": "FAKE-THR-FAKE-MSG-1",
+   "messages": [
+    {
+     "id": "FAKE-MSG-1",
+     "threadId": "FAKE-THR-FAKE-MSG-1",
+     "toRecipients": [
+      "person11@fake1.example.com"
+     ],
+     "internalDate": 1795402800000
+    }
+   ]
+  }
+ ]
+}
