@@ -399,7 +399,8 @@ AMBIGUOUS_NOTE = "role ambiguous: check it is a digital product role"
 LAUNCH_NOTE = "physical or unclear product launch: check it is digital"
 MA_TARGET_NOTE = "being acquired: leadership/platform change likely"
 MA_ACQUIRER_FULL_NOTE = "acquirer of a digital business or a full acquisition"
-MA_MINORITY_NOTE = "acquirer of a minority stake or unrelated business"
+MA_MINORITY_NOTE = "acquirer of a minority stake or unrelated business"      # a real minority stake
+MA_UNRELATED_NOTE = "acquirer of an unrelated business"                   # majority / full stake, not a digital business
 MA_UNCLEAR_NOTE = "M&A direction unclear: check the deal"
 PARTNERSHIP_NOTE = "partnership without product, digital or customer words: check relevance"
 DEBT_NOTE = "debt facility, not an equity round"
@@ -485,6 +486,14 @@ _RUMOUR = re.compile(r"(?<!\w)(?:reportedly|in\s+talks|rumou?r\w*|understood\s+t
 _INFRASTRUCTURE_DEAL = re.compile(
     r"(?<!\w)(?:compute|gpus?|data[\s-]?cent(?:re|er)s?|capacity|megawatts?|mw|arr|annual\s+recurring\s+revenue|"
     r"colocation|co-location|hyperscal\w*|power\s+purchase|offtake|take-or-pay|contracted\s+revenue|hosting)(?!\w)", _FLAGS)
+# Real product words that rescue an infrastructure-worded partnership: an app, mobile, portal, website, software, a launch,
+# or a platform that is itself a product for end-users ('customer support platform', 'digital banking', 'online store').
+# NOT rescuing: 'customers', 'cloud', 'AI cloud services', 'digital', 'platform' on its own, 'products'.
+_PRODUCT_RESCUE = re.compile(
+    r"(?<!\w)(?:apps?|applications?|webapps?|mobile|portals?|websites?|software|saas|chatbots?|e-?commerce|launch(?:ed|es|ing)?|"
+    r"ux|cx|customer\s+experience|digital\s+(?:banking|experience|product|channel)s?|online\s+(?:store|shop|banking)|"
+    r"(?:customer[\s-]+\w+|support|experience|analytics|banking|payments?|commerce|learning|engagement|onboarding|"
+    r"self-service|digital)\s+platforms?)(?!\w)", _FLAGS)
 # Partnership: product / digital / customer wording makes it worth 0.30, otherwise 0.20. Deliberately narrow:
 # 'AI', 'data', 'cloud', 'infrastructure' alone do not count (an AI data-centre capacity deal is not a Pendo trigger).
 _PARTNERSHIP_WORDS = re.compile(
@@ -648,14 +657,18 @@ def _acquirer_variant(description: str) -> tuple[float, str]:
         or (stake and not majority and pct_val is None)
     digital = bool(_DIGITAL_BUSINESS.search(after))
     unrelated = bool(_NON_DIGITAL_SECTOR.search(after)) and not digital
-    if minority or unrelated or (stake and not digital):
+    if minority:
         return MA_MINORITY_OR_UNRELATED_WEIGHT, MA_MINORITY_NOTE
+    if unrelated or (stake and not digital):
+        # a majority / full acquisition of a business outside digital: same 0.25, but NOT labelled a minority stake
+        return MA_MINORITY_OR_UNRELATED_WEIGHT, MA_UNRELATED_NOTE
     return KIND_BASE_WEIGHT[SignalKind.MA], MA_ACQUIRER_FULL_NOTE
 
 
 def classify_ma(description: str, company_name: str) -> tuple[str, float, str]:
     """(role, weight, note) for an M&A scoop. Weights: target 0.50, acquirer of a digital business or a full
-    acquisition 0.50, acquirer of a minority stake or unrelated business 0.25, unclear 0.25."""
+    acquisition 0.50, acquirer of a minority stake 0.25 (note: ... minority stake or unrelated business), acquirer of
+    a majority / full unrelated business 0.25 (note: acquirer of an unrelated business), unclear 0.25."""
     role = ma_role(description, company_name)
     if role == "target":
         if _is_minority_stake(description, _name_token(company_name)):
@@ -854,10 +867,13 @@ def _judge_kind(kind: SignalKind, scoop: Scoop, config: Config) -> _J:
         return _J(True, note, factor=weight / KIND_BASE_WEIGHT[kind], notes=tuple(notes))
 
     if kind is SignalKind.PARTNERSHIP:
+        if _INFRASTRUCTURE_DEAL.search(desc):
+            # compute / capacity / ARR wording: only REAL product words rescue it ('customers', 'AI cloud services' do not)
+            if _PRODUCT_RESCUE.search(desc):
+                return _J(True)
+            return _J(False, "infrastructure or capacity contract (compute, data centre, ARR, power), not a product partnership")
         if _PARTNERSHIP_WORDS.search(desc):
             return _J(True)
-        if _INFRASTRUCTURE_DEAL.search(desc):
-            return _J(False, "infrastructure or capacity contract (compute, data centre, ARR, power), not a product partnership")
         return _J(True, PARTNERSHIP_NOTE, factor=PARTNERSHIP_NO_PRODUCT_WEIGHT / KIND_BASE_WEIGHT[kind],
                   notes=(PARTNERSHIP_NOTE,))
     return _J(True)
@@ -984,7 +1000,7 @@ AMBIGUOUS_SUFFIX = f" ({AMBIGUOUS_NOTE})"
 #: 'same deal as <names>' is dynamic, so it is matched as that exact prefix followed by names.
 KNOWN_NOTES = frozenset({
     AMBIGUOUS_NOTE, LAUNCH_NOTE, FINANCIAL_LAUNCH_NOTE, DEBT_NOTE, RUMOUR_NOTE, MA_TARGET_NOTE, MA_TARGET_MINORITY_NOTE,
-    MA_ACQUIRER_FULL_NOTE, MA_MINORITY_NOTE, MA_UNCLEAR_NOTE, PARTNERSHIP_NOTE, VACATED_NOTE})
+    MA_ACQUIRER_FULL_NOTE, MA_MINORITY_NOTE, MA_UNRELATED_NOTE, MA_UNCLEAR_NOTE, PARTNERSHIP_NOTE, VACATED_NOTE})
 _SAME_DEAL_NOTE = re.compile(rf"^{re.escape(SAME_DEAL_PREFIX)}\S.*$")
 
 
