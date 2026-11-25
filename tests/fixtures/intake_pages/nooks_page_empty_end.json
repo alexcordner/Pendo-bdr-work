@@ -1,0 +1,10 @@
+{
+ "traceId": "FAKE",
+ "hint": "No resources matched",
+ "data": [],
+ "links": {
+  "first": "/v1/calls?x",
+  "prev": null,
+  "next": null
+ }
+}

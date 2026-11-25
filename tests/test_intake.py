@@ -166,7 +166,7 @@ def test_run_meta_and_file_disagree_cautious_value_wins(raw):
     assert not r.can_go_live
 
 
-@pytest.mark.parametrize("name", ["sf_accounts", "sf_contacts", "nooks_prospects", "nooks_tasks"])
+@pytest.mark.parametrize("name", ["sf_accounts", "sf_contacts", "nooks_tasks"])
 def test_other_safety_sources_also_block_live(raw, name):
     rewrite(raw, name, lambda d: d["meta"].__setitem__("reached_last_page", False))
     rewrite(raw, RUN_META, lambda d: d["reached_last_page"].__setitem__(name, False))
@@ -396,26 +396,216 @@ def test_nooks_account_rows_keeps_an_existing_link(raw):
 def test_build_prospects_joins_contact_phone_and_optout(raw):
     d = load_raw(raw, now=NOW)
     ps = intake.build_prospects(d, {}, {})
-    assert len(ps) == 2 and all(p.phone_e164 for p in ps)
-    assert d.report.stats["prospects_with_salesforce_contact"] == 2
+    assert len(ps) == 2 and all(p.phone_e164 for p in ps) and all(p.nooks_id for p in ps)
+    st = d.report.stats
+    assert st["contacts_total"] == 2 and st["contacts_with_usable_phone"] == 2
+    assert st["prospects_nooks_id_resolved"] == 2 and st["prospects_nooks_id_unresolved"] == 0
 
 
-def test_prospect_with_crm_id_but_no_contact_is_flagged(raw):
+def test_nooks_prospects_file_is_optional_and_contacts_become_prospects(raw):
+    (raw / "nooks_prospects.json").unlink()
+    d = load_raw(raw, now=NOW)
+    assert d.report.ok and d.report.can_go_live and has(d.report.warnings, "optional file missing: nooks_prospects.json")
+    ps = intake.build_prospects(d, {}, {})
+    assert len(ps) == 2 and all(p.nooks_id is None and p.sf_contact_id for p in ps)
+    assert d.report.stats["prospects_nooks_id_unresolved"] == 2
+
+
+def test_contact_name_comes_from_first_and_last_name_or_name(raw):
+    rows = read(raw, "sf_contacts")["rows"]
+    rows[0].update({"FirstName": "Pat", "LastName": "Example"})
+    rows[1].update({"Name": "Sam Sample"})
+    set_rows(raw, "sf_contacts", rows)
+    (raw / "nooks_prospects.json").unlink()
+    ps = intake.build_prospects(load_raw(raw, now=NOW), {}, {})
+    assert sorted(p.name for p in ps) == ["Pat Example", "Sam Sample"]
+
+
+def test_contact_without_any_name_is_labelled_not_invented(raw):
+    (raw / "nooks_prospects.json").unlink()
+    ps = intake.build_prospects(load_raw(raw, now=NOW), {}, {})
+    assert {p.name for p in ps} == {"(no name)"}
+
+
+def test_sales_opt_out_flag_is_counted_but_not_modelled(raw):
+    rows = read(raw, "sf_contacts")["rows"]
+    rows[0]["Sales_Opt_Out_Email__c"] = True
+    set_rows(raw, "sf_contacts", rows)
+    d = load_raw(raw, now=NOW)
+    ps = intake.build_prospects(d, {}, {})
+    assert d.report.stats["contacts_sales_opt_out_email_unverified"] == 1
+    assert not any(p.opted_out_email for p in ps if rows[0]["Id"] == p.sf_contact_id and not rows[0]["HasOptedOutOfEmail"])
+
+
+def test_nooks_row_without_contact_row_is_flagged(raw):
     set_rows(raw, "sf_contacts", read(raw, "sf_contacts")["rows"][:1])
     d = load_raw(raw, now=NOW)
     ps = intake.build_prospects(d, {}, {})
-    assert d.report.stats["prospects_with_crm_id_but_no_contact_row"] == 1
-    assert has(d.report.warnings, "crmId but no Salesforce Contact row")
+    assert d.report.stats["nooks_rows_without_contact_row"] == 1
+    assert has(d.report.warnings, "no Salesforce Contact row")
     assert sum(1 for p in ps if p.phone_e164 is None) == 1                # no contact: no phone, cannot be called
 
 
-def test_prospect_without_crm_id_is_counted(raw):
+def test_duplicate_crm_ids_in_nooks_rows_use_the_first(raw):
     rows = read(raw, "nooks_prospects")["rows"]
-    rows[0]["crmId"] = None
-    set_rows(raw, "nooks_prospects", rows)
+    set_rows(raw, "nooks_prospects", rows + [dict(rows[0], id="ZZZ-LATER-ID")])
     d = load_raw(raw, now=NOW)
-    intake.build_prospects(d, {}, {})
-    assert d.report.stats["prospects_without_crm_id"] == 1
+    ps = intake.build_prospects(d, {}, {})
+    assert d.report.stats["nooks_prospects_duplicate_crm_id"] == 1
+    assert "ZZZ-LATER-ID" not in {p.nooks_id for p in ps}
+
+
+# ---------------------------------------------------------------- inferring Nooks ids from call phones
+def _mk(raw_dir, calls, contacts):
+    for f in ("nooks_prospects.json",):
+        (raw_dir / f).unlink()
+    set_rows(raw_dir, "nooks_calls", calls)
+    set_rows(raw_dir, "sf_contacts", contacts)
+    d = load_raw(raw_dir, now=NOW)
+    return d, intake.build_prospects(d, {}, {})
+
+
+def _call(i, pid, to):
+    return {"id": f"C{i}", "time": "2026-11-20T01:00:00Z", "duration": 20, "to": to, "prospect": {"id": pid},
+            "callDisposition": {"id": "disp-no-answer"}}
+
+
+def _contact(i, phone):
+    return {"Id": f"003FAKE{i:08d}", "AccountId": "001FAKE00000001", "MobilePhone": phone, "HasOptedOutOfEmail": False}
+
+
+def test_unique_phone_resolves_the_nooks_id(raw):
+    d, ps = _mk(raw, [_call(1, "NK-A", "+61400000001"), _call(2, "NK-A", "+61400000001")],
+                [_contact(1, "+61400000001"), _contact(2, "+61400000002")])
+    out = intake.infer_prospect_ids_from_calls(d, ps)
+    assert {p.sf_contact_id[-1]: p.nooks_id for p in out} == {"1": "NK-A", "2": None}
+    assert d.report.stats["prospect_ids_inferred_from_call_phone"] == 1
+
+
+def test_shared_switchboard_phone_is_not_resolved(raw):
+    d, ps = _mk(raw, [_call(1, "NK-A", "+61400000001")], [_contact(1, "+61400000001"), _contact(2, "+61400000001")])
+    out = intake.infer_prospect_ids_from_calls(d, ps)
+    assert all(p.nooks_id is None for p in out) and d.report.stats["call_prospect_ids_left_unresolved"] == 1
+
+
+def test_one_nooks_id_dialled_on_two_numbers_is_not_resolved(raw):
+    d, ps = _mk(raw, [_call(1, "NK-A", "+61400000001"), _call(2, "NK-A", "+61400000002")],
+                [_contact(1, "+61400000001"), _contact(2, "+61400000002")])
+    assert all(p.nooks_id is None for p in intake.infer_prospect_ids_from_calls(d, ps))
+
+
+def test_unusable_to_never_resolves(raw):
+    d, ps = _mk(raw, [_call(1, "NK-A", "external")], [_contact(1, "+61400000001")])
+    assert all(p.nooks_id is None for p in intake.infer_prospect_ids_from_calls(d, ps))
+
+
+def test_two_nooks_ids_cannot_claim_the_same_contact(raw):
+    d, ps = _mk(raw, [_call(1, "NK-A", "+61400000001"), _call(2, "NK-B", "+61400000001")], [_contact(1, "+61400000001")])
+    out = intake.infer_prospect_ids_from_calls(d, ps)
+    assert [p.nooks_id for p in out] == ["NK-A"]
+
+
+def test_inference_does_not_touch_already_resolved_prospects(raw):
+    d = load_raw(raw, now=NOW)
+    ps = intake.build_prospects(d, {}, {})
+    assert intake.infer_prospect_ids_from_calls(d, ps) == ps
+
+
+# ---------------------------------------------------------------- gmail window, tasks, call sources
+@pytest.mark.parametrize("meta,expected", [({"window_days": 7}, 7), ({"query": "in:sent to:a newer_than:14d"}, 14),
+                                           ({"window_days": 0, "query": "x"}, None), ({"window_days": True}, None),
+                                           ({"query": "in:sent newer_than:7h"}, None), ({}, None)])
+def test_gmail_window_days(meta, expected):
+    assert intake.gmail_window_days(meta) == expected
+
+
+def test_unknown_gmail_window_blocks_live(raw):
+    rewrite(raw, "gmail_sent", lambda d: (d["meta"].pop("window_days"), d["meta"].__setitem__("query", "in:sent")))
+    r = load_raw(raw, now=NOW).report
+    assert r.ok and not r.can_go_live and has(r.live_blockers, "window unknown")
+
+
+def test_gmail_window_is_read_from_the_query(raw):
+    rewrite(raw, "gmail_sent", lambda d: d["meta"].pop("window_days"))
+    assert load_raw(raw, now=NOW).report.stats["gmail_window_days"] == 7
+
+
+def test_missing_tasks_file_blocks_live_only(raw):
+    (raw / "nooks_tasks.json").unlink()
+    r = load_raw(raw, now=NOW).report
+    assert r.ok and not r.can_go_live and has(r.live_blockers, "nooks_tasks.json missing")
+
+
+def test_non_dialer_call_sources_are_flagged(raw):
+    rows = read(raw, "nooks_calls")["rows"]
+    rows[0]["source"] = "outreach"
+    set_rows(raw, "nooks_calls", rows)
+    r = load_raw(raw, now=NOW).report
+    assert r.stats["calls_source_outreach"] == 1 and r.stats["calls_source_nooks_sep"] == 1
+    assert has(r.warnings, "Do Not Call is only visible for Nooks-dialer calls")
+    assert r.can_go_live                    # a limitation to know about, not a blocker
+
+
+def test_external_and_odd_to_values_do_not_crash_the_loader(raw):
+    rows = read(raw, "nooks_calls")["rows"]
+    rows[0]["to"], rows[1]["to"] = "external", "+61 (0)4 1234 5678"
+    set_rows(raw, "nooks_calls", rows)
+    d = load_raw(raw, now=NOW)
+    assert d.report.ok and len(d.calls) == 2 and "nooks_calls" not in d.report.malformed
+
+
+# ---------------------------------------------------------------- last sheet from tagged tasks
+D = intake.date
+
+
+def task(note, pid="NK-P1", status="finished"):
+    return {"id": f"T-{abs(hash(note)) % 10**6}-{pid}", "action": "call", "status": status, "completed": status == "finished",
+            "note": note, "prospect": {"id": pid}}
+
+
+@pytest.mark.parametrize("note,expected", [
+    ("[apac-callsheet 2026-11-24 #3]", (D(2026, 11, 24), 3, None)),
+    ("hello [apac-callsheet 2026-11-24 #12 acct=001FAKE00000001] bye", (D(2026, 11, 24), 12, "001FAKE00000001")),
+    ("[apac-callsheet 2026-02-30 #1]", None), ("[apac-callsheet 2026-11-24]", None), ("call them", None),
+    (None, None), (42, None), ("[apac-callsheet 2026-11-24 #x]", None)])
+def test_parse_sheet_tag(note, expected):
+    assert intake.parse_sheet_tag(note) == expected
+
+
+def _prospects(d):
+    return intake.build_prospects(d, {}, {})
+
+
+def test_last_sheet_uses_latest_tagged_date_before_run_date(raw):
+    acct1, acct2 = "001FAKE00000001", "001FAKE00000002"
+    set_rows(raw, "nooks_tasks", [task(f"[apac-callsheet 2026-11-23 #1 acct={acct2}]"),
+                                  task(f"[apac-callsheet 2026-11-24 #1 acct={acct1}]"),
+                                  task(f"[apac-callsheet 2026-11-25 #1 acct={acct2}]"),       # run date itself: ignored
+                                  task(f"[apac-callsheet 2026-11-26 #1 acct={acct2}]"),       # future: ignored
+                                  task("untagged note", status="ready")])
+    d = load_raw(raw, now=NOW)
+    assert intake.last_sheet_from_tasks(d, _prospects(d), D(2026, 11, 25)) == {acct1}
+    assert d.report.stats["tagged_tasks"] == 4 and d.report.can_go_live
+
+
+def test_last_sheet_resolves_through_the_prospect_when_the_tag_has_no_account(raw):
+    d0 = load_raw(raw, now=NOW)
+    p = _prospects(d0)[0]
+    set_rows(raw, "nooks_tasks", [task("[apac-callsheet 2026-11-24 #1]", pid=p.nooks_id)])
+    d = load_raw(raw, now=NOW)
+    assert intake.last_sheet_from_tasks(d, _prospects(d), D(2026, 11, 25)) == {p.sf_account_id}
+
+
+def test_unresolvable_tagged_task_blocks_live(raw):
+    set_rows(raw, "nooks_tasks", [task("[apac-callsheet 2026-11-24 #1]", pid="NK-UNKNOWN")])
+    d = load_raw(raw, now=NOW)
+    assert intake.last_sheet_from_tasks(d, _prospects(d), D(2026, 11, 25)) == set()
+    assert d.report.stats["tagged_tasks_unresolved"] == 1 and not d.report.can_go_live
+
+
+def test_no_tagged_tasks_means_no_ids_and_no_block(raw):
+    d = load_raw(raw, now=NOW)
+    assert intake.last_sheet_from_tasks(d, _prospects(d), D(2026, 11, 25)) == set() and d.report.can_go_live
 
 
 # ---------------------------------------------------------------- scrub / lines

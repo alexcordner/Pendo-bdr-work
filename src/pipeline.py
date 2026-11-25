@@ -34,8 +34,9 @@ from zoneinfo import ZoneInfo
 from src import accounts as acc_mod
 from src import ranker, signals as sig_mod, state as st_mod
 from src.config import Config, load_config, next_working_windows
-from src.intake import (IntakeReport, RawData, build_prospects, derive_nooks_sf_links, load_raw,
-                        nooks_account_rows, scrub)
+from src.intake import (IntakeReport, RawData, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
+                        last_sheet_from_tasks, load_raw, nooks_account_rows, scrub)
+from src.loaders import parse_utc
 from src.models import Prospect, Signal
 
 SYDNEY = ZoneInfo("Australia/Sydney")
@@ -44,6 +45,12 @@ _E164 = re.compile(r"^\+\d{8,15}$")
 # Last-line defence for the run log: emails, E.164 numbers, AU national numbers. Names are fine.
 _LOG_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
 _LOG_E164 = re.compile(r"\+\d[\d ]{7,}\d")
+SURROGATE = "sfc:"        # internal state key for a Contact with no Nooks prospect id (never leaves this module)
+DNC_NOTE = ("Do Not Call visibility: only Nooks-dialer (nooks_sep) calls carry a 'Do Not Call' disposition; Outreach / "
+            "CSV / Salesforce-sourced calls use other disposition sets with none. This run matches Do Not Call by "
+            "phone and hashed email from call history (most contacts have no Nooks prospect id yet); after Nooks "
+            "prospect ids are resolved Phase 3 must RE-RUN the Do Not Call / opt-out check by Nooks prospect id "
+            "before writing any task.")
 _LOG_NATIONAL = re.compile(r"(?<![\w])0[2-478][\d ]{8,10}(?![\w])")
 
 
@@ -101,6 +108,30 @@ def write_log(lines: list[str], log_dir, now: datetime, run: str = "pipeline") -
         path = log_dir / f"{stem}-{n}.log"
     path.write_text(scrub_log("\n".join(lines)) + "\n", encoding="utf-8")
     return path
+
+
+def _surrogate(prospects: list[Prospect]) -> list[Prospect]:
+    """Give Contacts without a Nooks id a stable internal key so state can link phone-matched calls to them."""
+    return [replace(p, nooks_id=SURROGATE + p.sf_contact_id) if not p.nooks_id and p.sf_contact_id else p
+            for p in prospects]
+
+
+def _restore(prospects: list[Prospect]) -> list[Prospect]:
+    return [replace(p, nooks_id=None) if p.nooks_id and p.nooks_id.startswith(SURROGATE) else p for p in prospects]
+
+
+def _to_stats(raw: RawData) -> tuple[int, int]:
+    """(calls whose `to` is the literal 'external', calls whose `to` is otherwise not E.164)."""
+    ext = other = 0
+    for r in raw.nooks_calls:
+        t = r.get("to")
+        if isinstance(t, str) and _E164.match(t):
+            continue
+        if t == "external":
+            ext += 1
+        else:
+            other += 1
+    return ext, other
 
 
 def _first_call_date(cfg: Config, now: datetime) -> date:
@@ -182,7 +213,7 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     log: list[str] = [f"RUN LOG pipeline  now={now.isoformat()}  run_date={run_date}  mode={mode}  "
                       f"limit={limit if limit is not None else 'config cap ' + str(cfg.limits.daily_call_cap)}",
                       "Nothing is sent or written to Nooks, Gmail or Salesforce by this run. Salesforce is read-only.",
-                      "Real data never enters git: output/, state/ and logs/ are gitignored.", ""]
+                      "Real data never enters git: output/, state/ and logs/ are gitignored.", DNC_NOTE, ""]
 
     def stop(reasons: list[str], cls=PipelineStopped):
         log.append("")
@@ -227,7 +258,14 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     first = acc_mod.build_account_list(raw.sf_accounts, nooks_rows, [], cfg, {}, run_date)
     by_sf = {a.sf_account_id: a for a in first.accounts if a.sf_account_id}
     by_nooks = {a.nooks_account_id: a for a in first.accounts if a.nooks_account_id}
-    prospects = build_prospects(raw, by_sf, by_nooks)
+    prospects = infer_prospect_ids_from_calls(raw, build_prospects(raw, by_sf, by_nooks))
+    task_last_ids = last_sheet_from_tasks(raw, prospects, run_date)
+    rep.stats["last_sheet_accounts_from_tasks"] = len(task_last_ids)
+    email_window = rep.stats.get("gmail_window_days")
+    if email_window is not None and email_window < cfg.limits.email_cooldown_days:
+        rep.warn(f"gmail search window ({email_window}d) is shorter than email_cooldown_days "
+                 f"({cfg.limits.email_cooldown_days}d): older sent mail is invisible")
+        rep.block_live("sent-email search window shorter than the email cooldown")
     log += ["", "== JOINS (prospects, contacts, Nooks to Salesforce links) =="]
     log += [f"  {k}: {v}" for k, v in sorted(rep.stats.items()) if old_stats.get(k) != v]
     log += [f"WARNING: {w}" for w in rep.warnings[n_warn:]]
@@ -239,7 +277,8 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     log += [f"  state warning: {scrub(w)}" for w in st.load_warnings[:25]]
     if len(st.load_warnings) > 25:
         log.append(f"  ... and {len(st.load_warnings) - 25} more state warnings")
-    st = st_mod.record_calls(st, raw.calls, prospects, by_sf, config=cfg)
+    keyed = _surrogate(prospects)
+    st = st_mod.record_calls(st, raw.calls, keyed, by_sf, config=cfg)
     calls_seen = st.report["record_calls"]["calls_seen"]
     rebuilt_now = False
     if not rep.calls_reached_last_page:
@@ -258,7 +297,13 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     n_bad_dnc, dnc_lines = _dnc_phone_issues(raw, cfg)
     log.append(f"Do Not Call calls whose 'to' is not E.164 in the source: {n_bad_dnc}")
     log += dnc_lines
-    st = st_mod.record_sent_emails(st, raw.sent_emails, prospects, by_sf, today=run_date)
+    # Search results carry no dates: a hit means "sent inside the query window". The undated rule in state.py then
+    # blocks until first_seen + email_cooldown_days; first_seen is the day the SEARCH ran (the window's anchor), so
+    # the block lasts exactly until the window could have elapsed.
+    gm = raw.metas.get("gmail_sent") or {}
+    gm_stamp = parse_utc(gm.get("fetched_at"))
+    email_today = gm_stamp.astimezone(SYDNEY).date() if gm_stamp else run_date
+    st = st_mod.record_sent_emails(st, raw.sent_emails, keyed, by_sf, today=email_today)
     reports = dict(st.report)                  # `report` is not persisted: keep it for the log
     log.append("record_calls: " + _json(reports.get("record_calls", {})))
     log.append("record_sent_emails: " + _json(reports.get("record_sent_emails", {})))
@@ -280,8 +325,9 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
         stop(["live refused: " + b for b in rep.live_blockers], LiveRefused)
 
     # 6. Do Not Call on the prospects, right before ranking ------------------------------------
-    marked = st_mod.mark_do_not_call(prospects, st)
-    n_blocked = sum(1 for a, b in zip(prospects, marked) if b.do_not_call and not a.do_not_call)
+    marked_keyed = st_mod.mark_do_not_call(keyed, st)
+    n_blocked = sum(1 for a, b in zip(keyed, marked_keyed) if b.do_not_call and not a.do_not_call)
+    marked = _restore(marked_keyed)
     log.append(f"prospects marked do-not-call from state: {n_blocked}")
 
     # 7. accounts, second pass -----------------------------------------------------------------
@@ -301,7 +347,10 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     cooldown = dict(cu_sf)
     for kind in ("nooks_account_id", "zoominfo_id"):
         cooldown.update(st_mod.cooldown_until_by(st, cfg, kind))
-    last_ids = set(st_mod.last_sheet_ids(st, run_date))
+    state_last_ids = set(st_mod.last_sheet_ids(st, run_date))
+    last_ids = state_last_ids | task_last_ids
+    log.append(f"last-sheet memory: {len(state_last_ids)} accounts from state.json, {len(task_last_ids)} from tagged "
+               f"Nooks tasks ({rep.stats.get('tagged_tasks', 0)} tagged tasks seen)")
     result = ranker.rank_accounts(res.accounts, signals, marked, cooldown, last_ids, cfg, now)
     # safety net (phase1 risk 5): nobody blocked may be a chosen prospect
     unsafe = [p.nooks_id for ps in result.prospects.values() for p in ps if ranker.is_blocked(p)]
@@ -317,6 +366,12 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
         sheet_recorded = True
 
     stats = _stats(raw, res, result, marked, verdicts, batch, n_blocked, n_bad_dnc, links)
+    book_zi = {str(r.get("DOZISF__ZoomInfo_Id__c")).strip() for r in raw.sf_accounts if r.get("DOZISF__ZoomInfo_Id__c")}
+    stats["scoops_matched_to_book"] = sum(1 for sc in raw.scoops if str(sc.company_id).strip() in book_zi)
+    stats["scoop_companies"] = len({sc.company_id for sc in raw.scoops})
+    stats["scoop_companies_matched_to_book"] = len({sc.company_id for sc in raw.scoops if str(sc.company_id).strip() in book_zi})
+    stats["calls_to_external"], stats["calls_to_not_e164_other"] = _to_stats(raw)
+    stats.update({k: v for k, v in rep.stats.items() if isinstance(v, int) and k not in stats})
     log += _log_body(raw, res, result, verdicts, batch, stats, run_date, call_date, sheet_recorded, live)
     path = write_log(log, log_dir, now) if log_dir else None
     return PipelineResult(res, verdicts, signals, result, marked, st, rep, log, stats, rep.zoominfo_credits_used,
@@ -344,11 +399,26 @@ def _stats(raw: RawData, res, result, marked, verdicts, batch, n_blocked, n_bad_
 
 def _log_body(raw, res, result, verdicts, batch, stats, run_date, call_date, sheet_recorded, live) -> list[str]:
     lines = ["", "== SIGNALS =="]
+    lines.append(f"  scoops matched to your book: {stats['scoops_matched_to_book']} of {stats['scoops']} "
+                 f"(companies {stats['scoop_companies_matched_to_book']} of {stats['scoop_companies']}); unmatched scoops "
+                 "are normal (most scoop companies are not in your book)")
+    types: dict[str, int] = {}
+    for sc in raw.scoops:
+        for t in sc.types:
+            types[t] = types.get(t, 0) + 1
+    lines.append("  scoop types in the file: " + (", ".join(f"{k}={v}" for k, v in sorted(types.items())) or "none"))
+    by_type = (raw.run_meta or {}).get("scoop_counts_by_type")
+    if isinstance(by_type, dict):
+        lines.append("  scoops fetched per type (run_meta): " + ", ".join(f"{k}={v}" for k, v in sorted(by_type.items())))
+    lines.append(f"  calls with a 'to' that is not E.164: {stats['calls_to_external']} literal 'external', "
+                 f"{stats['calls_to_not_e164_other']} other (not usable for phone matching, matched by prospect id)")
     for v in verdicts:
         lines.append(f"  {v.scoop.id} ({v.scoop.company_name}): {sig_mod.verdict_summary(v)}")
     lines.append(f"  kept scoops with no matching account: {len(batch.unmatched)}")
-    for s in batch.unmatched:
+    for s in batch.unmatched[:25]:
         lines.append(f"    - {s.id} ({s.company_name}): no account with zoominfo id (not callable here)")
+    if len(batch.unmatched) > 25:
+        lines.append(f"    ... and {len(batch.unmatched) - 25} more (counted)")
     lines += ["", f"== ACCOUNTS ==  (first call date {call_date})", acc_mod.summarise(res)]
     lines += _list_dropped(res) + _list_flagged(res)
     lines += ["", "== RANKER ==", ranker.summarise(result, top_n=max(15, len(result.ranked)), list_limit=10 ** 6)]

@@ -194,3 +194,56 @@ def test_merged_dump_is_readable_by_intake(tmp_path):
     run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--last-page-reached", "true")
     got = _read_dump(tmp_path / "raw", "nooks_calls", IntakeReport())
     assert got is not None and len(got[1]) == 2
+
+
+# ---------------------------------------------------------------- reached_last_page from the final page
+def test_derive_last_page_nooks_links_next():
+    assert mp.derive_last_page([page("nooks_page_more.json"), page("nooks_page_last.json")]) is True
+    assert mp.derive_last_page([page("nooks_page_more.json")]) is False
+    assert mp.derive_last_page([page("nooks_page_empty_end.json")]) is True        # cursor past the end
+
+
+def test_derive_last_page_uses_only_the_final_page():
+    assert mp.derive_last_page([page("nooks_page_last.json"), page("nooks_page_more.json")]) is False
+
+
+def test_derive_last_page_has_more_and_mcp_wrapper():
+    assert mp.derive_last_page([page("has_more_true.json")]) is False
+    assert mp.derive_last_page([page("data_page2.json")]) is True
+    wrapped = [{"type": "text", "text": json.dumps(page("nooks_page_last.json"))}]
+    assert mp.derive_last_page([wrapped]) is True
+
+
+@pytest.mark.parametrize("fixture", ["bare_list.json", "records_page2.json", "threads_page.json"])
+def test_derive_last_page_without_a_marker_is_an_error(fixture):
+    with pytest.raises(mp.MergeError, match="cannot derive"):
+        mp.derive_last_page([page(fixture)])
+    with pytest.raises(mp.MergeError, match="no pages"):
+        mp.derive_last_page([])
+
+
+def test_cli_auto_derives_from_links_next(tmp_path):
+    assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_more.json")}, {"path": str(PAGES / "nooks_page_last.json")}],
+                   "--last-page-reached", "auto") == 0
+    assert json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]["reached_last_page"] is True
+    assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_more.json")}], "--last-page-reached", "auto") == 0
+    assert json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]["reached_last_page"] is False
+
+
+def test_cli_auto_without_marker_fails_and_writes_nothing(tmp_path, capsys):
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--last-page-reached", "auto", name="x") == 2
+    assert "cannot derive" in capsys.readouterr().err and not (tmp_path / "raw").exists()
+
+
+def test_probe_fixture_shapes_merge(tmp_path):
+    probe = Path(__file__).resolve().parent / "fixtures"
+    for name, key in (("probe_nooks_calls_page.json", "id"), ("probe_nooks_tasks_oneoff.json", "id"),
+                      ("probe_scoops_page.json", "id"), ("probe_sf_paging_page.json", "Id")):
+        f = probe / name
+        rows, _ = mp.merge_pages([json.loads(f.read_text())])
+        assert rows and all(key in r for r in rows)
+
+
+def test_probe_nooks_page_has_links_next_and_no_has_more():
+    pg = json.loads((Path(__file__).resolve().parent / "fixtures" / "probe_nooks_calls_page.json").read_text())
+    assert "hasMore" not in pg and mp.derive_last_page([pg]) == (pg["links"]["next"] is None)

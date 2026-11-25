@@ -1,0 +1,15 @@
+{
+ "traceId": "FAKE",
+ "hint": "",
+ "data": [
+  {
+   "id": "FAKE-CALL-023",
+   "duration": 33
+  }
+ ],
+ "links": {
+  "first": "/v1/calls?x",
+  "prev": "/v1/calls?y",
+  "next": null
+ }
+}

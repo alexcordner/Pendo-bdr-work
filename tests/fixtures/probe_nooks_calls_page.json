@@ -1,0 +1,80 @@
+{
+  "_note": "SYNTHETIC listCalls page: cursor is base64 of {\"id\":<uuid>,\"v\":1}; links.next null on last page; empty page carries a hint; unfiltered pages mix owners and sources (nooks_sep, outreach, salesforce). Fake values.",
+  "traceId": "FAKE-TRACE",
+  "hint": "More results are available. Call `listCalls` again with `page_after` set to \"FAKE-CURSOR\" and the same filters.",
+  "data": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "source": "outreach",
+      "duration": 12,
+      "from": "+61000000001",
+      "to": "+61000000002",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": {
+        "id": "00000000-0000-4000-8000-0000000000a1",
+        "_href": "/v1/prospects/FAKE"
+      },
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "00000000-0000-4000-8000-0000000000d1",
+        "_href": "/v1/callDispositions/FAKE"
+      },
+      "owner": {
+        "id": "FAKEOWNER1",
+        "_href": "/v1/users/FAKEOWNER1"
+      },
+      "dialingMode": null,
+      "hungUpBy": null,
+      "time": "2026-08-26T23:08:52.195Z",
+      "createdAt": "2026-08-26T23:10:00.000Z",
+      "updatedAt": "2026-08-26T23:10:00.000Z",
+      "hasTranscript": false
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "source": "nooks_sep",
+      "duration": 3,
+      "from": "external",
+      "to": "external",
+      "direction": "outgoing",
+      "recordingUrl": null,
+      "prospect": null,
+      "sequence": null,
+      "sequenceStep": null,
+      "callDisposition": {
+        "id": "00000000-0000-4000-8000-0000000000d2",
+        "_href": "/v1/callDispositions/FAKE"
+      },
+      "owner": {
+        "id": "FAKEOWNER2",
+        "_href": "/v1/users/FAKEOWNER2"
+      },
+      "dialingMode": null,
+      "hungUpBy": null,
+      "time": "2026-08-27T01:00:00.000Z",
+      "createdAt": "2026-08-27T01:01:00.000Z",
+      "updatedAt": "2026-08-27T01:01:00.000Z",
+      "hasTranscript": false
+    }
+  ],
+  "links": {
+    "first": "/mcp/calls?page%5Bsize%5D=100",
+    "prev": null,
+    "next": "/mcp/calls?page%5Bsize%5D=100&page%5Bafter%5D=FAKE-CURSOR"
+  },
+  "_last_page_empty": {
+    "data": [],
+    "hint": "No resources matched this request.",
+    "links": {
+      "first": "/mcp/calls?page%5Bsize%5D=100",
+      "prev": null,
+      "next": null
+    }
+  },
+  "_non_e164_to_shapes": [
+    "external",
+    "<spaced international form>"
+  ]
+}

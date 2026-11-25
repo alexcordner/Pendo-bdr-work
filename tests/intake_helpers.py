@@ -15,14 +15,15 @@ def iso(dt: datetime) -> str:
 
 
 def dump(rows: list, *, tool: str, query: str = "q", pages: int = 1, last: bool | None = True,
-         fetched_at: str) -> dict:
+         fetched_at: str, **extra_meta) -> dict:
     meta = {"source_tool": tool, "query": query, "page_count": pages, "reached_last_page": last,
-            "fetched_at": fetched_at}
+            "fetched_at": fetched_at, **extra_meta}
     return {"meta": meta, "rows": rows}
 
 
 def write_raw(world, raw_dir, now: datetime, *, calls_last_page: bool = True, credits: int | None = 0,
-              strip_links: bool = False, include_gmail: bool = True, include_tasks: bool = False,
+              strip_links: bool = False, include_gmail: bool = True, include_tasks: bool = True,
+              include_prospects: bool = True, gmail_window: int | None = 7,
               owner: str = NOOKS_USER, **overrides) -> Path:
     """Write every raw file for ``world``. ``overrides`` replaces rows per file stem, e.g.
     ``nooks_calls=[...]``. Rows are written exactly as the world holds them; ``strip_links=True`` removes the
@@ -39,10 +40,11 @@ def write_raw(world, raw_dir, now: datetime, *, calls_last_page: bool = True, cr
         "sf_contacts": (world.contacts, "soqlQuery", True),
         "nooks_calls": (world.calls, "listCalls", calls_last_page),
         "nooks_dispositions": (world.dispositions, "listCallDispositions", None),
-        "nooks_prospects": (world.nooks_prospects, "listProspects", True),
         "nooks_accounts": (nooks_accounts, "listAccounts", True),
         "zoominfo_scoops": (world.scoops, "search_scoops", True),
     }
+    if include_prospects:
+        spec["nooks_prospects"] = (world.nooks_prospects, "listProspects", True)
     if include_tasks:
         spec["nooks_tasks"] = ([], "listTasks", True)
     if include_gmail:
@@ -50,7 +52,14 @@ def write_raw(world, raw_dir, now: datetime, *, calls_last_page: bool = True, cr
     counts, flags = {}, {}
     for name, (rows, tool, last) in spec.items():
         rows = overrides.get(name, rows)
-        (raw_dir / f"{name}.json").write_text(json.dumps(dump(rows, tool=tool, last=last, fetched_at=fetched)))
+        extra = {}
+        query = "q"
+        if name == "gmail_sent":
+            query = "in:sent to:<addr> newer_than:7d"
+            if gmail_window is not None:
+                extra["window_days"] = gmail_window
+        (raw_dir / f"{name}.json").write_text(json.dumps(dump(rows, tool=tool, last=last, fetched_at=fetched,
+                                                                query=query, **extra)))
         counts[name] = len(rows)
         if last is not None:
             flags[name] = last

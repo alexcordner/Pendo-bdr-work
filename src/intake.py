@@ -16,13 +16,13 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from src.loaders import (LoaderError, account_from_nooks, account_from_sf_row, build_disposition_index,
-                         call_from_nooks, normalise_sf_id, parse_utc, prospect_from_nooks, scoop_from_zoominfo,
-                         sent_emails_from_gmail, task_from_nooks)
+                         call_from_nooks, normalise_phone, normalise_sf_id, parse_utc, prospect_from_nooks,
+                         scoop_from_zoominfo, sent_emails_from_gmail, task_from_nooks)
 from src.models import CallRecord, Prospect, Scoop, SentEmail, TaskRecord
 
 STALE_AFTER = timedelta(hours=24)
@@ -36,7 +36,7 @@ FILES: dict[str, tuple[bool, bool]] = {
     "sf_contacts": (True, True),
     "nooks_calls": (True, True),
     "nooks_dispositions": (True, False),
-    "nooks_prospects": (True, True),
+    "nooks_prospects": (False, True),     # lazily resolved ids only (workspace table is ~3M rows): never bulk
     "nooks_accounts": (False, True),
     "nooks_tasks": (False, True),
     "zoominfo_scoops": (True, True),
@@ -45,7 +45,7 @@ FILES: dict[str, tuple[bool, bool]] = {
 RUN_META = "run_meta"
 # A partial copy of these makes a live run unsafe (missing accounts, contacts, Do Not Call history,
 # or our own earlier tasks). A partial scoop or Nooks account list only loses triggers / links.
-SAFETY_PAGED = ("sf_accounts", "sf_contacts", "nooks_calls", "nooks_prospects", "nooks_tasks")
+SAFETY_PAGED = ("sf_accounts", "sf_contacts", "nooks_calls", "nooks_tasks")
 # id key used to de-duplicate each source
 ID_KEY = {"sf_accounts": "Id", "sf_contacts": "Id"}
 META_KEYS = ("source_tool", "query", "page_count", "reached_last_page", "fetched_at")
@@ -401,14 +401,47 @@ def _convert(data: RawData, now: datetime) -> None:
             rep.warn(f"{name}: more than 5% malformed: the real response shape may have changed")
     if rep.malformed.get("nooks_calls"):
         rep.block_live("some call rows are malformed (a Do Not Call could be hidden in them)")
-    if rep.malformed.get("sf_contacts") or rep.malformed.get("nooks_prospects"):
-        rep.block_live("some contact / prospect rows are malformed")
+    if rep.malformed.get("sf_contacts"):
+        rep.block_live("some contact rows are malformed")
 
     if "gmail_sent" not in data.metas:
         rep.block_live("no sent-email history (gmail_sent.json missing)")
+    else:
+        days = gmail_window_days(data.metas["gmail_sent"])
+        if days is None:
+            rep.warn("gmail_sent.json: the search window is unknown (meta.window_days or newer_than:Nd in meta.query): "
+                     "search results carry no dates, so the window IS the only date information")
+            rep.block_live("sent-email search window unknown")
+        else:
+            rep.stats["gmail_window_days"] = days
+    if "nooks_tasks" not in data.metas:
+        rep.block_live("no Nooks task list (nooks_tasks.json missing): last-sheet memory from tagged tasks unavailable")
+    srcs: dict[str, int] = {}
+    for r in data.nooks_calls:
+        k = str(r.get("source") or "unknown")
+        srcs[k] = srcs.get(k, 0) + 1
+    for k, v in srcs.items():
+        rep.stats[f"calls_source_{k}"] = v
+    if any(k != "nooks_sep" for k in srcs):
+        rep.warn("nooks_calls include sources other than nooks_sep (" + ", ".join(sorted(srcs)) + "): Outreach / CSV / "
+                 "Salesforce-sourced calls use other disposition sets with no 'Do Not Call', so Do Not Call is only "
+                 "visible for Nooks-dialer calls")
     if not data.calls and data.nooks_calls == [] and "nooks_calls" in data.metas:
         rep.warn("nooks_calls is empty: Do Not Call cannot be rebuilt from an empty history")
         rep.block_live("no call history")
+
+
+_WINDOW = re.compile(r"newer_than:(\d+)d\b")
+
+
+def gmail_window_days(meta: dict) -> int | None:
+    """Days covered by the Gmail sent search: ``meta.window_days`` (int) or ``newer_than:Nd`` in ``meta.query``.
+    None if neither says. (Search results carry no dates: the window is the only date information.)"""
+    w = meta.get("window_days")
+    if isinstance(w, int) and not isinstance(w, bool) and w > 0:
+        return w
+    m = _WINDOW.search(str(meta.get("query") or ""))
+    return int(m.group(1)) if m else None
 
 
 # ------------------------------------------------------------------ joins that need accounts
@@ -444,36 +477,176 @@ def nooks_account_rows(data: RawData, links: dict[str, str]) -> list[dict]:
     return out
 
 
+def _contact_name(c: dict) -> str:
+    n = " ".join(x for x in (c.get("FirstName"), c.get("LastName")) if x) or c.get("Name") or ""
+    return n.strip() or "(no name)"
+
+
+def prospect_from_contact(c: dict, account_country: str | None = None) -> Prospect:
+    """A Prospect built from a Salesforce Contact alone (no Nooks prospect row): ``nooks_id`` is None until it
+    is resolved. Phone prefers MobilePhone, then Phone; ``HasOptedOutOfEmail`` is the opt-out."""
+    return Prospect(nooks_id=None, sf_contact_id=normalise_sf_id(c.get("Id")),
+                    sf_account_id=normalise_sf_id(c.get("AccountId")), nooks_account_id=None,
+                    name=_contact_name(c), title=c.get("Title"), email=c.get("Email"),
+                    phone_e164=normalise_phone(c.get("MobilePhone"), account_country)
+                    or normalise_phone(c.get("Phone"), account_country),
+                    opted_out_email=bool(c.get("HasOptedOutOfEmail", False)))
+
+
 def build_prospects(data: RawData, accounts_by_sf: dict, accounts_by_nooks: dict) -> list[Prospect]:
-    """Nooks prospect rows + their Salesforce Contact -> Prospect (phone, opt-out, account country).
-    A row that cannot be converted was already counted by ``load_raw`` (never skipped silently)."""
+    """Prospects come from SALESFORCE CONTACTS (phone, opt-out, title, name, account). The Nooks prospect table
+    is workspace-wide (~3M rows) and is never bulk-fetched: ``nooks_prospects.json`` holds only lazily resolved
+    rows. A Contact with a matching Nooks row (``crmId``) gets that row's Nooks id (and name / title / email, as
+    ``prospect_from_nooks`` reads them); every other Contact has ``nooks_id = None``. Nooks rows with no Contact
+    row are kept too (no phone: they land in needs_prospect). Counts go into ``report.stats``.
+    Malformed rows were already counted by ``load_raw`` (never skipped silently)."""
     rep = data.report
-    contacts = {normalise_sf_id(c.get("Id")): c for c in data.sf_contacts if c.get("Id")}
-    out: list[Prospect] = []
-    with_contact = without_link = missing_contact = 0
-    for row in data.nooks_prospects:
+    nooks_by_crm: dict[str, dict] = {}
+    dup_crm = 0
+    for row in data.nooks_prospects:                      # already sorted by id: first wins, deterministically
         crm = normalise_sf_id(row.get("crmId"))
-        c = contacts.get(crm)
-        if c is not None:
-            with_contact += 1
-        elif crm:
-            missing_contact += 1
-        else:
-            without_link += 1
-        acct = None
-        if c and normalise_sf_id(c.get("AccountId")) in accounts_by_sf:
-            acct = accounts_by_sf[normalise_sf_id(c["AccountId"])]
-        elif (row.get("account") or {}).get("id") in accounts_by_nooks:
-            acct = accounts_by_nooks[row["account"]["id"]]
+        if crm:
+            if crm in nooks_by_crm:
+                dup_crm += 1
+            else:
+                nooks_by_crm[crm] = row
+    out: list[Prospect] = []
+    used: set[str] = set()
+    failed = 0
+    for c in data.sf_contacts:
+        cid = normalise_sf_id(c.get("Id"))
+        if not cid:
+            continue                                      # counted as malformed by load_raw
+        acct = accounts_by_sf.get(normalise_sf_id(c.get("AccountId")))
+        country = acct.country if acct else None
+        row = nooks_by_crm.get(cid)
         try:
-            out.append(prospect_from_nooks(row, sf_contact=c, account_country=acct.country if acct else None))
+            if row is not None:
+                out.append(prospect_from_nooks(row, sf_contact=c, account_country=country))
+                used.add(cid)
+            else:
+                out.append(prospect_from_contact(c, country))
         except LoaderError:
-            # load_raw already counted rows that cannot be converted; this only guards the join path
-            rep.stats["prospects_failed_in_join"] = rep.stats.get("prospects_failed_in_join", 0) + 1
-    rep.stats["prospects_with_salesforce_contact"] = with_contact
-    rep.stats["prospects_with_crm_id_but_no_contact_row"] = missing_contact
-    rep.stats["prospects_without_crm_id"] = without_link
-    if missing_contact:
-        rep.warn(f"{missing_contact} Nooks prospects have a crmId but no Salesforce Contact row in sf_contacts: "
+            failed += 1
+    unmatched_rows = 0
+    for row in data.nooks_prospects:                      # Nooks rows whose Contact is not in sf_contacts
+        crm = normalise_sf_id(row.get("crmId"))
+        if crm and (crm in used or nooks_by_crm.get(crm) is not row):
+            continue                                      # matched to a Contact, or a duplicate of a matched row
+        acct = accounts_by_nooks.get((row.get("account") or {}).get("id"))
+        try:
+            out.append(prospect_from_nooks(row, sf_contact=None, account_country=acct.country if acct else None))
+            unmatched_rows += 1
+        except LoaderError:
+            failed += 1
+    contacts = [p for p in out if p.sf_contact_id]
+    rep.stats["contacts_total"] = len(data.sf_contacts)
+    rep.stats["contacts_with_usable_phone"] = sum(1 for p in out if p.sf_contact_id and p.phone_e164)
+    rep.stats["contacts_opted_out_email"] = sum(1 for p in contacts if p.opted_out_email)
+    # Sales_Opt_Out_Email__c: meaning UNVERIFIED, not modelled on Prospect: counted only (coordinator decides)
+    rep.stats["contacts_sales_opt_out_email_unverified"] = sum(
+        1 for c in data.sf_contacts if c.get("Sales_Opt_Out_Email__c") is True)
+    rep.stats["prospects_nooks_id_resolved"] = sum(1 for p in out if p.nooks_id)
+    rep.stats["prospects_nooks_id_unresolved"] = sum(1 for p in out if not p.nooks_id)
+    rep.stats["nooks_rows_without_contact_row"] = unmatched_rows
+    if dup_crm:
+        rep.stats["nooks_prospects_duplicate_crm_id"] = dup_crm
+        rep.warn(f"{dup_crm} Nooks prospect rows share a crmId with another row: the first (by id) is used")
+    if failed:
+        rep.stats["prospects_failed_in_join"] = failed
+    if unmatched_rows:
+        rep.warn(f"{unmatched_rows} Nooks prospects have no Salesforce Contact row in sf_contacts: "
                  "phone and email opt-out are unknown for them (they cannot be called)")
     return out
+
+
+def infer_prospect_ids_from_calls(data: RawData, prospects: list[Prospect]) -> list[Prospect]:
+    """Resolve Nooks prospect ids WITHOUT extra connector calls, conservatively: a Nooks prospect id seen on calls
+    is attached to a Contact only when EVERY call carrying that id was dialled to one phone number, that number
+    belongs to exactly ONE Contact, and the Contact has no Nooks id yet. Shared switchboards (several Contacts on
+    one number) and conflicting numbers stay unresolved. Counts go into ``report.stats``. Returns a new list."""
+    by_phone: dict[str, list[int]] = {}
+    for i, p in enumerate(prospects):
+        if p.phone_e164 and p.sf_contact_id:
+            by_phone.setdefault(p.phone_e164, []).append(i)
+    known = {p.nooks_id for p in prospects if p.nooks_id}
+    phones_for: dict[str, set[str | None]] = {}
+    for c in data.calls:
+        if c.prospect_id and c.prospect_id not in known:
+            phones_for.setdefault(c.prospect_id, set()).add(c.to_e164)
+    out = list(prospects)
+    taken: set[int] = set()
+    inferred = ambiguous = 0
+    for pid in sorted(phones_for):
+        phones = phones_for[pid]
+        if len(phones) != 1 or None in phones:
+            ambiguous += 1
+            continue
+        hits = by_phone.get(next(iter(phones)), [])
+        if len(hits) != 1 or hits[0] in taken or out[hits[0]].nooks_id:
+            ambiguous += 1
+            continue
+        taken.add(hits[0])
+        out[hits[0]] = replace(out[hits[0]], nooks_id=pid)
+        inferred += 1
+    data.report.stats["prospect_ids_inferred_from_call_phone"] = inferred
+    data.report.stats["call_prospect_ids_left_unresolved"] = ambiguous
+    data.report.stats["prospects_nooks_id_resolved"] = sum(1 for p in out if p.nooks_id)
+    data.report.stats["prospects_nooks_id_unresolved"] = sum(1 for p in out if not p.nooks_id)
+    return out
+
+
+# ------------------------------------------------------------------ last sheet from our tagged tasks
+SHEET_TAG = re.compile(r"\[apac-callsheet (\d{4}-\d{2}-\d{2}) #(\d+)(?: acct=([A-Za-z0-9]{15,18}))?\]")
+
+
+def parse_sheet_tag(note) -> tuple[date, int, str | None] | None:
+    """``[apac-callsheet 2026-11-25 #3]`` (optionally ``... #3 acct=<SF id>]``) in a task note ->
+    (sheet date, rank, SF account id or None). Untagged or malformed notes give None (ignored)."""
+    if not isinstance(note, str):
+        return None
+    m = SHEET_TAG.search(note)
+    if not m:
+        return None
+    try:
+        d = date.fromisoformat(m.group(1))
+    except ValueError:
+        return None
+    return d, int(m.group(2)), normalise_sf_id(m.group(3)) if m.group(3) else None
+
+
+def last_sheet_from_tasks(data: RawData, prospects: list[Prospect], run_date: date) -> set[str]:
+    """Account ids on the most recent sheet BEFORE ``run_date`` according to our tagged one-off tasks (any status):
+    the second source of "never the same account twice in a row" besides state.json, which is gitignored and
+    starts 'new' in every fresh container. Untagged tasks are ignored; tasks tagged ``run_date`` or later are
+    ignored (same-night reruns stay stable). The account is the tag's ``acct=`` id when present, else the task's
+    prospect resolved to a Contact. A tagged task whose account cannot be found is counted and BLOCKS live."""
+    rep = data.report
+    prospect_acct = {p.nooks_id: normalise_sf_id(p.sf_account_id) for p in prospects if p.nooks_id and p.sf_account_id}
+    tagged = []
+    for r in data.nooks_tasks:
+        t = parse_sheet_tag(r.get("note"))
+        if t:
+            tagged.append((t, (r.get("prospect") or {}).get("id")))
+    rep.stats["tagged_tasks"] = len(tagged)
+    before = [x for x in tagged if x[0][0] < run_date]
+    if not before:
+        return set()
+    last = max(x[0][0] for x in before)
+    ids: set[str] = set()
+    unresolved = 0
+    for (d, _rank, acct), pid in before:
+        if d != last:
+            continue
+        sf = acct or prospect_acct.get(pid)
+        if sf:
+            ids.add(sf)
+        else:
+            unresolved += 1
+    rep.stats["last_sheet_date_from_tasks"] = int(last.strftime("%Y%m%d"))
+    if unresolved:
+        rep.stats["tagged_tasks_unresolved"] = unresolved
+        rep.warn(f"{unresolved} tagged tasks from the last sheet ({last}) could not be tied to an account "
+                 "(no acct= in the tag and the prospect is not resolved)")
+        rep.block_live("tagged tasks from the last sheet could not be tied to accounts")
+    return ids

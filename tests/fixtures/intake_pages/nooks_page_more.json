@@ -1,0 +1,19 @@
+{
+ "traceId": "FAKE",
+ "hint": "More results are available.",
+ "data": [
+  {
+   "id": "FAKE-CALL-021",
+   "duration": 31
+  },
+  {
+   "id": "FAKE-CALL-022",
+   "duration": 32
+  }
+ ],
+ "links": {
+  "first": "/v1/calls?x",
+  "prev": null,
+  "next": "/v1/calls?page[after]=FAKECURSOR"
+ }
+}

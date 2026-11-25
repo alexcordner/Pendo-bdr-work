@@ -12,9 +12,12 @@ Usage:
     python scripts/merge_pages.py --manifest m.json --name nooks_calls --raw-dir output/raw \
         --source-tool listCalls --query "owner=<id>, page_size=100" --last-page-reached true
 
-``--last-page-reached`` is what the SESSION saw (the last page said hasMore == false, or the
-SOQL result said done == true). It is never guessed here. ``--rows-key`` forces a key when a
-page is a dict holding the rows under an unusual key.
+``--last-page-reached`` is what the SESSION saw: ``true`` / ``false``, or ``auto`` to derive it from the
+FINAL page (``derive_last_page``): Nooks has NO hasMore field, the end is ``links.next == null``
+(a non-null ``links.next`` means NOT reached); a page with ``hasMore`` uses that. Salesforce keyset pages
+carry no usable end marker (``done`` is true on every page): the session decides (a short page, fewer
+rows than LIMIT, means the end). ``auto`` on a page with no end marker is an ERROR, never a guess.
+``--rows-key`` forces a key when a page is a dict holding the rows under an unusual key.
 
 Page envelopes understood (see ``extract_rows``), first match wins:
   1. bare list:                      [ {...}, {...} ]
@@ -110,6 +113,22 @@ def _row_id(row: dict, id_field: str):
     return None
 
 
+def derive_last_page(pages: list) -> bool:
+    """Was the last page the end? From the FINAL page only (page order). Nooks: ``links.next`` is null on the
+    last page and a cursor URL otherwise. Other tools: ``hasMore``. Anything else: MergeError (no guess)."""
+    if not pages:
+        raise MergeError("no pages: cannot derive reached_last_page")
+    last = _unwrap_mcp_text(pages[-1])
+    if isinstance(last, dict):
+        links = last.get("links")
+        if isinstance(links, dict) and "next" in links:
+            return links["next"] in (None, "")
+        if isinstance(last.get("hasMore"), bool):
+            return not last["hasMore"]
+    raise MergeError("cannot derive reached_last_page: the final page has neither links.next nor hasMore; "
+                     "pass --last-page-reached true or false")
+
+
 def merge_pages(pages: list, *, id_field: str = "id", allow_no_id: bool = False,
                 rows_key: str | None = None) -> tuple[list, dict]:
     """pages: list of already-parsed page values (page order). Returns (rows, stats)."""
@@ -193,13 +212,15 @@ def build_dump(rows: list, stats: dict, *, source_tool: str, query: str, reached
     return {"meta": meta, "rows": rows}
 
 
-def _bool_arg(text: str) -> bool:
+def _bool_arg(text: str):
     t = text.strip().lower()
     if t in ("true", "yes", "1"):
         return True
     if t in ("false", "no", "0"):
         return False
-    raise argparse.ArgumentTypeError("expected true or false")
+    if t == "auto":
+        return "auto"
+    raise argparse.ArgumentTypeError("expected true, false or auto")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,7 +231,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--source-tool", required=True)
     ap.add_argument("--query", required=True, help="the query / filters used (no secrets)")
     ap.add_argument("--last-page-reached", type=_bool_arg, default=None,
-                    help="true/false as SEEN by the session; omit for a non-paged source")
+                    help="true/false as SEEN by the session, or auto (from the final page's links.next / hasMore); "
+                         "omit for a non-paged source")
     ap.add_argument("--id-field", default="id")
     ap.add_argument("--rows-key", default=None)
     ap.add_argument("--allow-no-id", action="store_true")
@@ -221,8 +243,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         entries = read_manifest(args.manifest)
-        rows, stats = merge_pages(load_pages(entries), id_field=args.id_field, allow_no_id=args.allow_no_id,
+        pages = load_pages(entries)
+        rows, stats = merge_pages(pages, id_field=args.id_field, allow_no_id=args.allow_no_id,
                                   rows_key=args.rows_key)
+        if args.last_page_reached == "auto":
+            args.last_page_reached = derive_last_page(pages)
     except MergeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

@@ -536,8 +536,8 @@ def test_prospect_without_contact_row_cannot_be_called(world, cfg, tmp_path):
     keep = world.contacts[1:]
     raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, sf_contacts=keep)
     r = run(raw, cfg, tmp_path)
-    assert r.intake_report.stats["prospects_with_crm_id_but_no_contact_row"] == 1
-    assert any("crmId but no Salesforce Contact row" in l for l in r.log_lines)
+    assert r.intake_report.stats["nooks_rows_without_contact_row"] == 1
+    assert any("no Salesforce Contact row" in l for l in r.log_lines)
 
 
 # ---------------------------------------------------------------- CLI
@@ -621,3 +621,167 @@ def test_no_hardcoded_real_ids_in_new_files():
     for p in SOURCES + [ROOT / "docs" / "fetch_runbook.md", ROOT / "docs" / "intake_schema.md"]:
         text = p.read_text()
         assert "5koD9szETWeI1F0DcRTqkoHGPlY2" not in text and "@pendo.io" not in text
+
+
+# ---------------------------------------------------------------- probe findings (task 2a, round 2)
+def p_ok(ps):
+    """Contact-built prospects: a Contact id always; a Nooks id only when inferred from a unique call phone."""
+    return all(p.sf_contact_id and not (p.nooks_id or "").startswith(pl.SURROGATE) for p in ps)
+
+
+def test_contacts_only_run_has_no_nooks_ids_and_no_internal_keys_leak(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, include_prospects=False)
+    r = run(raw, cfg, tmp_path)
+    assert r.intake_report.ok and r.stats["prospects_nooks_id_unresolved"] > 0
+    assert all(not (p.nooks_id or "").startswith(pl.SURROGATE) for p in r.prospects)
+    for ps in r.rank_result.prospects.values():
+        assert p_ok(ps)
+    assert r.stats["prospects_nooks_id_resolved"] >= r.stats.get("prospect_ids_inferred_from_call_phone", 0)
+    assert len(keys(r)) > 0
+    assert r.stats["contacts_with_usable_phone"] > 0
+
+
+def test_contacts_only_do_not_call_still_blocks_by_phone_and_email(world, cfg, tmp_path):
+    with_ids = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    no_ids = run(write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, include_prospects=False), cfg,
+                 tmp_path / "rb")
+    blocked = lambda r: {p.sf_contact_id for p in r.prospects if p.do_not_call}
+    assert blocked(with_ids) and blocked(no_ids) <= blocked(with_ids)
+    # nobody blocked by phone / email in the full run may be chosen in the contacts-only run
+    chosen = {p.sf_contact_id for ps in no_ids.rank_result.prospects.values() for p in ps}
+    assert not (chosen & blocked(no_ids))
+
+
+def test_phone_matched_calls_still_cool_accounts_down_without_nooks_ids(world, cfg, tmp_path):
+    b = Builder()
+    b.account(1, "Cool Down Pty Ltd", state="New South Wales", emp=300)
+    p = b.prospect(1, 1, "Head of Product")
+    b.scoop(1, "Funding", "Cool raised $5 million in funding.", 1, topics=("Funding",))
+    b.call(p, "No Answer", 1, duration=10, unlinked=True)          # no prospect id: phone only
+    raw = write_raw(b.w, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, include_prospects=False)
+    r = run(raw, cfg, tmp_path)
+    assert r.stats["accounts_dropped"] >= 1 or any(x.skipped_reason and "cooldown" in x.skipped_reason.lower()
+                                                   for x in r.rank_result.skipped)
+    assert not names(r.rank_result.ranked)
+
+
+def test_tagged_task_puts_the_account_on_the_last_sheet(world, cfg, tmp_path):
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    top = base.rank_result.ranked[0].account
+    tasks = [{"id": "T1", "action": "call", "status": "finished", "completed": True,
+              "note": f"[apac-callsheet 2026-11-24 #1 acct={top.sf_account_id}]", "prospect": {"id": "NK"}},
+             {"id": "T2", "action": "call", "status": "ready", "completed": False, "note": "untagged", "prospect": {"id": "NK"}}]
+    raw = write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks)
+    r = run(raw, cfg, tmp_path / "rb")
+    assert top.name not in names(r.rank_result.ranked)
+    assert any(x.account.name == top.name and x.skipped_reason == "on last sheet" for x in r.rank_result.skipped)
+    assert r.stats["last_sheet_accounts_from_tasks"] == 1
+    assert any("1 from tagged Nooks tasks" in l for l in r.log_lines)
+
+
+def test_tagged_task_for_today_or_untagged_tasks_change_nothing(world, cfg, tmp_path):
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    top = base.rank_result.ranked[0].account
+    tasks = [{"id": "T1", "action": "call", "status": "ready", "completed": False,
+              "note": f"[apac-callsheet 2026-11-25 #1 acct={top.sf_account_id}]", "prospect": {"id": "NK"}}]
+    r = run(write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks), cfg, tmp_path / "rb")
+    assert keys(r) == keys(base)
+
+
+def test_state_and_task_memory_are_unioned(world, cfg, tmp_path):
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    a, b = base.rank_result.ranked[0].account, base.rank_result.ranked[1].account
+    state = tmp_path / "rc" / "state"
+    st_mod.save_state(st_mod.record_sheet(st_mod.State(), datetime(2026, 11, 24).date(), [a.sf_account_id]), state)
+    tasks = [{"id": "T1", "action": "call", "status": "finished", "completed": True,
+              "note": f"[apac-callsheet 2026-11-24 #1 acct={b.sf_account_id}]", "prospect": {"id": "NK"}}]
+    raw = write_raw(world, tmp_path / "c", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks)
+    r = run_pipeline(raw, cfg, state, NOW)
+    skipped = {x.account.name for x in r.rank_result.skipped if x.skipped_reason == "on last sheet"}
+    assert {a.name, b.name} <= skipped
+
+
+def test_live_refused_when_tagged_tasks_cannot_be_tied_to_an_account(world, cfg, tmp_path):
+    tasks = [{"id": "T1", "action": "call", "status": "finished", "completed": True,
+              "note": "[apac-callsheet 2026-11-24 #1]", "prospect": {"id": "NK-NOBODY"}}]
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_tasks=tasks)
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("tagged tasks" in r for r in e.value.reasons)
+    assert run(raw, cfg, tmp_path).live is False
+
+
+def test_live_refused_without_a_task_list(raw, cfg, tmp_path):
+    (raw / "nooks_tasks.json").unlink()
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("nooks_tasks.json missing" in r for r in e.value.reasons)
+
+
+def test_gmail_hits_are_anchored_to_the_search_day_not_the_run_day(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id)
+    def f(d):
+        d["meta"]["fetched_at"] = "2026-11-24T03:00:00Z"
+        for t in d["rows"]:
+            for m in t["messages"]:
+                m.pop("internalDate", None)               # the live search results carry no date
+    rewrite(raw, "gmail_sent", f)
+    r = run(raw, cfg, tmp_path)
+    firsts = {v["first_seen"] for per in r.state.emails.values() for v in per.values()}
+    assert firsts == {"2026-11-24"}
+    assert all(v["sent_on"] is None for per in r.state.emails.values() for v in per.values())
+
+
+def test_gmail_window_shorter_than_the_cooldown_blocks_live(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_window=3)
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path, live=True)
+    assert any("shorter than the email cooldown" in r for r in e.value.reasons)
+
+
+def test_log_header_states_the_dnc_limitation(raw, cfg, tmp_path):
+    text = run(raw, cfg, tmp_path).log_path.read_text()
+    head = text.split("== INTAKE ==")[0]
+    assert "Do Not Call visibility" in head and "nooks_sep" in head and "RE-RUN" in head
+
+
+def test_log_reports_scoops_matched_to_the_book(raw, cfg, tmp_path):
+    r = run(raw, cfg, tmp_path)
+    s = r.stats
+    assert 0 < s["scoops_matched_to_book"] <= s["scoops"] and s["scoop_companies_matched_to_book"] <= s["scoop_companies"]
+    assert any(f"scoops matched to your book: {s['scoops_matched_to_book']} of {s['scoops']}" in l for l in r.log_lines)
+    assert any("scoop types in the file:" in l for l in r.log_lines)
+
+
+def test_log_counts_external_and_odd_to_values(world, cfg, tmp_path):
+    calls = [dict(c) for c in world.calls]
+    calls[0]["to"], calls[1]["to"] = "external", "+61 (0)4 1234 5678"
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path)
+    assert r.stats["calls_to_external"] == 1 and r.stats["calls_to_not_e164_other"] == 1
+    assert any("1 literal 'external', 1 other" in l for l in r.log_lines)
+
+
+def test_per_type_scoop_counts_from_run_meta_are_logged(raw, cfg, tmp_path):
+    rewrite(raw, RUN_META, lambda d: d.__setitem__("scoop_counts_by_type", {"Funding": 270, "Executive Move": 1000}))
+    assert any("Executive Move=1000, Funding=270" in l for l in run(raw, cfg, tmp_path).log_lines)
+
+
+def test_unmatched_scoops_are_capped_in_the_log(world, cfg, tmp_path):
+    b = Builder()
+    b.account(1, "Only Account Pty Ltd", state="New South Wales", emp=300)
+    b.prospect(1, 1, "Head of Product")
+    for n in range(100, 140):
+        b.scoop(n, "Funding", f"Stranger {n} raised $5 million in funding.", 2, topics=("Funding",))
+    raw = write_raw(b.w, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id)
+    r = run(raw, cfg, tmp_path)
+    text = r.log_path.read_text()
+    assert r.stats["scoops_matched_to_book"] == 0 and "and 15 more (counted)" in text
+
+
+def test_calls_from_other_sources_warn_but_do_not_block_a_live_run(world, cfg, tmp_path):
+    calls = [dict(c) for c in world.calls]
+    calls[0]["source"] = "outreach"
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path, live=True)
+    assert any("Outreach" in w for w in r.intake_report.warnings) and r.live

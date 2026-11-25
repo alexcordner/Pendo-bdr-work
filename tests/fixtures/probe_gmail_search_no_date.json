@@ -1,0 +1,20 @@
+{
+  "_note": "SYNTHETIC search_threads. Live results carry NO date field in METADATA_ONLY or SUMMARY views (keys: id, messageCount, messages[id,sender,toRecipients,threadId,(subject)]). Date filtering must be done in the query (newer_than: / after:).",
+  "resultCountEstimate": "1",
+  "threads": [
+    {
+      "id": "FAKE-THREAD",
+      "messageCount": 1,
+      "messages": [
+        {
+          "id": "FAKE-MSG",
+          "sender": "firstlast@example.org",
+          "threadId": "FAKE-THREAD",
+          "toRecipients": [
+            "someone@example.com"
+          ]
+        }
+      ]
+    }
+  ]
+}
