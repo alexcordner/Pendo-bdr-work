@@ -405,7 +405,7 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
         for i in range(0, len(calls), call_page):
             st = st_mod.record_calls(st, calls[i:i + call_page], prospects, by_sf, config=cfg)
             total += st.report["record_calls"]["calls_seen"]
-        st = st_mod.mark_dnc_rebuilt(st, run_date, total)
+        st = st_mod.mark_dnc_rebuilt(st, run_date, total, reached_last_page=True)
     else:
         st = st_mod.record_calls(st, calls, prospects, by_sf, config=cfg)
     sent = []
@@ -458,7 +458,7 @@ def run_pipeline(world: World, state_dir, now: datetime = NOW, cfg: Config | Non
     cooldown = dict(cu_sf)
     for kind in ("nooks_account_id", "zoominfo_id"):
         cooldown.update(st_mod.cooldown_until_by(st, cfg, kind))
-    last_ids = {restyle(x) for x in st_mod.last_sheet_ids(st)}
+    last_ids = {restyle(x) for x in st_mod.last_sheet_ids(st, run_date)}
     result = ranker.rank_accounts(res.accounts, signals, marked, cooldown, last_ids, cfg, now)
     t["rank"] = time.perf_counter() - t4
 
@@ -913,8 +913,6 @@ def test_d_sheet_history_keeps_three_nights(tmp_path):
     assert [s["run_date"] for s in st.sheets] == ["2026-11-27", "2026-11-28", "2026-11-29"]
 
 
-@pytest.mark.xfail(strict=False, reason="review_1g H1: last_sheet_ids does not ignore a sheet recorded for the "
-                                        "SAME run date, so a second run on the same night replaces the whole sheet")
 def test_d_same_night_rerun_is_stable(world, tmp_path):
     a = run(world, tmp_path)
     b = run(world, tmp_path)
@@ -922,13 +920,13 @@ def test_d_same_night_rerun_is_stable(world, tmp_path):
 
 
 def test_d_same_night_rerun_documents_the_hole(world, tmp_path):
-    """Pinned current behaviour of H1 so it is visible in the normal run: every account from the first run
-    is 'on last sheet' in the second run of the same night. 2c must not record the sheet in a dry run."""
+    """H1 fixed in state.last_sheet_ids(state, run_date): the sheet recorded for TODAY is ignored, so a second
+    run on the same night skips nothing as 'on last sheet' and ranks the same accounts."""
     a = run(world, tmp_path)
     b = run(world, tmp_path)
     assert a.result.ranked
-    assert {x.account.name for x in a.result.ranked} <= {x.account.name for x in b.result.skipped
-                                                          if x.skipped_reason == "on last sheet"}
+    assert not {x.account.name for x in b.result.skipped if x.skipped_reason == "on last sheet"} & \
+        {x.account.name for x in a.result.ranked}
 
 
 def test_d_dry_run_without_record_sheet_is_repeatable(world, tmp_path):
@@ -1579,31 +1577,36 @@ def test_m_guessed_timezone_no_longer_calls_later_but_models_comment_says_so(wor
 
 
 # ----------------------------------------------------------------------------- (n) tracked leftovers
-def test_n_1c_M1_partial_history_is_accepted_as_a_full_rebuild(world, tmp_path):
-    """STILL PRESENT. mark_dnc_rebuilt trusts the caller's count: one page of one call 'proves' a full rebuild."""
+def test_n_1c_M1_partial_history_is_rejected(world, tmp_path):
+    """Fixed: mark_dnc_rebuilt needs reached_last_page=True and calls_seen >= distinct calls already recorded."""
     idx = build_disposition_index(world.dispositions)
     cfg_ = load_config(CFG_PATH)
     calls = [call_from_nooks(r, idx) for r in world.calls]
     st = st_mod.record_calls(State(), calls[:1], [], {}, config=cfg_)       # page 1 of N only
-    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), st.report["record_calls"]["calls_seen"])
-    st_mod.require_healthy(st, live=True)                                   # live runs now allowed...
-    assert not st.dnc_prospect_ids or len(st.dnc_prospect_ids) < len(DNC_IDS)       # ...with DNC incomplete
+    with pytest.raises(ValueError):                                         # adapter says hasMore is still true
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 1, reached_last_page=False)
+    full = st_mod.record_calls(State(), calls, [], {}, config=cfg_)
+    with pytest.raises(ValueError):                                         # count smaller than calls already held
+        st_mod.mark_dnc_rebuilt(full, date(2026, 11, 25), 1, reached_last_page=True)
+    with pytest.raises(st_mod.StateResetError):
+        st_mod.require_healthy(st, live=True)
 
 
-def test_n_1c_L1_saving_an_empty_state_over_a_populated_file_wipes_dnc_silently(world, tmp_path):
-    """STILL PRESENT. save_state has no guard against replacing a populated file with an empty State."""
+def test_n_1c_L1_saving_an_empty_state_over_a_populated_file_is_refused(world, tmp_path):
+    """Fixed: StateShrinkError unless allow_shrink=True; the old file is kept and a .prev backup exists."""
     out = run(world, tmp_path)
-    assert json.loads((tmp_path / "state.json").read_text())["dnc_prospect_ids"]
-    st_mod.save_state(State(), tmp_path)                                    # no exception, no .bak
-    raw = json.loads((tmp_path / "state.json").read_text())
-    assert raw["dnc_prospect_ids"] == [] and raw["dnc_phones"] == []
-    assert not any(p.name.startswith("state.json.") for p in tmp_path.iterdir())
-    assert not st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))            # the marker gate still catches it
+    before = (tmp_path / "state.json").read_text()
+    assert json.loads(before)["dnc_prospect_ids"]
+    with pytest.raises(st_mod.StateShrinkError):
+        st_mod.save_state(State(), tmp_path)
+    assert (tmp_path / "state.json").read_text() == before
+    st_mod.save_state(State(), tmp_path, allow_shrink=True)                 # explicit override
+    assert (tmp_path / "state.json.prev").read_text() == before
+    assert not st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))            # and the marker gate still catches it
 
 
-def test_n_1c_L2_malformed_local_date_falls_back_to_the_utc_date(tmp_path):
-    """STILL PRESENT. Call at Tue 23:00 UTC = Wed 10:00 Sydney; with a corrupt stored local date the fallback is the
-    UTC date (Tue), so the cooldown ends a day early (Mon->Thu would be Wed->Sat)."""
+def test_n_1c_L2_malformed_local_date_falls_back_to_the_account_zone(tmp_path):
+    """Fixed: Tue 23:00 UTC = Wed 10:00 Sydney; with a corrupt stored date the fallback uses the account zone."""
     st = State(accounts={sf15(1): AccountState(last_call_at=datetime(2026, 11, 24, 23, 0, tzinfo=UTC),
                                               last_call_date="2026-11-25", last_outcome="no_contact")})
     raw = st_mod.state_to_dict(st)
@@ -1612,8 +1615,8 @@ def test_n_1c_L2_malformed_local_date_falls_back_to_the_utc_date(tmp_path):
     bad = st_mod.state_from_dict(json.loads(json.dumps(raw)))
     cfg_ = load_config(CFG_PATH)
     assert st_mod.cooldown_until(good, cfg_)[sf15(1)] == date(2026, 11, 28)
-    assert st_mod.cooldown_until(bad, cfg_)[sf15(1)] == date(2026, 11, 27)
-    assert any("malformed last_call_date" in w for w in bad.load_warnings)   # at least it is logged
+    assert st_mod.cooldown_until(bad, cfg_)[sf15(1)] == date(2026, 11, 28)  # no longer a day short
+    assert any("malformed last_call_date" in w for w in bad.load_warnings)
 
 
 def test_n_1e_max_age_days_still_drives_ranker_recency(world, tmp_path):
@@ -1684,8 +1687,10 @@ def test_gate_live_requires_marker_and_dry_run_only_warns(tmp_path):
         st_mod.require_healthy(st, live=True)
     st_mod.require_healthy(st, live=False)
     with pytest.raises(ValueError):
-        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0)
-    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3)
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True)      # 0 needs confirmation
+    with pytest.raises(ValueError):
+        st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 3, reached_last_page=True)      # nothing was recorded
+    st = st_mod.mark_dnc_rebuilt(st, date(2026, 11, 25), 0, reached_last_page=True, empty_history_confirmed=True)
     st_mod.require_healthy(st, live=True)
     st_mod.save_state(st, tmp_path)
     assert st_mod.dnc_is_rebuilt(st_mod.load_state(tmp_path))
