@@ -1,0 +1,94 @@
+# APAC call sheet config. Edit freely. Values marked TODO need your input.
+
+owner:
+  nooks_user_id: "5koD9szETWeI1F0DcRTqkoHGPlY2"
+  email: "alex.cordner@pendo.io"
+
+territory:
+  priority_countries: ["Australia", "New Zealand"]   # main focus
+  secondary_countries: []                             # ANZ only (confirmed)
+  # Timezone per country / state, used for call windows. Verify the states you work.
+  timezones:
+    Australia:
+      default: "Australia/Sydney"
+      Queensland: "Australia/Brisbane"       # no DST
+      "Western Australia": "Australia/Perth"
+      "South Australia": "Australia/Adelaide"
+      "Northern Territory": "Australia/Darwin"
+      Victoria: "Australia/Melbourne"
+      Tasmania: "Australia/Hobart"
+    "New Zealand": { default: "Pacific/Auckland" }
+
+company_size:
+  max_employees: 2000
+  min_employees: 20          # TODO confirm floor; avoids tiny shops
+
+tiers:
+  # Used by the ranker. Tier 1 = best fit.
+  tier1: { employees: [200, 2000], note: "Mid-size, real product / digital teams" }
+  tier2: { employees: [50, 199] }
+  tier3: { employees: [20, 49] }
+
+call_windows:          # local time at the prospect, Mon-Fri
+  - { name: "morning",   start: "08:45", end: "11:30" }
+  - { name: "afternoon", start: "13:30", end: "16:30" }
+  # TODO: tell me if you want a different split (e.g. avoid Fri afternoon)
+
+limits:
+  daily_call_cap: 40                 # top N accounts per night
+  max_per_account_per_run: 1         # contacts called per account per night
+  cooldown_days_no_answer: 3         # don't re-queue an account touched in the last N days
+  cooldown_days_after_connect: 14
+  email_cooldown_days: 7             # voicemail pair: skip if emailed in last 7 days
+  voicemail_lookback_hours: 24
+  max_voicemail_drafts_per_run: 25
+  zoominfo_credit_budget_per_run: 0  # 0 = search only. Raise deliberately.
+
+sources:               # in priority order
+  - salesforce         # read-only: accounts where I'm the BDR ("ROE" BDR) on the account team; open tasks. Exact field TBC in Phase 1
+  - nooks              # accounts / prospects I own
+  - zoominfo           # search_companies (free) under the size cap, matching icp.md
+
+# Persona titles to look for (call targets). TODO: you said "anyone Pendo helps"; edit order of preference.
+personas:
+  primary:
+    - "Head of Product"
+    - "VP Product"
+    - "Chief Product Officer"
+    - "Director of Product"
+    - "Head of Digital"
+    - "Chief Digital Officer"
+    - "Head of Customer Experience"
+    - "Head of Customer Success"
+    - "Head of Support"
+  secondary:
+    - "Product Manager"
+    - "Head of Engineering"
+    - "CTO"
+    - "Head of IT"
+    - "Digital Transformation Manager"
+    - "Head of Digital Workplace"     # employee-facing (digital adoption)
+
+# Scoop / trigger filtering (signals.py). Only these map to Pendo buyers.
+signals:
+  scoop_types_keep: ["Product Launch", "Funding", "Executive Move", "New Hire", "Hiring Plans",
+                     "Open Position", "Management Move", "Partnership", "Mergers & Acquisitions (M&A)"]
+  keywords_keep: ["product", "digital", "customer experience", "cx", "customer success", "support",
+                  "engineering", "cto", "app", "mobile", "platform", "transformation", "launch", "ux"]
+  keywords_drop: ["medical & health", "legal", "nurse", "paralegal", "driver", "warehouse"]
+  max_age_days: 45
+  weights:             # plain-Python scoring weights (0-100 total scale, tune later)
+    trigger_strength: 40
+    icp_fit: 25
+    recency: 15
+    named_prospect_with_phone: 15
+    cooldown_penalty: -30
+
+filters:
+  drop_name_patterns: ["CBD", "Sydney", "Melbourne", "Brisbane", "Auckland", "Perth", "Adelaide"]  # only dropped when the whole name is just a place
+  drop_if_no_domain: true
+
+paths:
+  state_dir: "state"
+  log_dir: "logs"
+  output_dir: "output"

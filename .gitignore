@@ -1,0 +1,9 @@
+# live data never goes in git
+state/*.json
+logs/*.log
+output/
+__pycache__/
+.pytest_cache/
+.venv/
+.env
+*.pyc
