@@ -1,0 +1,351 @@
+# Voice rules for openers, facts, gatekeeper lines and "just tried you" email drafts.
+# Enforced deterministically by src/textcheck.py. Explained in docs/voice_guide.md.
+#
+# Source of every rule below: skills/opener/SKILL.md, skills/email-draft/SKILL.md (draft v0) and the call-length data in
+# docs/connector_notes.md (about two-thirds of Alex's calls last under 10s, about a quarter pass 30s).
+# Items marked INFERRED are extensions of a rule the skills state in general terms. They are NOT Alex's confirmed taste.
+# Regexes are Python, matched case-insensitively. Single quotes in YAML so backslashes stay literal.
+
+# While false, every generated opener block / email draft MUST carry the label below as its first line.
+# Flip to true ONLY after Alex has supplied alex_examples and approved the tuned output (task 2e).
+calibrated: false
+draft_style_label: "DRAFT STYLE: not yet calibrated to Alex"
+
+# TODO (task 2e, needs Alex): fill these with his real examples. Do not invent any.
+# The checker reads disliked_openers (near-duplicates are warned). The Claude session reads all three once calibrated.
+alex_examples:
+  liked_openers: []      # TODO Alex: 3 openers he likes
+  disliked_openers: []   # TODO Alex: 3 openers he hates
+  proud_emails: []       # TODO Alex: 2 emails he is proud of
+
+opener:
+  max_words: 25            # spoken in about 8 seconds (skill: "max ~25 words"; most calls end inside 10s)
+  max_questions: 1         # one ask
+gatekeeper:
+  max_words: 14            # skill: "under 15 words"
+  role_cues:               # it must ask for a role / person, not a name
+    - who
+    - whoever
+    - whom
+    - person
+    - someone
+    - anyone
+    - head
+    - lead
+    - manager
+    - owner
+    - team
+    - director
+    - looks after
+    - responsible
+  pitch_words:             # no pitch (skill: "no pitch")
+    - pendo
+    - software
+    - platform
+    - solution
+    - solutions
+    - demo
+    - analytics
+    - adoption
+    - offer
+    - help
+    - helps
+    - improve
+    - increase
+    - reduce
+    - save
+    - free
+    - sell
+    - pitch
+    - we
+    - our
+
+email:
+  subject_min_words: 2     # skill: "2-5 words"
+  subject_max_words: 5
+  body_max_words: 79       # skill: "under 80 words" (counts greeting and sign-off too)
+  content_lines_min: 3     # skill: "3 to 5 short lines" (greeting and sign-off not counted)
+  content_lines_max: 5
+  opening: "Just tried you"
+  signoff: "Alex"
+  allow_links: false       # skill: "no links except where Alex asks"
+  ask_cues:                # an ask that is not a question mark; counted toward the one-ask limit
+    - '\blet me know\b'
+    - '\bplease reply\b'
+    - '\bsend me\b'
+    - '\bhappy to (chat|talk|jump|find)\b'
+
+# Matching is whole-word, case-insensitive. Applied to opener, gatekeeper, email subject and body. Not to FACT lines,
+# which quote the research packet.
+banned_phrases:
+  - "hope you're well"
+  - "hope you are well"
+  - "hope this finds you well"
+  - "hope this email finds you"
+  - "i'm reaching out"
+  - "i am reaching out"
+  - "reaching out"
+  - "quick call"
+  - "touch base"
+  - "circle back"
+  - "synergy"
+  - "leverage"
+  - "game-changing"
+  - "game changing"
+  - "revolutionise"
+  - "revolutionize"
+  # INFERRED from "no hype words":
+  - "cutting-edge"
+  - "best-in-class"
+  - "world-class"
+  - "unlock"
+  - "supercharge"
+  - "disrupt"
+  - "transformative"
+banned_phrases_email_only:
+  - "quick"              # skill: no "quick"
+  - "attached"
+  - "attachment"
+
+# Pendo-feature words never go in the opener (skill: "Do not mention Pendo features in the opener").
+# INFERRED list of what counts as a feature: Alex to confirm.
+pendo_feature_words:
+  - "in-app"
+  - "guide"
+  - "guides"
+  - "analytics"
+  - "session replay"
+  - "heatmap"
+  - "heatmaps"
+  - "walkthrough"
+  - "walkthroughs"
+  - "tooltip"
+  - "tooltips"
+  - "resource center"
+  - "funnel"
+  - "funnels"
+  - "nps"
+  - "survey"
+  - "surveys"
+
+# Claims about Pendo's results or customers must never be written unless the packet supplies them (and it never does yet).
+unsupported_claim_patterns:
+  - '\bwe help\b'
+  - '\bcompanies like (yours|you)\b'
+  - '\b(customers|clients) (like|such as)\b'
+  - '\bour (customers|clients)\b'
+  - "\\bwe(?:'ve| have) helped\\b"
+  - '\b(increase|increases|increased|increasing|reduce|reduces|reduced|reducing|improve|improves|improved|improving|boost|boosts|boosted|cut|cuts) [\w ]{0,20}by\b'
+  - '\bcase stud(y|ies)\b'
+  - '\b(proven|trusted by)\b'
+  - '\b\d+\s?x\b'
+  - '\b(other|similar) (apac|anz|australian|nz|new zealand) (companies|teams|businesses)\b'
+
+# Phrases that claim a real-world event or an observation of one. With no real trigger in the packet, the opener and
+# the email may not contain any of these. With a trigger, each event word must also appear in the trigger evidence.
+trigger_reaction_patterns:      # reactions: need a trigger to exist
+  - '\bcongrat\w*'
+  - '\b(saw|noticed|spotted|came across)\b'
+  - '\b(read|heard|seen) (that|about)\b'
+trigger_event_words:            # event words: must also appear (first 5 letters) in the trigger evidence
+  - raise
+  - raised
+  - raising
+  - funding
+  - series
+  - appointed
+  - appointment
+  - launch
+  - launched
+  - launches
+  - launching
+  - acquired
+  - acquires
+  - acquisition
+  - merger
+  - partnership
+  - partnered
+  - hiring
+  - hired
+  - joined
+  - joins
+  - promoted
+  - announced
+  - rollout
+  - migration
+  - expansion
+
+# When the packet flags an ambiguous role, the text must not assume what the contact does.
+role_assumption_patterns:
+  - '\bas (the|a|an|their) \w+'
+  - '\b(in )?your role\b'
+  - '\byou (lead|run|manage|own|head|oversee)\b'
+  - '\byour (team|department|function)\b'
+
+email_send_language_patterns:
+  - '\bsend (this|it|now)\b'
+  - '\bsent (this|from|via|by)\b'
+  - "\\b(?:i'?ll|i will|will) send (?:this|it)\\b"
+  - '\bsending (this|now|it)\b'
+  - '\bauto-?send\b'
+  - '\[send\]'
+
+# Proper nouns allowed even when the packet does not contain them (matched lowercase, per word).
+allowed_proper_nouns:
+  - alex
+  - pendo
+  - australia
+  - australian
+  - new
+  - zealand
+  - apac
+  - anz
+  - nz
+  - monday
+  - tuesday
+  - wednesday
+  - thursday
+  - friday
+  - saturday
+  - sunday
+  - january
+  - february
+  - march
+  - april
+  - may
+  - june
+  - july
+  - august
+  - september
+  - october
+  - november
+  - december
+
+# Words that may open a sentence without being in the packet. A sentence-initial word is a name check only when it
+# is NOT in this list or the packet (so an invented company at the start of a sentence is caught). Extend as needed.
+sentence_start_words:
+  - "curious"
+  - "congratulations"
+  - "congrats"
+  - "saw"
+  - "noticed"
+  - "heard"
+  - "cold"
+  - "just"
+  - "fair"
+  - "is"
+  - "are"
+  - "was"
+  - "can"
+  - "could"
+  - "would"
+  - "will"
+  - "do"
+  - "does"
+  - "did"
+  - "have"
+  - "has"
+  - "who"
+  - "what"
+  - "when"
+  - "where"
+  - "why"
+  - "how"
+  - "which"
+  - "hi"
+  - "hello"
+  - "hey"
+  - "g'day"
+  - "not"
+  - "no"
+  - "yes"
+  - "sorry"
+  - "thanks"
+  - "thank"
+  - "mind"
+  - "worth"
+  - "happy"
+  - "looks"
+  - "sounds"
+  - "keen"
+  - "wondering"
+  - "thought"
+  - "given"
+  - "since"
+  - "with"
+  - "after"
+  - "before"
+  - "if"
+  - "it"
+  - "this"
+  - "that"
+  - "these"
+  - "those"
+  - "there"
+  - "the"
+  - "a"
+  - "an"
+  - "we"
+  - "you"
+  - "your"
+  - "our"
+  - "my"
+  - "so"
+  - "and"
+  - "but"
+  - "or"
+  - "to"
+  - "for"
+  - "at"
+  - "on"
+  - "in"
+  - "as"
+  - "from"
+  - "by"
+  - "one"
+  - "any"
+  - "some"
+  - "many"
+  - "most"
+  - "new"
+  - "big"
+  - "early"
+  - "first"
+  - "last"
+  - "next"
+  - "today"
+  - "now"
+  - "please"
+  - "let"
+  - "change"
+  - "changes"
+  - "weeks"
+  - "teams"
+  - "leaders"
+  - "launches"
+  - "launch"
+  - "money"
+  - "funding"
+  - "hiring"
+  - "partnership"
+  - "appointments"
+  - "appointment"
+  - "growth"
+  - "quick"
+  - "short"
+  - "fine"
+  - "okay"
+  - "right"
+  - "sure"
+  - "also"
+  - "still"
+  - "then"
+  - "once"
+  - "while"
+  - "whoever"
+  - "someone"
+  - "anyone"
+# Thresholds for the token-overlap tests (0 to 1).
+fact_overlap_min: 0.6         # share of a FACT line's words found in one packet fact
+trigger_overlap_min: 0.5      # share of a TRIGGER line's words found in the packet trigger evidence
+disliked_similarity_min: 0.7  # Jaccard against alex_examples.disliked_openers
