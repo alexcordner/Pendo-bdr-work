@@ -84,7 +84,7 @@ There is no plain "Connected".
 - "Left Voicemail" calls ran about 20 to 35s, but "No Answer" is also used on 30 to 65s calls. **Do not infer voicemail from duration.**
 - `dialingMode` was always `one-off`.
 
-**Duration shares** (about 40 calls in one week; a fortnight gave 68/7/25): under 10s about 60%, 10 to 30s about 12%, over 30s about 28% (fixture shape; fortnight real mix was similar).
+**Duration shares** (real pattern): roughly two-thirds of calls last under 10s, under 10% fall between 10 and 30s, and about a quarter run over 30s. The fixture `nooks_calls_sample.json` uses a deliberately different synthetic mix (about 60/12/28) for shape coverage only; do not use it to calibrate thresholds.
 
 **Prospects.** `id`, `type`, `name`, `firstName`, `lastName`, `title`, `primaryEmail`, `linkedInUrl`, `crmId` (SF Contact id; null if type is not salesforce), `account{id}` (a Nooks id, not SF), `sequenceStates`, timestamps. **No phone and no opt-out flag on read**; phones come from SF Contact or `call.to`. `globalOptedOut` exists as a write field only; how it reads is **UNVERIFIED**. `primaryEmail` is dotted.
 
