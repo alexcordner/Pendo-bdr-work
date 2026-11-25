@@ -24,15 +24,28 @@ NOW = datetime(2026, 11, 25, 3, 0, tzinfo=UTC)          # Wed 14:00 AEDT
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 PHONE_RE = re.compile(r"\+\d{8,}|\b04\d{8}\b")
 NID = "NK-RESOLVED-0001"
-OWNER = "OWNER_ABC"
+OWNER = "Zq8Lm3Vx2Rt7Ny4Kp9Wd5Hs6Jc1"
 OPENER = {"opener": "Saw the new product lead. Who owns the app roadmap?", "fact_1": "Fact one (source: x)",
           "fact_2": "none verified", "gatekeeper": "Who looks after your app team?", "trigger": "Exec move"}
 
 
-def prep(line, fields=None, *, nid=NID, owner_id=OWNER, state=None, **kw):
+def healthy():
+    """A State whose Do Not Call memory counts as rebuilt (live payloads need that)."""
+    return State(dnc_rebuilt_at="2026-11-24", dnc_rebuilt_calls=1)
+
+
+_UNSET = object()
+
+
+def direct(line, resolved, state=_UNSET, fields=None, owner=OWNER, **kw):
+    kw.setdefault("now", line.local_call_time - timedelta(minutes=1) if hasattr(line, "ranked") and line.ranked.local_call_time else None)
+    return cs.prepare_task(line, resolved, healthy() if state is _UNSET else state, fields or OPENER, owner, **kw)
+
+
+def prep(line, fields=None, *, nid=NID, owner_id=OWNER, state=_UNSET, **kw):
     """prepare_task with a resolved prospect copied from the sheet contact plus a Nooks id."""
     resolved = replace(line.entry.prospect, nooks_id=nid)
-    return cs.prepare_task(line, resolved, state or State(), fields or OPENER, owner_id, **kw)
+    return direct(line, resolved, state, fields, owner_id, **kw)
 
 
 def sf(n): return f"001FAKE0000{n:04d}"
@@ -654,7 +667,7 @@ def test_owner_placeholder_matches_nooks_pattern():
 
 
 def test_owner_id_override(sheet):
-    assert prep(sheet.lines[0], OPENER, owner_id="abc123")["ownerId"] == "abc123"
+    assert prep(sheet.lines[0], OPENER, owner_id="Abc123Def456Ghi789Jkl012")["ownerId"] == "Abc123Def456Ghi789Jkl012"
 
 
 def test_payload_note_layout(sheet):
@@ -688,9 +701,9 @@ def test_refuses_needs_prospect_entry(config, bucket_world):
     accts, signals, prospects, rr = bucket_world
     ra = rr.needs_prospect[0]
     with pytest.raises(cs.SheetError):
-        cs.prepare_task(SheetEntry(ra), None, State(), OPENER, OWNER)           # type: ignore[arg-type]
+        direct(SheetEntry(ra), None, healthy(), OPENER, OWNER)           # type: ignore[arg-type]
     with pytest.raises(cs.SheetError):
-        cs.prepare_task(ra, None, State(), OPENER, OWNER)                       # type: ignore[arg-type]
+        direct(ra, None, healthy(), OPENER, OWNER)                       # type: ignore[arg-type]
 
 
 def test_refuses_spilled_and_skipped_ranked_accounts(config, parts):
@@ -886,7 +899,7 @@ def test_h1_blank_owner_refused_even_in_dry_run(sheet):
 def test_h1_owner_is_required_positional(sheet):
     ln = sheet.lines[0]
     with pytest.raises(TypeError):
-        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), State(), OPENER)       # type: ignore[call-arg]
+        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), healthy(), OPENER)       # type: ignore[call-arg]
 
 
 def test_h2_no_public_unchecked_payload_builder():
@@ -895,7 +908,7 @@ def test_h2_no_public_unchecked_payload_builder():
 
 # ---- H2: prepare_task is the only path
 def test_h2_padded_id_checked_as_stripped(sheet):
-    st = State(); st.dnc_prospect_ids.add("NK-RES")
+    st = healthy(); st.dnc_prospect_ids.add("NK-RES")
     with pytest.raises(cs.BlockedError, match="Do Not Call"):
         prep(sheet.lines[0], nid=" NK-RES ", state=st)
 
@@ -917,27 +930,36 @@ def test_h2_bad_nooks_id(sheet, bad):
 def test_h2_resolved_sf_id_none_fails_closed(sheet):
     ln = sheet.lines[0]
     with pytest.raises(cs.SheetError, match="cannot verify"):
-        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id=None), State(), OPENER, OWNER)
+        direct(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id=None), healthy(), OPENER, OWNER)
 
 
 def test_h2_resolved_sf_id_blank_fails_closed(sheet):
     ln = sheet.lines[0]
     with pytest.raises(cs.SheetError):
-        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id="  "), State(), OPENER, OWNER)
+        direct(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id="  "), healthy(), OPENER, OWNER)
 
 
-def test_h2_sheet_contact_without_sf_id_fails_closed(sheet):
-    ln = sheet.lines[0]
-    resolved = replace(ln.prospect, nooks_id=NID)
-    ln.entry.prospect = replace(ln.entry.prospect, sf_contact_id=None)
+def test_h2_sheet_contact_without_sf_id_fails_closed(config):
+    accts, signals, prospects = world()
+    prospects = [replace(p, sf_contact_id=None) for p in prospects]
+    rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
+    ln = cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines[0]
     with pytest.raises(cs.SheetError, match="sheet contact has no SF"):
-        cs.prepare_task(ln, resolved, State(), OPENER, OWNER)
+        direct(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id="003X"))
+
+
+def test_h2_swapped_prospect_after_build_refused(sheet):
+    ln = sheet.lines[0]
+    other = replace(ln.prospect, sf_contact_id="003OTHERCONTACT")
+    ln.entry.prospect = other
+    with pytest.raises(cs.SheetError, match="changed after build"):
+        direct(ln, replace(other, nooks_id=NID))
 
 
 def test_h2_mismatched_ids(sheet):
     ln = sheet.lines[0]
     with pytest.raises(cs.SheetError, match="different contact"):
-        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id="003OTHER"), State(), OPENER, OWNER)
+        direct(ln, replace(ln.prospect, nooks_id=NID, sf_contact_id="003OTHER"), healthy(), OPENER, OWNER)
 
 
 def test_h2_15_and_18_char_sf_ids_match(config):
@@ -946,11 +968,11 @@ def test_h2_15_and_18_char_sf_ids_match(config):
     ra = RankedAccount(a, 50.0, {}, "morning", datetime(2026, 11, 26, 9, 0, tzinfo=ZoneInfo("Australia/Sydney")))
     s = cs.build_sheet(RankResult(ranked=[ra], prospects={account_key(a): [pr]}), [a], {}, [pr], config, NOW)
     r18 = replace(pr, nooks_id="NK-18", sf_contact_id="003AB0000012345AAA")
-    assert cs.prepare_task(s.lines[0], r18, State(), OPENER, OWNER)["prospectId"] == "NK-18"
+    assert direct(s.lines[0], r18, healthy(), OPENER, OWNER)["prospectId"] == "NK-18"
 
 
 def test_h2_blocked_by_nooks_id(sheet):
-    st = State(); st.dnc_prospect_ids.add(NID)
+    st = healthy(); st.dnc_prospect_ids.add(NID)
     with pytest.raises(cs.BlockedError):
         prep(sheet.lines[0], state=st)
 
@@ -958,38 +980,38 @@ def test_h2_blocked_by_nooks_id(sheet):
 def test_h2_blocked_sheet_contact_phone_when_resolved_has_none(sheet):
     from src.state import _phone_key
     ln = sheet.lines[0]
-    st = State(); st.dnc_phones.add(_phone_key(ln.prospect.phone_e164))
+    st = healthy(); st.dnc_phones.add(_phone_key(ln.prospect.phone_e164))
     resolved = replace(ln.prospect, nooks_id=NID, phone_e164=None, email=None)
     with pytest.raises(cs.BlockedError, match="Do Not Call"):
-        cs.prepare_task(ln, resolved, st, OPENER, OWNER)
+        direct(ln, resolved, st, OPENER, OWNER)
 
 
 def test_h2_blocked_sheet_contact_email(sheet):
     from src.state import _hash_email
     ln = sheet.lines[0]
-    st = State(); st.dnc_emails.add(_hash_email(ln.prospect.email))
+    st = healthy(); st.dnc_emails.add(_hash_email(ln.prospect.email))
     resolved = replace(ln.prospect, nooks_id=NID, phone_e164=None, email=None)
     with pytest.raises(cs.BlockedError):
-        cs.prepare_task(ln, resolved, st, OPENER, OWNER)
+        direct(ln, resolved, st, OPENER, OWNER)
 
 
 def test_h2_flags_and_opt_out_block(sheet):
     ln = sheet.lines[0]
     for kw in ({"do_not_call": True}, {"opted_out_email": True}):
         with pytest.raises(cs.BlockedError):
-            cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID, **kw), State(), OPENER, OWNER)
+            direct(ln, replace(ln.prospect, nooks_id=NID, **kw), healthy(), OPENER, OWNER)
 
 
 def test_h2_sheet_contact_flag_blocks(sheet):
     ln = sheet.lines[0]
     ln.entry.prospect = replace(ln.entry.prospect, do_not_call=True)
     with pytest.raises(cs.BlockedError, match="sheet contact"):
-        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID, do_not_call=False), State(), OPENER, OWNER)
+        direct(ln, replace(ln.prospect, nooks_id=NID, do_not_call=False), healthy(), OPENER, OWNER)
 
 
 def test_h2_resolved_not_a_prospect(sheet):
     with pytest.raises(cs.SheetError):
-        cs.prepare_task(sheet.lines[0], None, State(), OPENER, OWNER)      # type: ignore[arg-type]
+        direct(sheet.lines[0], None, healthy(), OPENER, OWNER)      # type: ignore[arg-type]
 
 
 def test_h2_due_time_passed_refused_when_now_given(sheet):
@@ -1290,3 +1312,290 @@ def test_low_unused_import_removed():
     names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     imported = [a.asname or a.name for n in ast.walk(tree) if isinstance(n, (ast.Import, ast.ImportFrom)) for a in n.names]
     assert [i for i in imported if i not in names and i != "annotations"] == []
+
+
+# ================================================================ re-review fixes (R1-R13)
+import copy as _copy  # noqa: E402
+import dataclasses  # noqa: E402
+import pickle  # noqa: E402
+
+
+# ---- R1: case-insensitive Nooks id check
+@pytest.mark.parametrize("blocked_form,resolved_form", [("abc-123-def", "ABC-123-DEF"), ("ABC-123-DEF", "abc-123-def"),
+                                                        ("Abc-123-Def", "ABC-123-DEF"), ("abc-123-def", "abc-123-def")])
+def test_r1_case_variants_blocked(sheet, blocked_form, resolved_form):
+    st = healthy(); st.dnc_prospect_ids.add(blocked_form)
+    with pytest.raises(cs.BlockedError):
+        prep(sheet.lines[0], nid=resolved_form, state=st)
+
+
+def test_r1_mixed_case_blocked_when_set_is_lower(sheet):
+    st = healthy(); st.dnc_prospect_ids.add("abc-123-def")
+    with pytest.raises(cs.BlockedError):
+        prep(sheet.lines[0], nid="  ABC-123-DEF  ", state=st)
+
+
+def test_r1_payload_id_is_the_one_checked_case_preserved(sheet):
+    assert prep(sheet.lines[0], nid=" AbC-1 ")["prospectId"] == "AbC-1"
+
+
+# ---- R2: healthy state required live
+@pytest.mark.parametrize("bad", [None, {}, "state", 5, [1]])
+def test_r2_non_state_is_a_clear_sheet_error(sheet, bad):
+    with pytest.raises(cs.SheetError, match="state must be a State"):
+        prep(sheet.lines[0], state=bad)
+
+
+@pytest.mark.parametrize("st", [State(), State(is_new=True), State(was_reset=True, reset_reason="corrupt"),
+                                State(dnc_rebuilt_at="2026-11-24", dnc_rebuilt_calls=0)])
+def test_r2_unrebuilt_state_refuses_live(sheet, st):
+    with pytest.raises(cs.SheetError, match="not rebuilt"):
+        prep(sheet.lines[0], state=st)
+
+
+def test_r2_empty_history_confirmed_counts_as_rebuilt(sheet):
+    st = State(dnc_rebuilt_at="2026-11-24", dnc_rebuilt_empty=True)
+    assert prep(sheet.lines[0], state=st)["action"] == "call"
+
+
+def test_r2_dry_run_allows_fresh_state_but_not_non_state(sheet):
+    assert isinstance(prep(sheet.lines[0], state=State(is_new=True), dry_run=True, owner_id="x", now=None), cs.DryRunPayload)
+    with pytest.raises(cs.SheetError):
+        prep(sheet.lines[0], state=None, dry_run=True, now=None, owner_id="x")
+
+
+# ---- R3: no raw reason in BlockedError
+def test_r3_blocked_error_has_no_phone(sheet):
+    from src.state import _phone_key
+    ln = sheet.lines[0]
+    st = healthy(); st.dnc_phones.add(_phone_key(ln.prospect.phone_e164))
+    with pytest.raises(cs.BlockedError) as ei:
+        prep(ln, state=st)
+    msg = str(ei.value)
+    assert "6140000" not in msg and not PHONE_RE.search(msg) and "Do Not Call / opt-out [dnc_phone]" in msg
+
+
+@pytest.mark.parametrize("setup,code", [("id", "dnc_prospect_id"), ("flag", "dnc_flag"), ("optout", "opt_out_email")])
+def test_r3_codes(sheet, setup, code):
+    ln = sheet.lines[0]
+    st = healthy()
+    kw = {}
+    if setup == "id":
+        st.dnc_prospect_ids.add(NID)
+    resolved = replace(ln.prospect, nooks_id=NID, do_not_call=setup == "flag", opted_out_email=setup == "optout")
+    with pytest.raises(cs.BlockedError, match=rf"\[{code}\]"):
+        direct(ln, resolved, st)
+
+
+def test_r3_blocked_email_code(sheet):
+    from src.state import _hash_email
+    ln = sheet.lines[0]
+    st = healthy(); st.dnc_emails.add(_hash_email(ln.prospect.email))
+    with pytest.raises(cs.BlockedError, match=r"\[dnc_email\]") as ei:
+        direct(ln, replace(ln.prospect, nooks_id=NID, phone_e164=None), st)
+    assert "@" not in str(ei.value)
+
+
+# ---- R4: owner id / dry run
+@pytest.mark.parametrize("bad", ["owner_id_placeholder", "OWNER_ID_PLACEHOLDER2", "REPLACE_ME", "test", "x", "your_owner_id_here_please",
+                                 "abcdef", "REPLACE_ME_WITH_REAL_OWNER_ID", "FakeOwner000000000000000"])
+def test_r4_placeholder_looking_owner_refused_live(sheet, bad):
+    with pytest.raises(cs.SheetError):
+        prep(sheet.lines[0], owner_id=bad)
+
+
+@pytest.mark.parametrize("flag", ["no", 1, "yes", None, 0, "", [], 2])
+def test_r4_dry_run_must_be_exactly_bool(sheet, flag):
+    with pytest.raises(cs.SheetError, match="dry_run"):
+        prep(sheet.lines[0], owner_id=cs.OWNER_ID_PLACEHOLDER, dry_run=flag)
+
+
+def test_r4_dry_run_payload_marked(sheet):
+    p = prep(sheet.lines[0], owner_id=cs.OWNER_ID_PLACEHOLDER, dry_run=True)
+    assert isinstance(p, cs.DryRunPayload) and isinstance(p, dict) and p["note"].startswith("[DRY RUN] [apac-callsheet ")
+    assert len(p["note"]) <= cs.NOTE_MAX_CHARS and p["ownerId"] == cs.OWNER_ID_PLACEHOLDER
+
+
+def test_r4_live_payload_plain_dict(sheet):
+    p = prep(sheet.lines[0])
+    assert type(p) is dict and p["note"].startswith("[apac-callsheet ")
+
+
+def test_r4_dry_run_prefix_counts_toward_cap(sheet):
+    ln = sheet.lines[0]
+    base = len(prep(ln, dict(OPENER, opener="a"))["note"])
+    n = cs.NOTE_MAX_CHARS - base - len(cs.DRY_RUN_PREFIX) + 2        # fits live, too long as a dry run
+    with pytest.raises(cs.SheetError, match="cap"):
+        prep(ln, dict(OPENER, opener="a" * n), dry_run=True, owner_id="x")
+    assert prep(ln, dict(OPENER, opener="a" * (n - 1)), dry_run=True, owner_id="x")
+
+
+# ---- R5: line integrity
+def test_r5_hand_built_line_refused(sheet):
+    ln = sheet.lines[0]
+    forged = cs.SheetLine(ln.entry, ln.rank, ln.call_no, ln.group, ln.run_date, ln.why_chosen, ln.flags, ln.packet)
+    with pytest.raises(cs.SheetError, match="hand-built or copied"):
+        direct(forged, replace(ln.prospect, nooks_id=NID))
+
+
+def test_r5_line_from_spilled_account_refused(config, parts):
+    accts, signals, prospects, rr = parts
+    spilled = copy.copy(rr.ranked[0])
+    spilled.window, spilled.local_call_time = "morning", datetime(2026, 11, 30, 9, 0, tzinfo=ZoneInfo("Australia/Sydney"))
+    s = cs.build_sheet(RankResult(ranked=rr.ranked[1:], spilled=[spilled], prospects=rr.prospects), accts, signals, prospects, config, NOW)
+    ln = s.lines[0]
+    forged = cs.SheetLine(SheetEntry(spilled, ln.prospect), 1, 1, "g", s.run_date, [], [], ln.packet)
+    with pytest.raises(cs.SheetError):
+        direct(forged, replace(ln.prospect, nooks_id=NID))
+
+
+@pytest.mark.parametrize("bad", [0, -3, "x\n[evil]", None, 1.5, True])
+def test_r5_forged_rank_refused(sheet, bad):
+    ln = sheet.lines[0]
+    ln.rank = bad
+    with pytest.raises(cs.SheetError, match="rank"):
+        direct(ln, replace(ln.prospect, nooks_id=NID))
+
+
+@pytest.mark.parametrize("bad", ["2026-11-25", datetime(2026, 11, 25, 1, 0), None, 20261125])
+def test_r5_forged_run_date_refused(sheet, bad):
+    ln = sheet.lines[0]
+    ln.run_date = bad
+    with pytest.raises(cs.SheetError, match="run_date"):
+        direct(ln, replace(ln.prospect, nooks_id=NID))
+
+
+def test_r5_account_swapped_after_build(sheet):
+    a, b = sheet.lines[0], sheet.lines[1]
+    a.entry.ranked = b.entry.ranked
+    with pytest.raises(cs.SheetError, match="changed after build"):
+        direct(a, replace(a.prospect, nooks_id=NID))
+
+
+def test_r5_resolved_prospect_in_other_account_refused(sheet):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError, match="different account"):
+        direct(ln, replace(ln.prospect, nooks_id=NID, sf_account_id=sf(7)))
+
+
+def test_r5_skipped_reason_after_build_refused(sheet):
+    ln = sheet.lines[0]
+    ln.ranked.skipped_reason = "x"
+    with pytest.raises(cs.SheetError):
+        direct(ln, replace(ln.prospect, nooks_id=NID))
+
+
+def test_r5_built_lines_are_sealed(sheet):
+    assert all(ln._sealed is cs._SEAL for ln in sheet.lines)
+
+
+# ---- R6: now
+def test_r6_live_requires_now(sheet):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError, match="now"):
+        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), healthy(), OPENER, OWNER)
+
+
+def test_r6_past_due_refused_and_equal_refused(sheet):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError, match="already passed"):
+        prep(ln, now=ln.local_call_time)
+    with pytest.raises(cs.SheetError, match="already passed"):
+        prep(ln, now=ln.local_call_time + timedelta(hours=5))
+
+
+def test_r6_naive_now_value_error(sheet):
+    with pytest.raises(ValueError):
+        prep(sheet.lines[0], now=datetime(2026, 11, 25, 3, 0))
+
+
+def test_r6_dry_run_without_now_ok(sheet):
+    assert prep(sheet.lines[0], owner_id="x", dry_run=True, now=None)
+
+
+# ---- R7/R8: scrub forms
+@pytest.mark.parametrize("text", ["call 1300 123 456 now", "1800 555 123", "ring 13 12 34", "ph 9999 1234", "ph 9999-1234",
+                                  "tel: (02) 9999 1234", "mobile 9999 1234",
+                                  "jo [at] example dot com", "jo(at)example.com", "jo at example dot com",
+                                  "jo @ example.com", "jo＠example.com", "jo[at]example[dot]com", "x＠y.example.com"])
+def test_r8_scrub_forms(text):
+    out = cs._scrub(text)
+    assert "[redacted]" in out and not re.search(r"example|1300|1800|9999", out)
+
+
+@pytest.mark.parametrize("text", ["FY2025 2026 plan", "2025-2026 budget", "meet at example park", "chat at 5pm", "13 2026 users",
+                                  "Series B in 2026-11-22", "wait… more", "12 months", "about 450 staff", "$20,000,000 round"])
+def test_r8_scrub_leaves_normal_text(text):
+    assert cs._scrub(text) == text
+
+
+def test_r8_full_width_digits_phone():
+    assert cs._scrub("call ０４００１１１２２２ now") == "call [redacted] now"
+
+
+@pytest.mark.parametrize("val", ["Call 1300 123 456", "mail jo [at] example dot com", "ph 9999 1234 please"])
+def test_r8_opener_refuses_new_forms(sheet, val):
+    with pytest.raises(cs.SheetError, match="email address or phone"):
+        prep(sheet.lines[0], dict(OPENER, opener=val))
+
+
+# ---- R9: ContactHistory.source scrubbed
+def test_r9_history_source_scrubbed(config, parts):
+    accts, signals, prospects, rr = parts
+    key = account_key(next(a for a in accts if a.name == "Delta Health Pty Ltd"))
+    h = {key: cs.ContactHistory(date(2026, 11, 20), "No Answer", 1, matched_by="phone", source="Nooks jo@x.example.com +61400111222")}
+    s = cs.build_sheet(rr, accts, signals, prospects, config, NOW, history=h)
+    t = all_text(s)
+    assert "jo@x" not in t and "61400111222" not in t and "Nooks [redacted] [redacted] (matched by phone)" in t
+
+
+# ---- R10: asdict / vars / copy / pickle fail closed
+def test_r10_asdict_of_line_and_sheet_fail_closed(sheet):
+    with pytest.raises(TypeError):
+        dataclasses.asdict(sheet.lines[0])
+    with pytest.raises(TypeError):
+        dataclasses.asdict(sheet)
+    with pytest.raises(TypeError):
+        vars(sheet.lines[0])
+    with pytest.raises(TypeError):
+        dataclasses.replace(sheet.lines[0])
+
+
+def test_r10_copy_and_pickle_refused(sheet):
+    for fn in (_copy.copy, _copy.deepcopy, pickle.dumps):
+        with pytest.raises(TypeError):
+            fn(sheet.lines[0])
+
+
+def test_r10_line_repr_and_str_clean(sheet):
+    t = repr(sheet.lines[0]) + str(sheet.lines[0])
+    assert "person" not in t.lower() and "@" not in t and "6140000" not in t
+
+
+# ---- R11: unusable signals and render args
+def test_r11_stale_signal_not_listed_as_real_signal(config, parts):
+    ln = _with_sig(config, parts, kind=SignalKind.FUNDING, source_date=NOW - timedelta(days=400))
+    t = cs.render_packet_text(ln.packet)
+    head, _, tail = t.partition("NOT USABLE AS FACTS")
+    assert "SIGNALS (real, sourced)" not in head and "do not quote" in tail
+    assert "digital product lead" not in t
+
+
+def test_r11_usable_signal_still_listed(sheet):
+    t = cs.render_packet_text(line_for(sheet, "Alpha Digital Pty Ltd").packet)
+    assert "SIGNALS (real, sourced)" in t and "NOT USABLE" not in t
+
+
+@pytest.mark.parametrize("bad", [-1, True, 2.5, "5"])
+def test_r11_bad_bucket_limit(sheet, bad):
+    with pytest.raises(ValueError):
+        cs.render_sheet_text(sheet, bucket_limit=bad)
+    with pytest.raises(ValueError):
+        cs.render_sheet_markdown(sheet, bucket_limit=bad)
+
+
+def test_r11_zero_limit_ok(config, parts):
+    accts, signals, prospects, rr = parts
+    s = cs.build_sheet(RankResult(skipped=many_skipped(3)), accts, signals, prospects, config, NOW)
+    t = cs.render_sheet_text(s, bucket_limit=0)
+    assert "and 3 more" in t and "Skip 000" not in t

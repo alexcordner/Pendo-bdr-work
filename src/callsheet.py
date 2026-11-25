@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
@@ -27,7 +28,7 @@ from src.config import Config, tier_for
 from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, SheetEntry, Signal, SignalKind
 from src.ranker import RankResult, account_key, pick_prospect
-from src.state import State, is_blocked
+from src.state import State, dnc_is_rebuilt, is_blocked
 
 RUN_DATE_TZ = "Australia/Sydney"          # run_date in the task tag = 'now' in the BDR's home zone (a label only)
 TAG_PREFIX = "apac-callsheet"
@@ -70,23 +71,41 @@ class BlockedError(SheetError):
 
 # ---------------------------------------------------------------- text hygiene
 _EMAIL = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+# Obfuscated emails: 'jo [at] example dot com', 'jo(at)example.com', 'jo at example dot com', 'jo @ example.com'.
+_EMAIL_OBF = re.compile(
+    r"[\w.+'-]+\s*[\[({<]\s*at\s*[\])}>]\s*[\w-]+(?:\s*(?:[\[({<]\s*dot\s*[\])}>]|\.|\s+dot\s+)\s*[\w-]+)+"
+    r"|[\w.+'-]+\s+at\s+[\w-]+(?:\s+dot\s+[\w-]+)+"
+    r"|[\w.+'-]+\s+@\s+[\w-]+(?:\.[\w-]+)+", re.IGNORECASE)
 _PHONE = re.compile(
     r"(?<!\w)(?:"
     r"\+\d[\d\s().-]{6,}\d"                              # international, leading +
     r"|\(?0\d{1,2}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,4}"       # AU/NZ landline (02 9999 1234, 021 123 4567)
     r"|0\d{3}[\s.-]?\d{3}[\s.-]?\d{3}"                   # AU mobile (0400 111 222)
+    r"|1[38]00[\s-]?\d{3}[\s-]?\d{3}"                     # 1300 / 1800 numbers
+    r"|13[\s-]\d{2}[\s-]\d{2}"                           # 13 12 34
     r"|\d{9,}"                                           # any long digit run
-    r")(?!\w)")
-_ZERO_WIDTH = dict.fromkeys(map(ord, "​‌‍⁠﻿᠎"), None)
+    r")(?!\w)"
+    # 8-digit local numbers only after a phone-ish label (bare 'dddd dddd' would eat year pairs)
+    r"|(?i:\b(?:ph|phone|tel|telephone|mob|mobile|call|fax)\b)[\s:.]*(?:\(\d{1,2}\)\s*)?\d{4}[\s.-]?\d{4}(?!\d)")
+_ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u180e"), None)
+
+
+def _redact(text: str) -> str:
+    return _PHONE.sub(REDACTED, _EMAIL_OBF.sub(REDACTED, _EMAIL.sub(REDACTED, text)))
 
 
 def _scrub(text: str) -> str:
-    """Replace email addresses and phone-like numbers with '[redacted]'."""
-    return _PHONE.sub(REDACTED, _EMAIL.sub(REDACTED, text))
+    """Replace email addresses (plain and common obfuscations) and phone-like numbers with '[redacted]'.
+    Detection runs on the NFKC form (full-width '@' and digits), but text with nothing to redact is
+    returned unchanged."""
+    norm = unicodedata.normalize("NFKC", text)
+    out = _redact(norm)
+    return text if out == norm else out
 
 
 def _has_contact_data(text: str) -> bool:
-    return _scrub(text) != text
+    norm = unicodedata.normalize("NFKC", text)
+    return _redact(norm) != norm
 
 
 def _clean(text: object) -> str:
@@ -161,7 +180,8 @@ class ContactHistory:
 
     @property
     def source_label(self) -> str:
-        return f"{self.source} (matched by {self.matched_by})" if self.matched_by else self.source
+        src = _clean(self.source)
+        return f"{src} (matched by {_clean(self.matched_by)})" if self.matched_by else src
 
     def summary(self) -> str | None:
         if self.last_call_date is None and not self.last_outcome and not self.calls_total:
@@ -250,28 +270,56 @@ class ResearchPacket:
         }
 
 
-@dataclass
+_SEAL = object()
+
+
 class SheetLine:
     """One sheet row: the shared ``SheetEntry`` plus everything the sheet adds.
 
-    ``entry`` is excluded from ``repr`` (it holds the Prospect with email, phone and surname)."""
+    Deliberately NOT a dataclass and slotted: ``dataclasses.asdict`` / ``replace`` / ``vars`` / ``copy`` /
+    pickle all fail closed, ``repr`` hides the Prospect (email, phone, surname), and only ``build_sheet``
+    can seal a line as genuine (``prepare_task`` refuses unsealed or copied lines)."""
 
-    entry: SheetEntry = field(repr=False)
-    rank: int                                # 1 = best score (position among ALL ranked accounts: can skip numbers)
-    call_no: int                             # 1-based position in call order
-    group: str                               # e.g. 'Australia/Sydney morning Thu 26 Nov'
-    run_date: date
-    why_chosen: list[str]
-    flags: list[str]
-    packet: ResearchPacket
+    __slots__ = ("_entry", "rank", "call_no", "group", "run_date", "why_chosen", "flags", "packet", "_sealed",
+                 "__weakref__")
+
+    def __init__(self, entry: SheetEntry, rank: int, call_no: int, group: str, run_date: date,
+                 why_chosen: list[str], flags: list[str], packet: ResearchPacket):
+        self._entry = entry
+        self.rank = rank                     # 1 = best score; position among ALL ranked accounts (can skip numbers)
+        self.call_no = call_no               # 1-based position in call order
+        self.group = group                   # e.g. 'Australia/Sydney morning Thu 26 Nov'
+        self.run_date = run_date
+        self.why_chosen = why_chosen
+        self.flags = flags
+        self.packet = packet
+        self._sealed = False
+
+    def __repr__(self) -> str:
+        return (f"SheetLine(call_no={self.call_no!r}, rank={self.rank!r}, group={self.group!r}, "
+                f"account={self.account_name!r})")
+
+    __str__ = __repr__
+
+    def __copy__(self):
+        raise TypeError("SheetLine cannot be copied")
+
+    __deepcopy__ = lambda self, memo: self.__copy__()      # noqa: E731
+
+    def __reduce_ex__(self, protocol):
+        raise TypeError("SheetLine cannot be pickled")
+
+    @property
+    def entry(self) -> SheetEntry:
+        return self._entry
 
     @property
     def ranked(self) -> RankedAccount:
-        return self.entry.ranked
+        return self._entry.ranked
 
     @property
     def account(self) -> Account:
-        return self.entry.ranked.account
+        return self._entry.ranked.account
 
     @property
     def account_name(self) -> str:
@@ -279,15 +327,15 @@ class SheetLine:
 
     @property
     def prospect(self) -> Prospect:
-        return self.entry.prospect  # type: ignore[return-value]
+        return self._entry.prospect  # type: ignore[return-value]
 
     @property
     def score(self) -> float:
-        return self.entry.ranked.score
+        return self._entry.ranked.score
 
     @property
     def local_call_time(self) -> datetime:
-        return self.entry.ranked.local_call_time  # type: ignore[return-value]
+        return self._entry.ranked.local_call_time  # type: ignore[return-value]
 
 
 @dataclass
@@ -561,10 +609,17 @@ def render_packet_text(p: ResearchPacket) -> str:
              f"{p.local_time or 'unscheduled'} ({p.window or '-'}, {p.timezone or '-'})")
     if p.sdr_target:
         L.append("SDR TARGET: yes (internal flag, do not mention on the call)")
-    if p.signals:
+    usable = [x for x in p.signals if x.status not in ("future", "stale")]
+    unusable = [x for x in p.signals if x.status in ("future", "stale")]
+    if usable:
         L.append("SIGNALS (real, sourced):")
-        for s in p.signals:
+        for s in usable:
             L.append(f"  - {s.label} | {s.evidence} | source: {s.source_label} | {s.verdict_reason}")
+    if unusable:
+        L.append("NOT USABLE AS FACTS (do not quote or build an opener on these):")
+        for s in unusable:
+            L.append(f"  - {s.label} | {s.source_label} | {s.verdict_reason}")
+    if p.signals:
         if not p.has_real_trigger:
             L.append("TRIGGER: none usable (interest signal only, or date not trustworthy): say so "
                      "(TRIGGER: None found) and write a fit-based opener.")
@@ -667,10 +722,10 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
             why = build_why(ra, sigs, config, now)
             pk = account_key(ra.account)
             why.insert(0, f"Prospect: {_who(pr.name)}, {_clean(pr.title) if pr.title else 'title unknown'}")
-            ln = SheetLine(entry=SheetEntry(ranked=ra, prospect=pr), rank=pos, call_no=n, group=label,
-                           run_date=run_date, why_chosen=why,
-                           flags=_flags(ra, sigs, config, now) + _contact_flags(pr),
-                           packet=build_packet(ra, pr, sigs, config, history.get(pk), now))
+            ln = SheetLine(SheetEntry(ranked=ra, prospect=pr), pos, n, label, run_date, why,
+                           _flags(ra, sigs, config, now) + _contact_flags(pr),
+                           build_packet(ra, pr, sigs, config, history.get(pk), now))
+            ln._sealed = _SEAL
             glines.append(ln)
             sheet.lines.append(ln)
         sheet.groups.append((label, glines))
@@ -717,9 +772,16 @@ def _skip_counts(sheet: Sheet, esc=lambda s: s) -> list[str]:
     return ["Top skip reasons: " + "; ".join(f"{esc(k)} ({v})" for k, v in list(sheet.skipped_reason_counts.items())[:5])]
 
 
+def _check_limit(bucket_limit) -> None:
+    if bucket_limit is not None and (isinstance(bucket_limit, bool) or not isinstance(bucket_limit, int)
+                                     or bucket_limit < 0):
+        raise ValueError("bucket_limit must be None or an int >= 0")
+
+
 def render_sheet_text(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT) -> str:
     """Terminal table. ``bucket_limit`` caps each bucket's names (default 25); None lists EVERY account
     (use None for the run log: CLAUDE.md rule 5)."""
+    _check_limit(bucket_limit)
     L = [f"CALL SHEET {sheet.run_date.isoformat()}: {len(sheet.lines)} of {sheet.ranked_total} callable accounts"
          + (f" (top {sheet.limit} by score)" if sheet.limit is not None else "")
          + f" | needs prospect {len(sheet.needs_prospect)}, spilled {len(sheet.spilled)}, skipped {len(sheet.skipped)}"]
@@ -747,6 +809,7 @@ def render_sheet_text(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT
 
 def render_sheet_markdown(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT) -> str:
     """The short summary doc. Names, titles and evidence are markdown-escaped and shortened."""
+    _check_limit(bucket_limit)
     L = [f"# Call sheet {sheet.run_date.isoformat()}", "",
          f"{len(sheet.lines)} accounts built from {sheet.ranked_total} callable"
          + (f" (top {sheet.limit} by score, then ordered by local call time)" if sheet.limit is not None else "")
@@ -833,16 +896,36 @@ def _field_text(name: str, value: object, account: str) -> str:
     return text
 
 
-def _check_owner(owner_id: object, dry_run: bool) -> str:
+_PLACEHOLDER_WORDS = ("placeholder", "replace", "changeme", "todo", "example", "test", "dummy", "fake", "owner_id",
+                      "ownerid", "your", "xxx", "sample", "demo", "none", "null")
+OWNER_ID_MIN_LEN = 20                     # real Nooks owner ids are long (28-char Firebase UIDs)
+DRY_RUN_PREFIX = "[DRY RUN] "
+
+
+class DryRunPayload(dict):
+    """A payload built with ``dry_run=True``. Never write one to Nooks: check ``isinstance(p, DryRunPayload)``."""
+
+
+def _check_owner(owner_id: object, live: bool) -> str:
     if not isinstance(owner_id, str) or not owner_id.strip():
         raise SheetError("owner_id is required: a non-blank string")
     oid = owner_id.strip()
-    if oid == OWNER_ID_PLACEHOLDER:
-        if not dry_run:
-            raise SheetError("owner_id is still the placeholder: pass the real Nooks owner id (or dry_run=True)")
-    elif not ID_PATTERN.fullmatch(oid):
+    if not ID_PATTERN.fullmatch(oid):
         raise SheetError("owner_id must match [A-Za-z0-9_-]{1,128}")
+    if live:
+        low = oid.lower()
+        if len(oid) < OWNER_ID_MIN_LEN or any(w in low for w in _PLACEHOLDER_WORDS):
+            raise SheetError("owner_id looks like a placeholder: pass the real Nooks owner id (or dry_run=True)")
     return oid
+
+
+def _blocked_code(reason: str) -> str:
+    r = reason.lower()
+    for needle, code in (("flag set", "dnc_flag"), ("dispositioned", "dnc_prospect_id"), ("phone", "dnc_phone"),
+                         ("same email", "dnc_email"), ("opt-out", "opt_out_email")):
+        if needle in r:
+            return code
+    return "blocked"
 
 
 def _resolve_prospect(line: SheetLine, resolved: Prospect) -> Prospect:
@@ -863,48 +946,95 @@ def _resolve_prospect(line: SheetLine, resolved: Prospect) -> Prospect:
         raise SheetError(f"{name}: resolved prospect has no SF contact id: cannot verify identity")
     if want != got:
         raise SheetError(f"{name}: resolved prospect is a different contact ({got} != {want})")
+    acct, racct = normalise_sf_id(line.account.sf_account_id), normalise_sf_id(resolved.sf_account_id)
+    if acct and racct and acct != racct:
+        raise SheetError(f"{name}: resolved prospect belongs to a different account")
     return replace(resolved, nooks_id=nid, sf_contact_id=got)
+
+
+def _check_line(line: SheetLine) -> None:
+    """The line must be one build_sheet made, still consistent with itself."""
+    name = line.account_name
+    if line._sealed is not _SEAL:
+        raise SheetError(f"{name}: not a sheet line made by build_sheet (hand-built or copied)")
+    if isinstance(line.rank, bool) or not isinstance(line.rank, int) or line.rank < 1:
+        raise SheetError(f"{name}: rank must be an int >= 1")
+    if type(line.run_date) is not date:
+        raise SheetError(f"{name}: run_date must be a date")
+    ra = line.ranked
+    if ra.skipped_reason or ra.local_call_time is None or ra.window is None:
+        raise SheetError(f"{name}: not a scheduled callable account")
+    if ra.local_call_time.tzinfo is None:
+        raise SheetError("local_call_time must be timezone-aware")
+    pr = line.entry.prospect
+    if pr is None:
+        raise SheetError(f"{name}: sheet line has no prospect")
+    if line.packet.account_key != account_key(line.account):
+        raise SheetError(f"{name}: sheet line changed after build (account)")
+    if line.packet.prospect_sf_contact_id != pr.sf_contact_id:
+        raise SheetError(f"{name}: sheet line changed after build (contact)")
 
 
 def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, opener_fields: Mapping[str, str],
                  owner_id: str, *, dry_run: bool = False, now: datetime | None = None) -> dict:
     """THE way to build a Nooks task-create ``data`` dict. Pure: no I/O.
 
-    In order: validates owner_id (required; the placeholder only with ``dry_run=True``); checks the line is
-    a genuine scheduled sheet line (needs_prospect / spilled / skipped accounts are never SheetLines); strips
-    and normalises the resolved Nooks prospect id and the SF ids BEFORE any comparison; requires both SF
-    contact ids and that they match; runs ``state.is_blocked(.., 'any')`` on the resolved prospect AND on the
-    sheet contact (phone / email of both) and raises ``BlockedError`` if either is blocked; validates the
-    opener fields (real text, no email / phone, ``NOTE_MAX_CHARS`` cap); and builds the payload with exactly
-    the id it checked. ``now`` (aware), when given, refuses a due time that has already passed."""
+    Live (``dry_run is False``, the default) requires: a real owner id (placeholder-looking ids refused), a
+    healthy ``State`` (Do Not Call rebuilt, ``dnc_is_rebuilt``) and an aware ``now``. ``dry_run`` must be
+    exactly True or False; True allows a placeholder owner, a fresh state and no ``now``, and returns a
+    ``DryRunPayload`` whose note starts '[DRY RUN] '.
+
+    In order: line integrity (sealed by build_sheet, int rank >= 1, date run_date, packet still matches the
+    entry, scheduled, not skipped); due time not already passed; the resolved Nooks id is trimmed and the SF
+    ids normalised BEFORE any comparison; both SF contact ids must be present and equal (fail closed); the
+    Do Not Call / opt-out check (``state.is_blocked(.., 'any')``) runs on the resolved prospect with the
+    Nooks id in its exact, lower and upper case forms (plus a fully case-insensitive scan of the DNC id set) AND on the sheet contact, raising ``BlockedError`` with
+    a fixed message and a short code (never the raw reason, which can hold a phone number); opener fields are
+    validated (real text, no email / phone, ``NOTE_MAX_CHARS`` cap); the payload is built from exactly the id
+    that was checked."""
     if not isinstance(line, SheetLine):
         raise SheetError("payloads are built from sheet lines only")
+    if dry_run is not True and dry_run is not False:
+        raise SheetError("dry_run must be exactly True or False")
+    live = dry_run is False
     name = line.account_name
-    oid = _check_owner(owner_id, dry_run)
+    oid = _check_owner(owner_id, live)
+    if not isinstance(state, State):
+        raise SheetError(f"{name}: state must be a State (got {type(state).__name__})")
+    if live and not dnc_is_rebuilt(state):
+        raise SheetError(f"{name}: Do Not Call memory is not rebuilt: refusing a live payload")
+    if now is None:
+        if live:
+            raise SheetError(f"{name}: now (aware datetime) is required for a live payload")
+    elif not isinstance(now, datetime) or now.tzinfo is None:
+        raise ValueError("now must be a timezone-aware datetime")
+    _check_line(line)
     ra = line.ranked
-    if ra.skipped_reason or ra.local_call_time is None or ra.window is None:
-        raise SheetError(f"{name}: not a scheduled callable account")
-    if ra.local_call_time.tzinfo is None:
-        raise SheetError("local_call_time must be timezone-aware")
-    if now is not None:
-        if now.tzinfo is None:
-            raise ValueError("now must be timezone-aware")
-        if ra.local_call_time <= now:
-            raise SheetError(f"{name}: due time {ra.local_call_time.isoformat()} has already passed")
+    if now is not None and ra.local_call_time <= now:
+        raise SheetError(f"{name}: due time {ra.local_call_time.isoformat()} has already passed")
     checked = _resolve_prospect(line, resolved_prospect)
-    for who, p in (("resolved prospect", checked), ("sheet contact", line.entry.prospect)):
+    candidates = [("resolved prospect", checked)]
+    for variant in (checked.nooks_id.lower(), checked.nooks_id.upper()):
+        if variant != checked.nooks_id:
+            candidates.append(("resolved prospect", replace(checked, nooks_id=variant)))
+    candidates.append(("sheet contact", line.entry.prospect))
+    lowered = checked.nooks_id.lower()
+    if any(isinstance(i, str) and i.strip().lower() == lowered for i in state.dnc_prospect_ids):
+        raise BlockedError(f"{name}: resolved prospect blocked: Do Not Call / opt-out [dnc_prospect_id]")
+    for who, p in candidates:
         blocked, reason = is_blocked(p, state, "any")
         if blocked:
-            raise BlockedError(f"{name}: {who} blocked: {reason}")
+            raise BlockedError(f"{name}: {who} blocked: Do Not Call / opt-out [{_blocked_code(reason)}]")
     f = {k: _field_text(k, opener_fields.get(k), name) for k in OPENER_FIELDS}
     note = "\n".join([
-        task_tag(line.run_date, line.rank),
+        ("" if live else DRY_RUN_PREFIX) + task_tag(line.run_date, line.rank),
         f"OPENER: {f['opener']}", f"FACT 1: {f['fact_1']}", f"FACT 2: {f['fact_2']}",
         f"GATEKEEPER: {f['gatekeeper']}", f"TRIGGER: {f['trigger']}"])
     if len(note) > NOTE_MAX_CHARS:
         raise SheetError(f"{name}: note is {len(note)} characters, over the {NOTE_MAX_CHARS} cap (not truncated)")
-    return {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": oid,
-            "prospectId": checked.nooks_id, "priority": priority_for(ra.score), "note": note}
+    payload = {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": oid,
+               "prospectId": checked.nooks_id, "priority": priority_for(ra.score), "note": note}
+    return payload if live else DryRunPayload(payload)
 
 
 def sheet_needs_prospect_resolution(sheet: Sheet) -> list[str]:
