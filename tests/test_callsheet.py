@@ -1853,7 +1853,12 @@ def test_pe_constants_are_configurable(monkeypatch):
     assert cs.is_personal_email("a@fastmail.example") is True
 
 
-# ---- duplicate collapse
+# ---- duplicate collapse (reads accounts.duplicate_groups: the NEW 'possible_duplicate group dup-<id> (reason): also ...' notes)
+def _group_note(gid, other):
+    return (f"possible_duplicate group {gid} (same website domain): also {other.name!r} ({other.sf_account_id}); "
+            "not merged, collapse on the sheet")
+
+
 def _dup_world(config, score_boost_second=False, extra=None):
     rows = load_rows()
     accts, signals, prospects = world(rows)
@@ -1862,7 +1867,7 @@ def _dup_world(config, score_boost_second=False, extra=None):
     # make Alpha and a clone-ish 'Alpha Digital' second record a flagged pair
     for x, y in ((a, b), (b, a)):
         x.flags.append("possible_duplicate")
-        x.notes.append(f"possible_duplicate: shares a key with {y.name!r} (ids: {y.sf_account_id}, {y.zoominfo_id}); not merged")
+        x.notes.append(_group_note("dup-alpha-echo", y))
     rr = rank_accounts(accts, signals, prospects, {}, set(), config, NOW)
     return accts, signals, prospects, rr
 
@@ -1891,18 +1896,14 @@ def test_dup_flag_in_note_only_is_enough(config):
     assert len(s.lines) == 7
 
 
-def test_dup_one_sided_note_is_enough(config):
+def test_dup_lone_group_member_collapses_nothing(config):
+    """build_account_list writes the note on EVERY member; a group with a single carrier is not a group."""
     accts, signals, prospects, rr = _dup_world(config)
     echo = next(a for a in accts if a.name.startswith("Echo"))
     echo.notes.clear(); echo.flags.clear()
-    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 7
+    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 8
 
 
-def test_dup_match_by_name_when_ids_none(config):
-    accts, signals, prospects, rr = _dup_world(config)
-    for a in accts:
-        a.notes[:] = [n.split(" (ids:")[0] + " (ids: none); not merged" for n in a.notes]
-    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 7
 
 
 def test_dup_never_both_even_with_limit(config):
@@ -1938,31 +1939,23 @@ def test_dup_unrelated_flagged_accounts_not_collapsed(config):
     accts, signals, prospects, rr = _dup_world(config)
     for a in accts:
         if a.name.startswith("Echo"):
-            a.notes[:] = ["possible_duplicate: shares a key with 'Nobody Else' (ids: 001ZZZ); not merged"]
+            a.notes[:] = [_group_note("dup-other-1", Account(sf_account_id="001ZZZ", name="Nobody Else"))]
     for a in accts:
         if a.name.startswith("Alpha"):
-            a.notes[:] = ["possible_duplicate: shares a key with 'Somebody' (ids: 001YYY); not merged"]
+            a.notes[:] = [_group_note("dup-other-2", Account(sf_account_id="001YYY", name="Somebody"))]
     assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 8
 
 
-def test_dup_unparseable_note_is_ignored(config):
-    accts, signals, prospects, rr = _dup_world(config)
-    for a in accts:
-        a.notes[:] = ["possible_duplicate: something odd"]
-    assert len(cs.build_sheet(rr, accts, signals, prospects, config, NOW).lines) == 8
 
 
-def test_dup_name_with_apostrophe_parsed():
-    a = Account(sf_account_id=sf(1), name="A")
-    a.notes.append(f"possible_duplicate: shares a key with {chr(79)+chr(39)+'Neil Co'!r} (ids: none); not merged")
-    assert cs._dup_targets(a)[0][0] == "O'Neil Co"
 
 
 def test_dup_helper_probable_duplicates():
-    x = Account(sf_account_id=sf(1), name="X", flags=["possible_duplicate"],
-                notes=[f"possible_duplicate: shares a key with 'Y' (ids: {sf(2)}); not merged"])
-    y = Account(sf_account_id=sf(2), name="Y")
+    x = Account(sf_account_id=sf(1), name="X", flags=["possible_duplicate"])
+    y = Account(sf_account_id=sf(2), name="Y", flags=["possible_duplicate"])
     z = Account(sf_account_id=sf(3), name="Z")
+    x.notes.append(_group_note("dup-x", y))
+    y.notes.append(_group_note("dup-x", x))
     assert cs.probable_duplicates(x, y) and cs.probable_duplicates(y, x) and not cs.probable_duplicates(x, z)
     assert not cs.probable_duplicates(x, x)
 
@@ -1980,6 +1973,6 @@ def test_dup_names_scrubbed(config):
     rr = rank_accounts(accts2, signals, prospects, {}, set(), config, NOW)
     for a in accts2:
         if a.name.startswith("Alpha"):
-            a.notes[:] = [f"possible_duplicate: shares a key with {'Echo boss@x.example.com Pty Ltd'!r} (ids: none); not merged"]
+            a.notes[:] = [_group_note("dup-alpha-echo", next(e for e in accts2 if e.name.startswith("Echo")))]
     s = cs.build_sheet(rr, accts2, signals, prospects, config, NOW)
     assert "boss@" not in all_text(s) and "boss@" not in repr(s.dropped)

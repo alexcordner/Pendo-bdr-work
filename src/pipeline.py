@@ -32,12 +32,14 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from src import accounts as acc_mod
+from src import callsheet as cs_mod
 from src import ranker, signals as sig_mod, state as st_mod
 from src.config import Config, load_config, next_working_windows
 from src.intake import (MAX_UNLINKABLE_SHARE, MAX_UNTIED_RECENT_SHARE, RECENT_CALL_DAYS, UNRESOLVED_RECENT_DAYS, IntakeReport, RawData, address_hash, build_prospects, derive_nooks_sf_links, infer_prospect_ids_from_calls,
                         last_sheet_from_tasks, load_raw, nooks_account_rows, scrub, untied_recent_calls)
 from src.intake import DEFAULT_ADDRESS_SALT
-from src.loaders import parse_utc
+from src.intake import _contact_name
+from src.loaders import normalise_sf_id, parse_utc
 from src.models import Prospect, Signal
 
 SYDNEY = ZoneInfo("Australia/Sydney")
@@ -189,6 +191,31 @@ def _dnc_unmatched(raw: RawData, prospects: list[Prospect], cfg: Config) -> int:
             continue
         n += 1
     return n
+
+
+def contact_names_by_account(sf_contacts) -> dict[str, set[str]]:
+    """SF account id (15-char canonical) -> casefolded 'first last' names of its Salesforce Contacts. Evidence for
+    accounts.build_account_list's duplicate detection only: it is counted there (>= 3 shared names plus name
+    containment), never written to a note, the log, the sheet or a packet. Contacts without a name are skipped."""
+    out: dict[str, set[str]] = {}
+    for c in sf_contacts:
+        acct = normalise_sf_id(c.get("AccountId"))
+        name = " ".join(_contact_name(c).casefold().split())
+        if acct and name and name != "(no name)":
+            out.setdefault(acct, set()).add(name)
+    return out
+
+
+def _flag_counts(res, result) -> dict[str, int]:
+    """Counts the log must show (hard rule 5): junk-title needs_prospect, personal-email contacts on the ranked list,
+    possible-duplicate accounts / groups kept by the account list."""
+    chosen = [p for ps in result.prospects.values() for p in ps]
+    return {
+        "needs_prospect_junk_title": sum(1 for c in result.needs_prospect_codes.values() if c == "junk_title"),
+        "chosen_personal_email": sum(1 for p in chosen if cs_mod.email_reason(p) == "personal_email"),
+        "possible_duplicate_accounts": sum(1 for a in res.accounts if acc_mod.FLAG_POSSIBLE_DUPLICATE in a.flags),
+        "possible_duplicate_groups": len(acc_mod.duplicate_groups(res.accounts)),
+    }
 
 
 def _list_dropped(res: "acc_mod.AccountListResult", bulk_limit: int = 25) -> list[str]:
@@ -411,7 +438,8 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
     call_date = _first_call_date(cfg, now)
     cu_sf = st_mod.cooldown_until(st, cfg)
     res = acc_mod.build_account_list(raw.sf_accounts, nooks_rows, [], cfg, None, run_date,
-                                     blocked_account_ids=set(), cooldown_until=cu_sf, call_date=call_date)
+                                     blocked_account_ids=set(), cooldown_until=cu_sf, call_date=call_date,
+                                     contact_names_by_account=contact_names_by_account(raw.sf_contacts))
 
     # 8. signals -------------------------------------------------------------------------------
     verdicts = sig_mod.filter_scoops(raw.scoops, cfg, run_date)
@@ -458,6 +486,7 @@ def run_pipeline(raw_dir, config: Config, state_dir, now: datetime, *, live: boo
 
     stats = _stats(raw, res, result, marked, verdicts, batch, n_blocked, n_bad_dnc, links)
     book_zi = {str(r.get("DOZISF__ZoomInfo_Id__c")).strip() for r in raw.sf_accounts if r.get("DOZISF__ZoomInfo_Id__c")}
+    stats.update(_flag_counts(res, result))
     stats["scoops_matched_to_book"] = sum(1 for sc in raw.scoops if str(sc.company_id).strip() in book_zi)
     stats["scoop_companies"] = len({sc.company_id for sc in raw.scoops})
     stats["scoop_companies_matched_to_book"] = len({sc.company_id for sc in raw.scoops if str(sc.company_id).strip() in book_zi})
@@ -516,6 +545,11 @@ def _log_body(raw, res, result, verdicts, batch, stats, run_date, call_date, she
         lines.append(f"    ... and {len(batch.unmatched) - 25} more (counted)")
     lines += ["", f"== ACCOUNTS ==  (first call date {call_date})", acc_mod.summarise(res)]
     lines += _list_dropped(res) + _list_flagged(res)
+    lines += ["", "== FLAG COUNTS ==",
+              f"  junk_title (needs prospect: only contacts are assistants / junk titles): {stats['needs_prospect_junk_title']}",
+              f"  personal_email (chosen contact, call only, no email draft): {stats['chosen_personal_email']}",
+              f"  possible_duplicate: {stats['possible_duplicate_accounts']} accounts in {stats['possible_duplicate_groups']} "
+              "groups (kept on the account list, collapsed on the sheet)"]
     lines += ["", "== RANKER ==", ranker.summarise(result, top_n=max(15, len(result.ranked)), list_limit=10 ** 6)]
     lines += ["", "== RESULT ==", "  " + ", ".join(f"{k}={v}" for k, v in sorted(stats.items())),
               f"  sheet history recorded: {'yes (live, ranked only)' if sheet_recorded else 'NO'}",

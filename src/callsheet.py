@@ -24,6 +24,7 @@ from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 from src import signals as sigmod
+from src import accounts as acc_mod
 from src.config import Config, tier_for
 from src.loaders import normalise_sf_id
 from src.models import Account, Prospect, RankedAccount, SheetEntry, Signal, SignalKind
@@ -276,9 +277,12 @@ class PacketSignal:
     status: str                              # ok | undated | intent | future | stale
     verdict_reason: str
     ambiguous: bool
+    notes: tuple[str, ...] = ()              # signals.signal_notes(): role ambiguous, physical launch, debt facility, same deal as ...
 
     def to_dict(self) -> dict:
-        return dict(self.__dict__)
+        d = dict(self.__dict__)
+        d["notes"] = list(self.notes)
+        return d
 
 
 @dataclass
@@ -443,11 +447,22 @@ def _source_label(sig: Signal) -> str:
     return f"{_clean(sig.source)} {d}"
 
 
-def _clean_evidence(sig: Signal) -> str:
+def _plain_text(sig: Signal) -> str:
+    """The scoop text with every trailing ' (note)' warning removed (signals.signal_notes reads them back)."""
     ev = sig.evidence
-    if sigmod.is_ambiguous(sig):
-        ev = ev[: -len(sigmod.AMBIGUOUS_SUFFIX)]
-    return _clean(ev)
+    for n in reversed(sigmod.signal_notes(sig)):
+        suffix = f" ({n})"
+        if ev.endswith(suffix):
+            ev = ev[: -len(suffix)]
+    return ev
+
+
+def _clean_evidence(sig: Signal) -> str:
+    return _clean(_plain_text(sig))
+
+
+def _notes(sig: Signal) -> tuple[str, ...]:
+    return tuple(_clean(n) for n in sigmod.signal_notes(sig))
 
 
 def _real(sigs: Sequence[Signal]) -> list[Signal]:
@@ -521,8 +536,8 @@ def _verdict_reason(sig: Signal, status: str, age: int | None, config: Config) -
         out = f"kept: {label}, date unknown"
     else:
         out = f"kept: {label} within {sigmod.max_age_for(sig.kind, config)} day limit ({_plural(age or 0, 'day')} old)"
-    if sigmod.is_ambiguous(sig):
-        out += f"; {sigmod.AMBIGUOUS_NOTE}"
+    for n in _notes(sig):
+        out += f"; {n}"
     return out
 
 
@@ -532,7 +547,8 @@ def _packet_signal(sig: Signal, call_date: date | None, now: datetime | None, co
         kind=sig.kind.value, label=KIND_LABELS.get(sig.kind, sig.kind.value), evidence=_clean_evidence(sig),
         source=_clean(sig.source), source_label=_source_label(sig),
         date=sig.source_date.date().isoformat() if sig.source_date else None, age_days=age, status=status,
-        verdict_reason=_verdict_reason(sig, status, age, config), ambiguous=sigmod.is_ambiguous(sig))
+        verdict_reason=_verdict_reason(sig, status, age, config), ambiguous=sigmod.is_ambiguous(sig),
+        notes=_notes(sig))
 
 
 def _location(a: Account) -> str | None:
@@ -560,8 +576,8 @@ def build_why(ranked: RankedAccount, sigs: list[Signal], config: Config, now: da
             out.append("Flag: signal date in the future")
         elif status == "stale":
             out.append("Flag: signal older than its limit")
-        if sigmod.is_ambiguous(b):
-            out.append(f"Flag: {sigmod.AMBIGUOUS_NOTE}")
+        for n in _notes(b):
+            out.append(f"Flag: {n}")
         if len(sigs) > 1:
             out.append(f"{_plural(len(sigs) - 1, 'more trigger')}")
     else:
@@ -589,6 +605,8 @@ def _flags(ranked: RankedAccount, sigs: list[Signal], config: Config, now: datet
     out = []
     if any(sigmod.is_ambiguous(s) for s in sigs):
         out.append("role ambiguous")
+    if sigs:
+        out.extend(n for n in _notes(sigs[0]) if n != _clean(sigmod.AMBIGUOUS_NOTE))
     if not sigs:
         out.append("no trigger")
     elif not any(t in ("ok", "undated") for t in stats):
@@ -666,6 +684,10 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
     usable = [(s, p) for s, p in zip(sigs, psigs) if p.status in ("ok", "undated")]
     e_reason = email_reason(prospect)
     claims = list(MUST_NOT_CLAIM)
+    caution = list(dict.fromkeys(n for _, p in usable for n in p.notes if n != _clean(sigmod.AMBIGUOUS_NOTE)))
+    if caution:
+        notes.append("Trigger caution: " + "; ".join(caution) + ". State no more than the scoop text says.")
+        claims.append("Do not state more about the trigger than its text says. Caution on it: " + "; ".join(caution) + ".")
     if e_reason != "ok":
         claims.append(f"Do not suggest or draft an email to this contact ({_EMAIL_REASON_TEXT[e_reason]}).")
     return ResearchPacket(
@@ -741,51 +763,26 @@ def _bucket(items: Sequence[RankedAccount], reason_of) -> list[BucketItem]:
     return [BucketItem(_clean(r.account.name), _clean(reason_of(r))) for r in items]
 
 
-_DUP_NOTE = re.compile(r"possible_duplicate:\s*shares a key with\s+(?P<name>.+?)\s+\(ids:\s*(?P<ids>[^)]*)\)")
-
-
-def _unrepr(raw: str) -> str | None:
-    """Undo ``repr(str)`` for the account builder's note ('Name' or \"O'Neil Co\"), without eval."""
-    raw = raw.strip()
-    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
-        inner = raw[1:-1]
-        return re.sub(r"\\(['\"\\])", r"\1", inner)
-    return raw or None
-
-
-def _dup_targets(a: Account) -> list[tuple[str | None, set[str]]]:
-    """(name, ids) of the other account(s) named by this account's 'possible_duplicate' notes. Parsed
-    defensively from the account builder's note text; anything unparseable is ignored (no collapse)."""
-    if "possible_duplicate" not in a.flags and not any("possible_duplicate" in n for n in a.notes):
-        return []
-    out = []
-    for n in a.notes:
-        m = _DUP_NOTE.search(n)
-        if not m:
-            continue
-        raw = m.group("name")
-        name = _unrepr(raw)
-        ids = {normalise_sf_id(x) or x.strip() for x in m.group("ids").split(",") if x.strip() and x.strip().lower() != "none"}
-        out.append((name, {i for i in ids if i}))
+def _group_index(pools: Sequence[Account]) -> dict[str, int]:
+    """account_key -> duplicate group number, from ``accounts.duplicate_groups`` (the groups the account builder
+    flagged with 'possible_duplicate group dup-...' notes; unflagged hand-built accounts are detected fresh).
+    Accounts are de-duplicated by key; a key in two groups keeps the first."""
+    seen: dict[str, Account] = {}
+    for a in pools:
+        seen.setdefault(account_key(a), a)
+    out: dict[str, int] = {}
+    for n, members in enumerate(acc_mod.duplicate_groups(seen.values())):
+        for m in members:
+            out.setdefault(account_key(m), n)
     return out
 
 
-def _account_ids(a: Account) -> set[str]:
-    return {i for i in (normalise_sf_id(a.sf_account_id), normalise_sf_id(a.zoominfo_id),
-                        normalise_sf_id(a.nooks_account_id)) if i}
-
-
-def _names_other(a: Account, b: Account) -> bool:
-    """True when a's possible_duplicate note names b (by id overlap, else by exact name)."""
-    for name, ids in _dup_targets(a):
-        if (ids and ids & _account_ids(b)) or (name and name.casefold() == b.name.casefold()):
-            return True
-    return False
-
-
 def probable_duplicates(a: Account, b: Account) -> bool:
-    """True when the account builder flagged a and b as probably the same company (either note names the other)."""
-    return a is not b and (_names_other(a, b) or _names_other(b, a))
+    """True when the account builder put a and b in one duplicate group (see ``_group_index``)."""
+    if a is b:
+        return False
+    idx = _group_index([a, b])
+    return account_key(a) in idx and idx.get(account_key(a)) == idx.get(account_key(b))
 
 
 def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by_account: Mapping[str, list[Signal]],
@@ -839,8 +836,10 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
     # in score order), mention the other on the kept line, never put both on the sheet.
     kept: list[tuple[int, RankedAccount, Prospect]] = []
     also: dict[int, list[str]] = {}
+    gidx = _group_index([*accounts, *(t[1].account for t in picked)])
     for item in picked:
-        twin = next((k for k in kept if probable_duplicates(item[1].account, k[1].account)), None)
+        gi = gidx.get(account_key(item[1].account))
+        twin = next((k for k in kept if gi is not None and gidx.get(account_key(k[1].account)) == gi), None)
         if twin is None:
             kept.append(item)
             continue
