@@ -684,3 +684,147 @@ def test_empty_history_confirmed_is_accepted_for_a_new_seat(raw):
 def test_deeply_nested_json_is_an_error_not_a_crash(raw):
     (raw / "sf_contacts.json").write_text("[" * 100000)
     assert load_raw(raw, now=NOW).report.errors
+
+
+# ---------------------------------------------------------------- review round 3 (N2, N3, N6)
+from datetime import timedelta as _td                                     # noqa: E402
+
+
+def test_parse_sheet_tag_takes_the_newest_of_several_tags():
+    note = "[apac-callsheet 2026-11-20 #1] and [apac-callsheet 2026-11-24 #4 acct=001FAKE00000001] and [apac-callsheet 2026-11-22 #2]"
+    assert intake.parse_sheet_tag(note) == (D(2026, 11, 24), 4, "001FAKE00000001")
+    assert intake.parse_sheet_tag("[apac-callsheet 2026-02-30 #1] [apac-callsheet 2026-11-24 #1]")[0] == D(2026, 11, 24)
+
+
+def test_last_sheet_uses_the_newest_tag_in_a_note(raw):
+    set_rows(raw, "nooks_tasks", [task("[apac-callsheet 2026-11-20 #1 acct=001FAKE00000002] [apac-callsheet 2026-11-24 #1 acct=001FAKE00000001]")])
+    d = load_raw(raw, now=NOW)
+    assert intake.last_sheet_from_tasks(d, [], D(2026, 11, 25)) == {"001FAKE00000001"}
+
+
+def _recent_world(raw, calls, contacts, prospects=None):
+    set_rows(raw, "nooks_calls", calls)
+    set_rows(raw, "sf_contacts", contacts)
+    if prospects is None:
+        (raw / "nooks_prospects.json").unlink()
+    else:
+        set_rows(raw, "nooks_prospects", prospects)
+    return load_raw(raw, now=NOW)
+
+
+def _rcall(i, pid, to, days=2):
+    t = (NOW - _td(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {"id": f"C{i}", "time": t, "duration": 20, "to": to, "prospect": {"id": pid} if pid else None,
+            "callDisposition": {"id": "disp-no-answer"}}
+
+
+def test_recent_call_ids_and_batches(raw):
+    calls = [_rcall(i, f"NK-{i:03d}", "+61400000099") for i in range(60)] + [_rcall(99, "NK-OLD", "+61400000099", days=30)]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    ids = intake.recent_call_prospect_ids(d, NOW)
+    assert len(ids) == 60 and "NK-OLD" not in ids and ids == sorted(ids)
+    b = intake.id_batches(ids)
+    assert [len(x) for x in b] == [25, 25, 10]
+
+
+def test_untied_recent_calls_counts_and_lists_ids(raw):
+    calls = [_rcall(1, "NK-A", "+61400000001"), _rcall(2, "NK-B", "+61400000077"), _rcall(3, None, "+61400000001"),
+             _rcall(4, None, "external"), _rcall(5, "NK-OLD", "+61400000077", days=40)]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    ps = intake.infer_prospect_ids_from_calls(d, intake.build_prospects(d, {}, {}))
+    r = intake.untied_recent_calls(d, ps, NOW)
+    # NK-A resolves by its one phone; call 3 ties by unique phone; NK-B is unknown; call 4 can never be tied
+    assert r["total"] == 3 and r["untied"] == 1 and r["unlinkable"] == 1 and r["ids_to_resolve"] == ["NK-B"]
+    assert abs(r["share"] - 1 / 3) < 1e-9
+
+
+def test_untied_recent_calls_resolved_by_a_nooks_prospect_row(raw):
+    calls = [_rcall(1, "NK-B", "+61400000077")]
+    contact = _contact(1, "+61400000001")
+    row = {"id": "NK-B", "type": "salesforce", "name": "Pat", "crmId": contact["Id"], "account": {"id": "NA"}}
+    d = _recent_world(raw, calls, [contact], [row])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["untied"] == 0 and r["ids_to_resolve"] == []
+
+
+def test_untied_share_with_no_recent_calls_is_zero(raw):
+    d = _recent_world(raw, [_rcall(1, "NK-A", "+61400000001", days=60)], [_contact(1, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["total"] == 0 and r["share"] == 0.0
+
+
+def test_address_hash_is_salted_normalised_and_irreversible_looking():
+    h = intake.address_hash("First.Last@Example.com")
+    assert h == intake.address_hash("firstlast@example.com") and len(h) == 32 and "@" not in h
+    assert h != intake.address_hash("first.last@example.com", "other-salt")
+    assert intake.address_hash(None) is None and intake.address_hash("not an address") is None
+
+
+def test_gmail_hashes_are_read_and_raw_addresses_are_refused(raw):
+    rewrite(raw, "gmail_sent", lambda d: d["meta"].update({"searched_address_hashes": ["abc", "def"], "hash_salt": "s"}))
+    d = load_raw(raw, now=NOW)
+    assert d.gmail_searched == {"abc", "def"} and d.gmail_salt == "s" and d.report.stats["gmail_addresses_searched"] == 2
+    rewrite(raw, "gmail_sent", lambda d: d["meta"].update({"searched_address_hashes": ["jane@example.com"]}))
+    r = load_raw(raw, now=NOW).report
+    assert has(r.errors, "holds raw addresses") and not r.ok
+    rewrite(raw, "gmail_sent", lambda d: d["meta"].update({"searched_address_hashes": "nope"}))
+    assert has(load_raw(raw, now=NOW).report.errors, "must be a list of strings")
+
+
+def test_missing_gmail_hashes_warn_and_cover_nothing(raw):
+    d = load_raw(raw, now=NOW)
+    assert d.gmail_searched == set() and has(d.report.warnings, "no searched_address_hashes")
+
+
+# ---------------------------------------------------------------- round 3: call classification (O1, O5, O6)
+def _lead_row(pid, crm="00QFAKE00000001"):
+    return {"id": pid, "type": "salesforce", "name": "Lead Person", "crmId": crm, "account": None}
+
+
+def test_calls_on_resolved_lead_prospects_are_not_held_against_the_threshold(raw):
+    calls = [_rcall(i, f"NK-L{i}", "+61400000099") for i in range(3)] + [_rcall(10, "NK-T", "+61400000001"),
+                                                                        _rcall(11, "NK-T", "+61400000001")]
+    contacts = [_contact(1, "+61400000001")]
+    leads = [_lead_row(f"NK-L{i}", f"00QFAKE0000000{i}") for i in range(3)]
+    d = _recent_world(raw, calls, contacts, leads + [{"id": "NK-T", "type": "salesforce", "name": "T", "crmId": contacts[0]["Id"],
+                                                      "account": {"id": "NA"}}])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert (r["tied"], r["not_in_book"], r["unresolved"], r["untied"]) == (2, 3, 0, 0) and r["share"] == 0.0
+
+
+def test_calls_on_a_contact_outside_the_book_are_not_in_book(raw):
+    outside = {"id": "NK-O", "type": "salesforce", "name": "O", "crmId": "003OUTSIDE000001", "account": {"id": "NB"}}
+    d = _recent_world(raw, [_rcall(1, "NK-O", "+61400000099")], [_contact(1, "+61400000001")], [outside])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["not_in_book"] == 1 and r["untied"] == 0
+
+
+def test_unfetched_ids_and_book_contacts_without_account_still_count(raw):
+    noacct = {**_contact(1, "+61400000001"), "AccountId": None}
+    calls = [_rcall(1, "NK-UNFETCHED", "+61400000099"), _rcall(2, None, "+61400000001")]
+    d = _recent_world(raw, calls, [noacct])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unresolved"] == 1 and r["no_account"] == 1 and r["untied"] == 2 and r["ids_to_resolve"] == ["NK-UNFETCHED"]
+
+
+def test_phone_only_calls_with_no_unique_contact_are_logged_not_counted(raw):
+    d = _recent_world(raw, [_rcall(1, None, "+61400000555"), _rcall(2, None, "+61400000001")],
+                      [_contact(1, "+61400000001"), _contact(2, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["phone_unmatched"] == 2 and r["untied"] == 0
+
+
+def test_unresolved_calls_in_the_last_three_days_are_counted_separately(raw):
+    calls = [_rcall(1, "NK-A", "+61400000099", days=1), _rcall(2, "NK-B", "+61400000099", days=2),
+             _rcall(3, "NK-C", "+61400000099", days=5)]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unresolved"] == 3 and r["unresolved_recent"] == 2
+
+
+def test_unlinkable_share_is_of_all_recent_calls(raw):
+    calls = [_rcall(i, None, "external") for i in range(3)] + [_rcall(9, "NK-A", "+61400000001")]
+    d = _recent_world(raw, calls, [_contact(1, "+61400000001")])
+    r = intake.untied_recent_calls(d, intake.build_prospects(d, {}, {}), NOW)
+    assert r["unlinkable"] == 3 and r["all_recent"] == 4 and abs(r["unlinkable_share"] - 0.75) < 1e-9
+    assert r["total"] == 1                                              # the threshold denominator excludes them

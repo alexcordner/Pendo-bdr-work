@@ -2,18 +2,42 @@
 
 Module: `src/signals.py`. Offline, deterministic, no LLM. Tests: `tests/test_signals.py` (fixtures `tests/fixtures/signals_*.json`, all synthetic).
 
-## Strength = base weight x recency decay
-| Kind | Base weight | Half-life (days) |
-|---|---|---|
-| exec_move | 0.90 | 45 |
-| product_launch | 0.80 | 21 |
-| project_pain | 0.80 | 21 |
-| funding | 0.70 | 21 |
-| new_hire | 0.65 | 45 |
-| ma | 0.60 | 21 |
-| hiring_plan | 0.55 | 21 |
-| intent (UNVERIFIED) | 0.30, hard cap 0.30 | 21 |
-| partnership | 0.45 | 21 |
+## Strength = base weight x recency decay (revised after the first real dry run)
+| Kind | Base weight | Variants (multiplier on the base, shown as a note) | Half-life (days) |
+|---|---|---|---|
+| exec_move | 0.90 | role ambiguous x0.7 | 45 |
+| product_launch | 0.80 | physical or unclear launch: 0.40 (x0.5); fund / property / financial product launch: 0.20 (x0.25) | 21 |
+| project_pain | 0.80 | | 21 |
+| new_hire | 0.65 | role ambiguous x0.7 | 45 |
+| funding | 0.60 (was 0.70) | debt facility / loan / bond / credit line: 0.25 | 21 |
+| hiring_plan | 0.55 | | 21 |
+| ma | 0.50 (was 0.60) | target 0.50; acquirer of a digital business or a full acquisition 0.50; acquirer of a minority stake or unrelated business 0.25; direction unclear 0.25; acquirer in reported talks x0.5 of the acquirer weight | 21 |
+| partnership | 0.30 (was 0.45) | without product / digital / customer words: 0.20 | 21 |
+| intent (UNVERIFIED) | 0.30, cap 0.30 | | 21 |
+
+`strength = round(round(base * 0.5 ** (age_days / half_life), 4) * variant factor [* 0.7 if role ambiguous], 4)`. Constants: `KIND_BASE_WEIGHT`, `LAUNCH_NON_DIGITAL_WEIGHT` (0.40), `MA_MINORITY_OR_UNRELATED_WEIGHT` / `MA_UNCLEAR_WEIGHT` (0.25), `PARTNERSHIP_NO_PRODUCT_WEIGHT` (0.20), `RECENCY_HALF_LIFE_DAYS`, `KIND_HALF_LIFE_DAYS`. There are no new `SignalKind` values (the enum is shared), so variants are multipliers carried on the verdict (`ScoopVerdict.factor`, `.notes`) and shown on the signal as evidence notes.
+Literal checks: exec_move 21 days 0.6513, 45 days 0.45; funding 45 days 0.1359; digital launch 5 days 0.6783, physical launch 0.3392; M&A target 5 days 0.4239, minority acquirer 0.2119; partnership 5 days 0.2544 / 0.1696 without product words.
+A multi-type scoop takes the passing kind with the highest base weight (equal weights tie-break alphabetically by kind name). Order is now exec_move, launch / project_pain, new_hire, funding, hiring_plan, ma, then partnership / intent.
+
+## Phase 2 dry-run fixes (branch phase2/fix-triggers)
+First real dry run: 648 scoops, 258 kept, 20 ranked accounts with a trigger. Examples that scored but are not Pendo-buyer events, and what happens now:
+- **Product launch of lab consumables:** the full 0.80 needs a digital-product word (app, platform, software, digital, mobile, portal, online, website, web, SaaS, AI, cloud, API, e-commerce, customer experience, CX/UX, dashboard, chatbot, login...). Otherwise the scoop is kept at 0.40 with the note 'physical or unclear product launch: check it is digital' (on the verdict reason and as an evidence suffix; `signal_notes(signal)` reads it back). Whole-word match: 'apple' is not 'app'.
+- **'Pickles to be acquired by EQT' typed Funding:** a Funding scoop with target wording (to be acquired by, acquired by, has been bought by, taken over by, sold to, merger with, takeover bid from) and no money received (raised / secured / received / closed / Series / seed) is reclassified as M&A (reason 'Funding (reclassified as M&A: company is being acquired)'). Acquirer wording on a Funding scoop ('took a stake in') is NOT reclassified: it stays on the investor-note path and drops.
+- **M&A direction (`ma_role`, `classify_ma`):** deterministic text rules around the scoop company's name (first word). Passive wording makes the company the TARGET unless it is named after the phrase (then it is the buyer). Active wording (to acquire, acquires, acquired, to buy, takes / took / taken a stake in, takeover / acquisition / buyout of or for) makes it the ACQUIRER if named before the verb, the TARGET if named only after it, else unclear. Company not named in the text: unclear.
+  - Target: 0.50, reason 'being acquired: leadership/platform change likely'.
+  - Acquirer: 0.25 when a minority stake (a percentage under 50, 'minority', or a stake with no majority wording), or a non-digital sector (energy, mining, oil, gas, property, resources, agriculture, construction, utilities, pharma, food, hotels, shipping, steel, coal, lithium, gold) with no digital word, or a stake in a non-digital business, reason 'acquirer of a minority stake or unrelated business'. Otherwise 0.50, reason 'acquirer of a digital business or a full acquisition' (digital words: software, digital, data, platform, cloud, technology, SaaS, app, analytics, AI, product, CX, fintech, online, e-commerce, mobile, cyber).
+  - Unclear: 0.25, reason 'M&A direction unclear: check the deal'.
+- **Partnership:** 0.30 with a product / digital / customer / app / platform / software / mobile / portal / online / e-commerce / website / UX / CX word, 0.20 otherwise. 'AI', 'data', 'cloud', 'infrastructure' alone do not count, so an AI data-centre capacity deal gets 0.20 and a note.
+- **Same deal, two accounts:** kept M&A scoops of different companies in the same `filter_scoops` batch are the same deal when each names the other's company, or one names the other and they share most of their capitalised names and figures (9.9%, $20m). Both are kept; each verdict reason gets '; same deal as <other>' and the evidence gets the note (`ScoopVerdict.same_deal_as`). `combined_strength` counts one deal once inside an account (`dedupe_deals`: M&A signals with the same names and figures count once, the strongest wins; different deals still combine).
+- **Exec moves:** a role holder who LEFT is a valid trigger (a new leader is coming): 'CTO left to join another org', 'Interim Chief Digital Officer leaving', 'Head of Product has resigned' are kept with 'role ... vacated, new leader likely'. A departure is vacated only if the text names no incoming leader (joins, appointed, named, hired, replaces, successor...). A bare CEO departure is still dropped (no buyer role). The 'former X' background rule is unchanged: 'a former CIO of a rival lender' is not a vacancy.
+- **Incoming start date:** 'effective 1 December', 'will start on 15 October', 'starting December 1, 2026', 'from 2026-12-01' (needs a hint word such as joins, starts, effective, appointed in the same sentence). A past start date is the age basis and the signal's `source_date` (reason 'started N days ago'), and it can rescue a scoop published beyond the 90-day limit. A future start date counts as age 0 and `source_date` stays the publish date. A year-less date takes the publish year, or the next year when that would be more than 60 days before publication. Applies to Executive Move / New Hire only.
+- **Evidence notes:** `Signal.evidence` may end with ` (note)` groups: role ambiguous, physical or unclear product launch, acquirer of a minority stake or unrelated business, M&A direction unclear, partnership without product words, same deal as X. `signal_notes(signal)` lists them; `is_ambiguous(signal)` is the role flag. The description is shortened so evidence plus notes stays within 280 characters.
+- **Debt funding:** wording such as debt, loan, credit facility / line, notes, bonds, debenture, revolving, refinancing, borrowing, facility makes a Funding scoop 0.25 with 'debt facility, not an equity round', unless equity wording (equity, Series A-F, seed, venture, IPO, private placement) is also present. 'secured $ in funding' with no debt words stays 0.60. Debt funding hits the floor after day 27.
+- **Fund / property launches:** after the digital check fails, fund / REIT / trust / portfolio / ETF / property / mortgage / insurance policy or product / loan product / home loan / term deposit / annuity wording makes a launch 0.20 (x0.25 of 0.80) with 'financial or property product launch, not a digital product'. A bank, insurer or super fund launching an app, platform, portal, online tool still counts as digital (the digital check runs first). Digital words now also include 'solution(s)', 'technology' and CamelCase product names ending in AI ('SignalAI'); 'a new solution targeting higher education' is full weight. Limit: 'cleaning solution' also reads as digital.
+- **C-suite promotions:** 'promoted / moves / moved / elevated from X to (the role of) Y' judges the NEW role (Y) and the VACATED role (X) separately, never the rest of the sentence. If neither is a buyer role the scoop is dropped ('C-suite move from 'Chief Financial Officer' to 'CEO': neither the new nor the vacated role is a buyer role'). New role a buyer role: kept ('new role ...'); only the vacated role a buyer role (CTO to CEO): kept as a vacancy ('vacated role ..., new leader likely'). If both are buyer roles the new role is reported.
+- **Rumoured deals:** reportedly, in talks, rumoured, understood to, said to, considering, exploring, eyeing, weighing, approach make the ACQUIRER half weight (0.25 for a full acquisition, 0.125 for a minority stake) with 'reported talks, not a confirmed deal'. The target keeps 0.50: the rumour discount is applied to the acquirer only, as asked; the target of a rumoured deal is just as uncertain, so this is a judgement call to revisit. Sellers ('to sell', 'divests') have no rule yet and read as unclear.
+- **Real-data calibration (dry run):** of 118 M&A scoops about 46 acquirer, 51 target, 6 seller, 15 unclear; of 45 funding scoops 44 are recipients.
+- **Known limits:** M&A role needs the company named in the text; ZoomInfo scoops attached to a parent or alias name will read 'unclear' (0.25). Deal-pair detection only compares scoops in the same batch, and needs shared names or figures. The sector word lists are plain regex and will miss unseen wording. Intent is unchanged.
 
 ### Age limits and floor
 | Kind | Max age (days) |
@@ -27,10 +51,10 @@ Module: `src/signals.py`. Offline, deterministic, no LLM. Tests: `tests/test_sig
 - `KIND_MAX_AGE_DAYS` (this module) decides when a scoop is DROPPED by `filter_scoops` ('Dropped: expired...'). `config.signals.max_age_days` is used here only for a kind missing from that table (none today).
 - `config.signals.max_age_days` (45) is only a FALLBACK now. The ranker's recency is `1 - age / signals.max_age_for(best signal's kind, config)`, floored at 0, so an exec move 60 days old (limit 90) still earns recency points. (Resolved in 1f-final; earlier notes said the ranker used the config value as its horizon.)
 **Phase 2b: the scoop pull window must be 90 days for people-move scoops** (Executive Move, New Hire, Management Move), otherwise the 90-day limit is never used. That is the caller's job; this module only filters what it is given.
-Minimum strength floor `MIN_STRENGTH_FLOOR = 0.10`: a signal weaker than that is dropped with the reason 'faded below floor (0.09 < 0.10, N days old)'. With the default tables every kind is still at or above 0.10 on its last allowed day (exec_move 0.225, new_hire 0.1625, funding 0.1585, partnership 0.1672, hiring 0.2043), so the floor only bites on ambiguous roles, low intent scores or when the tables are tuned.
+Minimum strength floor `MIN_STRENGTH_FLOOR = 0.10`: a signal weaker than that is dropped with the reason 'faded below floor (0.09 < 0.10, N days old)'. With the base weights every kind is still at or above 0.10 on its last allowed day (exec_move 0.225, new_hire 0.1625, funding 0.1359, partnership 0.1114, hiring 0.2043, ma 0.1132, launch 0.1811). The reduced variants hit the floor earlier: physical launch after day 42, minority / unclear M&A after day 27, partnership without product words after day 21, ambiguous roles late in the 90-day window. Those scoops show up as 'Dropped: faded below floor'.
 
 `strength = round(base * 0.5 ** (age_days / half_life), 4)`. Constants: `KIND_BASE_WEIGHT`, `RECENCY_HALF_LIFE_DAYS` (21), `KIND_HALF_LIFE_DAYS` (exec_move, new_hire: 45).
-Literal checks: exec_move at 21 days 0.6513, at 45 days 0.45; funding at 45 days 0.1585; product_launch at 10 days 0.5751.
+Literal checks: exec_move at 21 days 0.6513, at 45 days 0.45; funding at 45 days 0.1359; product_launch at 10 days 0.5751.
 An ambiguous role (below) multiplies the strength by `AMBIGUOUS_ROLE_FACTOR` = 0.7 (so exec_move 5 days old: 0.8333 clear, 0.5833 ambiguous).
 Several signals on one account: `combined = 1 - (1 - best) * prod(1 - 0.5 * other)` (`COMBINE_DAMPING`), e.g. [0.5, 0.4] gives 0.6, [0.5, 0.4, 0.2] gives 0.64.
 

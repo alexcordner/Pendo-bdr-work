@@ -15,7 +15,7 @@ Every data file is one JSON object:
 - `rows`: the connector's rows EXACTLY as returned (no renaming, no trimming, no added fields). The one exception is documented under `nooks_accounts`.
 - `meta.source_tool`: the tool that produced the rows. `meta.query`: the query / filters used (no secrets).
 - `meta.page_count`: pages merged. `meta.fetched_at`: ISO UTC time the fetch finished.
-- `meta.reached_last_page`: `true` only when the END was seen. **Nooks has no `hasMore` field: the end is `links.next == null` on the final page** (`merge_pages.py --derive-last-page` derives it from the final page; a non-null `links.next` is `false`). Salesforce keyset pages: `done` is true on every page, so the end is `done` AND a final page with fewer rows than `LIMIT` (`--paging salesforce`). ZoomInfo: every page sequence runs `meta.page.number` 1..`total` without a gap and its rows add up to `meta.totalResults` (`--paging zoominfo`). `false` if paging stopped for any other reason (error, cap, rate limit). `null` for sources that are not paged. Never guessed.
+- `meta.reached_last_page`: `true` only when the END was seen. **Nooks has no `hasMore` field: the end is `links.next == null` on the final page** (`merge_pages.py --derive-last-page` derives it from the final page; a non-null `links.next` is `false`). Salesforce keyset pages: `done` is true on every page, so the end is `done` AND a final page with fewer rows than `LIMIT` (`--paging salesforce`). ZoomInfo: `meta.page.total` is the ROW COUNT of the page (not a page count) and `meta.totalResults` drifts between pages (real run), so neither is used: a type is complete when its `meta.page.number` runs 1, 2, 3 ... without a gap, every page but the last is full and the last page is SHORT or EMPTY (`--paging zoominfo`). `false` if paging stopped for any other reason (error, cap, rate limit). `null` for sources that are not paged. Never guessed.
 
 ## Files
 
@@ -37,7 +37,7 @@ A missing optional file is a warning. `gmail_sent.json` missing blocks a live ru
 ### Row fields the pipeline reads
 
 - **sf_accounts**: `Id, Name, Website, Type, BillingCountry, BillingState, BillingCity, HQ_Country__c, HQ_State_Province__c, ZoomInfo_Employee_Count__c, ROE_count__c, Current_Customer__c, SDR_Target__c, SDR_Prospecting_Priority__c, Prospecting_Priority__c, DOZISF__ZoomInfo_Id__c, Days_Since_Last_Activity__c` (a Salesforce `attributes` key is harmless). A row with no `Id` or an unusable value is reported as malformed (and listed by `accounts` in its dropped list).
-- **sf_contacts**: `Id, AccountId, FirstName, LastName, Phone, MobilePhone, HasOptedOutOfEmail, Sales_Opt_Out_Email__c, Title, Email` (`Name` is used if the first / last names are absent; with none the prospect is labelled `(no name)`, never invented). Probe: `MobilePhone` ~29%, `Phone` ~91%, `HasOptedOutOfEmail` ~24%; Contact has NO `DoNotCall` field. `Sales_Opt_Out_Email__c` (meaning UNVERIFIED) is only COUNTED (`contacts_sales_opt_out_email_unverified`), it does not block anyone: the `Prospect` model has no field for it.
+- **sf_contacts**: `Id, AccountId, FirstName, LastName, Phone, MobilePhone, HasOptedOutOfEmail, Sales_Opt_Out_Email__c, Title, Email` (`Name` is used if the first / last names are absent; with none the prospect is labelled `(no name)`, never invented). Probe: `MobilePhone` ~29%, `Phone` ~91%, `HasOptedOutOfEmail` ~24% on the probe's first page but 6.5% in the real full run (1,674 of 25,810 contacts); Contact has NO `DoNotCall` field. `Sales_Opt_Out_Email__c` (meaning UNVERIFIED) is only COUNTED (`contacts_sales_opt_out_email_unverified`), it does not block anyone: the `Prospect` model has no field for it.
 - **nooks_calls**: `id, source, duration, to, prospect{id}, callDisposition{id}, owner{id}, time, createdAt` (plus the rest of the `listCalls` row; verified shape `{traceId, hint, data, links{first, prev, next}}`). `callDisposition` is an id only: names come from `nooks_dispositions`. `to` is ~99% E.164; the literal `external` and odd spaced forms occur: the loader gives them `to_e164 = None` (counted in the run log), never an error. `source` varies (`nooks_sep`, `outreach`, `csv`, `salesforce`): see the Do Not Call limitation below.
 - **nooks_dispositions**: `id, name, source, callOutcome, archived`.
 - **nooks_prospects**: `id, name, firstName, lastName, title, primaryEmail, crmId, account{id}` (`account` is null for ~1/5 of rows; `crmId` can be a Lead id `00Q...`, only `003...` ids join to Contacts). Read only to attach a Nooks id (and name / title / email) to a Contact with the same `crmId`.
@@ -63,7 +63,7 @@ A plain JSON object (not `{meta, rows}`):
 
 - `fetched_at`, `sf_user_id`, `nooks_user_id`, `row_counts` are required. `row_counts[file]` is the number of rows written to that file (before any de-duplication). A mismatch is an ERROR (truncated or edited file).
 - `nooks_user_id` must equal `config.owner.nooks_user_id`, otherwise the run stops (the data belongs to someone else).
-- `scoop_counts_by_type` is optional (per-type totals from `meta.totalResults`), logged as is.
+- `scoop_counts_by_type` is optional (per-type counts, e.g. from `meta.totalResults`, which is APPROXIMATE: it drifts between pages), logged as is.
 - `reached_last_page` per paged source (derived from `links.next == null` for Nooks) must agree with the file's `meta`; on disagreement the cautious value (`false`) wins and a warning is logged.
 - `zoominfo_credits_used`: integer, `0` when only free searches ran. Missing is a warning and blocks live (credits unknown, CLAUDE.md rule 7). Above `limits.zoominfo_credit_budget_per_run` is a warning and blocks live.
 
@@ -116,3 +116,24 @@ A hit for `in:sent to:<addr> newer_than:7d` means "sent inside the window". `sen
 - `state.json` was reset (corrupt) and the tasks file has no tagged tasks to recover the last sheet from: live is blocked.
 - Files are read as UTF-8 (BOM allowed) or UTF-16; anything else is a report error (`IntakeError`), never an exception.
 - `Sales_Opt_Out_Email__c` is fetched and counted (`N contacts with Sales_Opt_Out_Email__c (meaning unverified, NOT used to block)` in the log); it never blocks until Alex decides.
+
+## Review round 3 additions (N1 to N6)
+
+- **Gmail coverage.** `gmail_sent.json` meta carries `searched_address_hashes` (salted, normalised hashes, 32 hex characters; never raw addresses: an `@` in a hash is an error) and `hash_salt` (default `apac-callsheet-v1`). `scripts/gmail_queue.py` produces the queue and the hashes. The pipeline reports `PipelineResult.gmail_uncovered` (hashes) and stats `gmail_ranked_prospects`, `gmail_ranked_prospects_uncovered`, `gmail_ranked_prospects_without_email`; live is refused while any ranked prospect with an email is uncovered. Missing hashes in meta = nothing covered (warning).
+- **Recent calls tied to accounts.** Calls from the last 14 days whose Nooks prospect id (or, with no id, a unique phone) cannot be tied to a Contact with an account lose their cooldown. The log line `recent calls not tied to an account: X of Y` is always written; live is blocked above `MAX_UNTIED_RECENT_SHARE` (5%, `src/intake.py`). Calls with no prospect and no usable number cannot be tied by any means and are counted separately, not held against the threshold. `scripts/recent_call_ids.py` lists the ids to resolve (batches of 25 for `listProspects filter_id`), the rows go into `nooks_prospects.json`.
+- **Do Not Call not matched to a contact.** Log line `DNC calls not matched to any contact: N (re-checked by Nooks prospect id in Phase 3)`. The Phase 3 re-check by Nooks prospect id and the Gmail coverage are HARD PRECONDITIONS: they are in the log header's DNC note, the `PHASE 3 PRECONDITIONS` log section and the `--live` output.
+- **Task tags.** A note with several tags uses the NEWEST tag date.
+- **Manifest checks and `--expect-pages`** are described in `docs/fetch_runbook.md` section 8.
+
+## Review round 4 additions (O1 to O6)
+
+- **Recent-call classes** (log line `recent calls not tied to an account: X of Y (...)`, stats `recent_calls_tied / _unresolved / _no_account / _not_in_book / _phone_unmatched / _unlinkable`): X = unresolved + book-contact-without-account. A call whose Nooks id resolved to a Lead (`crmId` `00Q...`), a Contact outside the book or no `crmId` is `not_in_book`: logged, not counted. Live is blocked above 5% of the judged calls AND by any unresolved call in the last 3 days (`UNRESOLVED_RECENT_DAYS`). Calls with no prospect and no usable number are `unlinkable`: a warning above 25% of all recent calls (`MAX_UNLINKABLE_SHARE`).
+- **Helper-script outputs** (`scripts/gmail_queue.py`, `scripts/recent_call_ids.py`): only under `output/` (symlinks resolved and refused, git must not report the path as not ignored), created with mode 0600; any other path exits 2 and writes nothing (`scripts/safeout.py`).
+- **Manifest checks** default to order-agnostic (duplicate ids, cursor continuity, full non-final pages, ZoomInfo totals) and `--expect-pages` is mandatory with `--derive-last-page`; `--strict-order` is opt-in.
+- **Phase 3 preconditions** are six (owner id from getMe as `expected_owner_id`; dry-run payloads refused; tasks only for `ranked`; `record_sheet` only after the writes; Do Not Call re-check by Nooks prospect id; full Gmail coverage) in `pipeline.PHASE3_PRECONDITIONS`, the log and the `--live` output.
+
+## Round 5 (first real dry run)
+
+- **ZoomInfo paging:** `meta.page.total` = rows on the page, `meta.totalResults` drifts; the end of a type is a short or empty page; real parameters `publishedStartDate`, `scoopTypes` (array), `page`.
+- **Inline results:** short results are not spilled; save them verbatim and merge with `--verify-rows N --verify-ids-hash H` (see `docs/fetch_runbook.md` section 7c2).
+- **Real opt-out rate:** 6.5% of contacts (1,674 of 25,810) have `HasOptedOutOfEmail`; blocking them from calls too (decision 2) therefore costs far less than the probe suggested.

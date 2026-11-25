@@ -14,6 +14,7 @@ Rules (CLAUDE.md rule 6, never fake data):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field, replace
@@ -21,7 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from src.loaders import (LoaderError, account_from_nooks, account_from_sf_row, build_disposition_index,
-                         call_from_nooks, normalise_phone, normalise_sf_id, parse_utc, prospect_from_nooks,
+                         call_from_nooks, normalise_email_for_match, normalise_phone, normalise_sf_id, parse_utc, prospect_from_nooks,
                          scoop_from_zoominfo, sent_emails_from_gmail, task_from_nooks)
 from src.models import CallRecord, Prospect, Scoop, SentEmail, TaskRecord
 
@@ -145,6 +146,8 @@ class RawData:
     gmail_sent: list[dict] = field(default_factory=list)
     run_meta: dict = field(default_factory=dict)
     metas: dict[str, dict] = field(default_factory=dict)
+    gmail_searched: set[str] = field(default_factory=set)       # salted hashes of the addresses actually searched
+    gmail_salt: str = ""
     disposition_index: dict = field(default_factory=dict)
     calls: list[CallRecord] = field(default_factory=list)
     tasks: list[TaskRecord] = field(default_factory=list)
@@ -350,6 +353,7 @@ def load_raw(raw_dir, *, now: datetime | None = None) -> RawData:
     if not rep.ok:
         rep.block_live("intake has errors")
     _convert(data, now)
+    _read_gmail_coverage(data)
     return data
 
 
@@ -465,6 +469,39 @@ def _convert(data: RawData, now: datetime) -> None:
         else:
             rep.warn("nooks_calls is empty: Do Not Call cannot be rebuilt from an empty history")
             rep.block_live("no call history")
+
+
+DEFAULT_ADDRESS_SALT = "apac-callsheet-v1"
+
+
+def address_hash(addr: str | None, salt: str = DEFAULT_ADDRESS_SALT) -> str | None:
+    """Salted hash of an address in its comparison form (lower case, dots removed from the local part), so the
+    Gmail coverage record never holds a raw address. 32 hex characters; None for an unusable address."""
+    key = normalise_email_for_match(addr)
+    return hashlib.sha256(f"{salt}:{key}".encode("utf-8")).hexdigest()[:32] if key else None
+
+
+def _read_gmail_coverage(data: "RawData") -> None:
+    """``gmail_sent.json`` meta may carry ``searched_address_hashes`` (list of ``address_hash`` values) and
+    ``hash_salt``. Without them nothing counts as searched (the pipeline then reports every chosen prospect)."""
+    meta = data.metas.get("gmail_sent")
+    if meta is None:
+        return
+    salt = meta.get("hash_salt")
+    data.gmail_salt = salt if isinstance(salt, str) and salt else DEFAULT_ADDRESS_SALT
+    hashes = meta.get("searched_address_hashes")
+    if hashes is None:
+        data.report.warn("gmail_sent.json meta has no searched_address_hashes: Gmail coverage of the ranked "
+                         "prospects cannot be shown (live needs full coverage)")
+        return
+    if not isinstance(hashes, list) or not all(isinstance(h, str) and h for h in hashes):
+        data.report.error("gmail_sent.json: meta.searched_address_hashes must be a list of strings")
+        return
+    if any("@" in h for h in hashes):
+        data.report.error("gmail_sent.json: meta.searched_address_hashes holds raw addresses (it must hold hashes only)")
+        return
+    data.gmail_searched = set(hashes)
+    data.report.stats["gmail_addresses_searched"] = len(data.gmail_searched)
 
 
 _WINDOW = re.compile(r"newer_than:(\d+)d\b")
@@ -632,6 +669,92 @@ def infer_prospect_ids_from_calls(data: RawData, prospects: list[Prospect]) -> l
     return out
 
 
+# ------------------------------------------------------------------ recent calls tied to accounts (cooldown memory)
+RECENT_CALL_DAYS = 14                 # the longest cooldown (cooldown_days_after_connect)
+MAX_UNTIED_RECENT_SHARE = 0.05        # live is blocked above this share of recent calls not tied to an account
+ID_BATCH = 25                         # prospect ids per listProspects filter_id call
+
+
+def _recent(data: RawData, now: datetime, days: int):
+    cutoff = now - timedelta(days=days)
+    return [c for c in data.calls if c.started_at >= cutoff]
+
+
+def recent_call_prospect_ids(data: RawData, now: datetime, days: int = RECENT_CALL_DAYS) -> list[str]:
+    """Distinct Nooks prospect ids on calls from the last ``days`` days (sorted): the ids whose crmId must be
+    fetched (``listProspects filter_id=<uuids>``, batches of ``ID_BATCH``) so those calls can be tied to accounts."""
+    return sorted({c.prospect_id for c in _recent(data, now, days) if c.prospect_id})
+
+
+def id_batches(ids: list[str], size: int = ID_BATCH) -> list[list[str]]:
+    return [ids[i:i + size] for i in range(0, len(ids), size)]
+
+
+UNRESOLVED_RECENT_DAYS = 3             # live needs 0 unresolved calls this recent (the no-answer cooldown window)
+MAX_UNLINKABLE_SHARE = 0.25            # warn above this share of recent calls that nothing can tie (external / no number)
+
+
+def untied_recent_calls(data: RawData, prospects: list[Prospect], now: datetime, days: int = RECENT_CALL_DAYS) -> dict:
+    """Classify the last ``days`` days of calls by whether state can record them on a Salesforce account (only then
+    does a cooldown start):
+
+      tied          a prospect carries the call's Nooks id (or, with no id, the dialled number belongs to exactly one
+                    prospect) AND has an account.
+      not_in_book   the Nooks id IS resolved (a Nooks row was fetched) but cannot yield a book account: a Lead
+                    (crmId 00Q...), a Contact that is not in sf_contacts, or no crmId. Fetching more cannot help and
+                    no book account can cool down, so these are logged, NOT held against the threshold. A call with no
+                    id whose number matches no prospect (or several) is counted separately (``phone_unmatched``), also
+                    not held against it.
+      unresolved    a prospect id on the call that no fetched row or prospect carries yet: counts.
+      no_account    resolved to a book Contact that has no AccountId: counts.
+      unlinkable    no prospect id and no usable number: counted separately; ``unlinkable_share`` (of ALL recent
+                    calls) feeds a warning above ``MAX_UNLINKABLE_SHARE``.
+
+    ``untied`` = unresolved + no_account (the threshold numerator); ``share`` = untied / (total - unlinkable);
+    ``unresolved_recent`` = unresolved calls in the last ``UNRESOLVED_RECENT_DAYS`` days (live needs 0)."""
+    by_id = {p.nooks_id: p for p in prospects if p.nooks_id}
+    contact_ids = {normalise_sf_id(c.get("Id")) for c in data.sf_contacts if c.get("Id")}
+    by_phone: dict[str, list[Prospect]] = {}
+    for p in prospects:
+        if p.phone_e164:
+            by_phone.setdefault(p.phone_e164, []).append(p)
+    recent = _recent(data, now, days)
+    cut3 = now - timedelta(days=UNRESOLVED_RECENT_DAYS)
+    out = {"tied": 0, "not_in_book": 0, "phone_unmatched": 0, "unresolved": 0, "no_account": 0, "unlinkable": 0}
+    missing: set[str] = set()
+    unresolved_recent = 0
+    for c in recent:
+        if not c.prospect_id and not c.to_e164:
+            out["unlinkable"] += 1
+            continue
+        if c.prospect_id:
+            p = by_id.get(c.prospect_id)
+            if p is None:
+                out["unresolved"] += 1
+                missing.add(c.prospect_id)
+                if c.started_at >= cut3:
+                    unresolved_recent += 1
+                continue
+        else:
+            hits = by_phone.get(c.to_e164, [])
+            if len(hits) != 1:
+                out["phone_unmatched"] += 1
+                continue
+            p = hits[0]
+        if p.sf_account_id:
+            out["tied"] += 1
+        elif p.sf_contact_id and normalise_sf_id(p.sf_contact_id) in contact_ids:
+            out["no_account"] += 1
+        else:
+            out["not_in_book"] += 1
+    total = len(recent)
+    judged = total - out["unlinkable"]
+    untied = out["unresolved"] + out["no_account"]
+    return {**out, "total": judged, "all_recent": total, "untied": untied, "ids_to_resolve": sorted(missing),
+            "share": (untied / judged) if judged else 0.0, "unresolved_recent": unresolved_recent,
+            "unlinkable_share": (out["unlinkable"] / total) if total else 0.0}
+
+
 # ------------------------------------------------------------------ last sheet from our tagged tasks
 SHEET_TAG = re.compile(r"\[apac-callsheet (\d{4}-\d{2}-\d{2}) #(\d+)(?: acct=([A-Za-z0-9]{15,18}))?\]")
 
@@ -641,14 +764,16 @@ def parse_sheet_tag(note) -> tuple[date, int, str | None] | None:
     (sheet date, rank, SF account id or None). Untagged or malformed notes give None (ignored)."""
     if not isinstance(note, str):
         return None
-    m = SHEET_TAG.search(note)
-    if not m:
-        return None
-    try:
-        d = date.fromisoformat(m.group(1))
-    except ValueError:
-        return None
-    return d, int(m.group(2)), normalise_sf_id(m.group(3)) if m.group(3) else None
+    best = None
+    for m in SHEET_TAG.finditer(note):                    # several tags in one note: the NEWEST date wins
+        try:
+            d = date.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        cand = (d, int(m.group(2)), normalise_sf_id(m.group(3)) if m.group(3) else None)
+        if best is None or cand[0] > best[0]:
+            best = cand
+    return best
 
 
 def last_sheet_from_tasks(data: RawData, prospects: list[Prospect], run_date: date) -> set[str]:

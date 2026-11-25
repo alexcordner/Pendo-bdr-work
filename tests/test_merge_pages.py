@@ -9,6 +9,13 @@ from scripts import merge_pages as mp
 PAGES = Path(__file__).resolve().parent / "fixtures" / "intake_pages"
 
 
+def dl(pages, kind="auto", **kw):
+    """derive_last_page with the now-mandatory expect_pages filled in and no Nooks page-size rule unless asked."""
+    kw.setdefault("expect_pages", len(pages))
+    kw.setdefault("page_size", None)
+    return mp.derive_last_page(pages, kind, **kw)
+
+
 def page(name):
     return json.loads((PAGES / name).read_text())
 
@@ -198,40 +205,43 @@ def test_merged_dump_is_readable_by_intake(tmp_path):
 
 # ---------------------------------------------------------------- reached_last_page from the final page
 def test_derive_last_page_nooks_links_next():
-    assert mp.derive_last_page([page("nooks_page_more.json"), page("nooks_page_last.json")]) is True
-    assert mp.derive_last_page([page("nooks_page_more.json")]) is False
-    assert mp.derive_last_page([page("nooks_page_empty_end.json")]) is True        # cursor past the end
+    assert dl([page("nooks_page_more.json"), page("nooks_page_last.json")]) is True
+    assert dl([page("nooks_page_more.json")]) is False
+    assert dl([page("nooks_page_empty_end.json")]) is True        # cursor past the end
 
 
-def test_derive_last_page_uses_only_the_final_page():
-    assert mp.derive_last_page([page("nooks_page_last.json"), page("nooks_page_more.json")]) is False
+def test_derive_last_page_reordered_pages_are_an_error_not_a_guess():
+    with pytest.raises(mp.MergeError, match="no next cursor"):
+        dl([page("nooks_page_last.json"), page("nooks_page_more.json")])
 
 
 def test_derive_last_page_has_more_and_mcp_wrapper():
-    assert mp.derive_last_page([page("has_more_true.json")]) is False
-    assert mp.derive_last_page([page("data_page2.json")]) is True
+    assert dl([page("has_more_true.json")]) is False
+    assert dl([page("data_page2.json")]) is True
     wrapped = [{"type": "text", "text": json.dumps(page("nooks_page_last.json"))}]
-    assert mp.derive_last_page([wrapped]) is True
+    assert dl([wrapped]) is True
 
 
 @pytest.mark.parametrize("fixture", ["bare_list.json", "records_page2.json", "threads_page.json"])
 def test_derive_last_page_without_a_marker_is_an_error(fixture):
     with pytest.raises(mp.MergeError, match="cannot derive"):
-        mp.derive_last_page([page(fixture)])
+        dl([page(fixture)])
     with pytest.raises(mp.MergeError, match="no pages"):
-        mp.derive_last_page([])
+        dl([])
 
 
 def test_cli_auto_derives_from_links_next(tmp_path):
     assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_more.json")}, {"path": str(PAGES / "nooks_page_last.json")}],
-                   "--last-page-reached", "auto") == 0
+                   "--last-page-reached", "auto", "--expect-pages", "2", "--page-size", "2") == 0
     assert json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]["reached_last_page"] is True
-    assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_more.json")}], "--last-page-reached", "auto") == 0
+    assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_more.json")}], "--last-page-reached", "auto",
+                   "--expect-pages", "1", "--page-size", "2") == 0
     assert json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]["reached_last_page"] is False
 
 
 def test_cli_auto_without_marker_fails_and_writes_nothing(tmp_path, capsys):
-    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--last-page-reached", "auto", name="x") == 2
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--last-page-reached", "auto", "--expect-pages", "1",
+                   name="x") == 2
     assert "cannot derive" in capsys.readouterr().err and not (tmp_path / "raw").exists()
 
 
@@ -246,61 +256,102 @@ def test_probe_fixture_shapes_merge(tmp_path):
 
 def test_probe_nooks_page_has_links_next_and_no_has_more():
     pg = json.loads((Path(__file__).resolve().parent / "fixtures" / "probe_nooks_calls_page.json").read_text())
-    assert "hasMore" not in pg and mp.derive_last_page([pg]) == (pg["links"]["next"] is None)
+    assert "hasMore" not in pg and dl([pg]) == (pg["links"]["next"] is None)
 
 
 # ---------------------------------------------------------------- --derive-last-page rules per source (review F2)
-def sf_page(n, done=True):
-    return {"totalSize": n, "done": done, "records": [{"Id": f"001FAKE{i:08d}"} for i in range(n)]}
+def sf_page(n, done=True, start=0):
+    return {"totalSize": n, "done": done, "records": [{"Id": f"001FAKE{i:08d}"} for i in range(start, start + n)]}
 
 
-def zi_page(num, total, rows, total_results=None):
-    meta = {"page": {"number": num, "total": total}}
+def zi_page(num, rows, total_results=None, seq="a"):
+    """A real search_scoops page: meta.page.total is the ROW COUNT of the page, totalResults drifts."""
+    meta = {"page": {"number": num, "total": rows}}
     if total_results is not None:
         meta["totalResults"] = total_results
-    return {"data": [{"id": f"S{num}-{i}"} for i in range(rows)], "meta": meta}
+    return {"data": [{"id": f"{seq}{num}-{i}"} for i in range(rows)], "meta": meta}
 
 
 def test_salesforce_short_final_page_with_done_is_the_end():
-    assert mp.derive_last_page([sf_page(2000), sf_page(37)], "salesforce") is True
+    assert dl([sf_page(2000), sf_page(37, start=2000)], "salesforce") is True
 
 
 def test_salesforce_full_final_page_is_not_the_end():
-    assert mp.derive_last_page([sf_page(2000), sf_page(2000)], "salesforce") is False
-    assert mp.derive_last_page([sf_page(10)], "salesforce", sf_limit=10) is False
+    assert dl([sf_page(2000), sf_page(2000, start=2000)], "salesforce") is False
+    assert dl([sf_page(10)], "salesforce", sf_limit=10) is False
 
 
 def test_salesforce_done_false_or_missing():
-    assert mp.derive_last_page([sf_page(5, done=False)], "salesforce") is False
+    assert dl([sf_page(5, done=False)], "salesforce") is False
     with pytest.raises(mp.MergeError, match="'done'"):
-        mp.derive_last_page([{"records": []}], "salesforce")
+        dl([{"records": []}], "salesforce")
 
 
-def test_zoominfo_complete_single_sequence():
-    assert mp.derive_last_page([zi_page(1, 2, 3, 5), zi_page(2, 2, 2, 5)], "zoominfo") is True
+def test_zoominfo_ends_on_a_short_page():
+    assert dl([zi_page(1, 3), zi_page(2, 3), zi_page(3, 2)], "zoominfo", page_size=3) is True
 
 
-def test_zoominfo_missing_a_page_or_short_rows_is_not_complete():
-    assert mp.derive_last_page([zi_page(1, 3, 3), zi_page(3, 3, 3)], "zoominfo") is False      # page 2 missing
-    assert mp.derive_last_page([zi_page(1, 2, 3, 9), zi_page(2, 2, 2, 9)], "zoominfo") is False   # 5 rows of 9
-    assert mp.derive_last_page([zi_page(1, 2, 3)], "zoominfo") is False                       # final page not the end
+def test_zoominfo_ends_on_an_empty_page_after_full_pages():
+    assert dl([zi_page(1, 3), zi_page(2, 3), zi_page(3, 0)], "zoominfo", page_size=3) is True
+    assert dl([zi_page(1, 0)], "zoominfo", page_size=3) is True
 
 
-def test_zoominfo_several_type_sequences_must_each_be_complete():
-    good = [zi_page(1, 2, 3, 5), zi_page(2, 2, 2, 5), zi_page(1, 1, 4, 4)]
-    assert mp.derive_last_page(good, "zoominfo") is True
-    truncated_first = [zi_page(1, 2, 3, 5), zi_page(1, 1, 4, 4)]            # type 1 stopped after page 1
-    assert mp.derive_last_page(truncated_first, "zoominfo") is False
+def test_zoominfo_full_final_page_is_not_the_end():
+    assert dl([zi_page(1, 3), zi_page(2, 3)], "zoominfo", page_size=3) is False
+
+
+def test_zoominfo_drifting_totals_do_not_matter():
+    """REAL: Executive Move read 458/435/437/383 while 400 rows came back; Partnership said 53 and returned 62."""
+    pages = [zi_page(1, 3, 458), zi_page(2, 3, 435), zi_page(3, 3, 437), zi_page(4, 1, 383)]
+    assert dl(pages, "zoominfo", page_size=3) is True
+
+
+def test_zoominfo_meta_page_total_is_the_row_count_not_a_page_count():
+    pages = [zi_page(1, 100), zi_page(2, 100), zi_page(3, 37)]
+    assert pages[0]["meta"]["page"]["total"] == 100
+    assert dl(pages, "zoominfo", page_size=100) is True
+
+
+def test_zoominfo_gap_or_repeated_page_number_is_not_complete():
+    assert dl([zi_page(1, 3), zi_page(3, 1)], "zoominfo", page_size=3) is False
+    assert dl([zi_page(1, 3), zi_page(1, 3, seq="b"), zi_page(2, 1, seq="b")], "zoominfo", page_size=3) is False
+    assert dl([zi_page(2, 1)], "zoominfo", page_size=3) is False                      # does not start at page 1
+
+
+def test_zoominfo_a_page_given_twice_is_an_error():
+    with pytest.raises(mp.MergeError, match="id repeated inside one type's pages"):
+        dl([zi_page(1, 3), zi_page(2, 3), zi_page(2, 3)], "zoominfo", page_size=3)
+
+
+def test_zoominfo_several_type_sequences_each_end_short_or_empty():
+    good = [zi_page(1, 3, seq="a"), zi_page(2, 1, seq="a"), zi_page(1, 2, seq="b"), zi_page(1, 3, seq="c"), zi_page(2, 0, seq="c")]
+    assert dl(good, "zoominfo", page_size=3) is True
+    truncated_first = [zi_page(1, 3, seq="a"), zi_page(1, 2, seq="b")]                  # type a stopped after a FULL page 1
+    assert dl(truncated_first, "zoominfo", page_size=3) is False
+
+
+def test_zoominfo_the_same_scoop_may_appear_under_two_types():
+    a = {"data": [{"id": "S1"}, {"id": "S2"}], "meta": {"page": {"number": 1, "total": 2}}}
+    b = {"data": [{"id": "S2"}], "meta": {"page": {"number": 1, "total": 1}}}
+    assert dl([a, b], "zoominfo", page_size=3) is True
+
+
+def test_zoominfo_expect_pages_is_optional_but_checked_when_given():
+    pages = [zi_page(1, 3), zi_page(2, 1)]
+    assert mp.derive_last_page(pages, "zoominfo", page_size=3) is True                # no --expect-pages: fine
+    assert mp.derive_last_page(pages, "zoominfo", expect_pages=2, page_size=3) is True
+    with pytest.raises(mp.MergeError, match="--expect-pages says 3"):
+        mp.derive_last_page(pages, "zoominfo", expect_pages=3, page_size=3)
 
 
 def test_zoominfo_page_without_meta_is_an_error():
-    with pytest.raises(mp.MergeError, match="meta.page"):
-        mp.derive_last_page([{"data": []}], "zoominfo")
+    with pytest.raises(mp.MergeError, match="meta.page.number"):
+        dl([{"data": []}], "zoominfo")
 
 
 def test_unknown_paging_kind():
     with pytest.raises(mp.MergeError, match="unknown paging kind"):
-        mp.derive_last_page([sf_page(1)], "ldap")
+        dl([sf_page(1)], "ldap")
 
 
 def _write(tmp_path, name, obj):
@@ -310,11 +361,11 @@ def _write(tmp_path, name, obj):
 
 
 def test_cli_derive_last_page_salesforce_and_zoominfo(tmp_path):
-    assert run_cli(tmp_path, [_write(tmp_path, "a.json", sf_page(2000)), _write(tmp_path, "b.json", sf_page(3))],
-                   "--derive-last-page", "--paging", "salesforce", name="sf_accounts", ) == 0
+    assert run_cli(tmp_path, [_write(tmp_path, "a.json", sf_page(2000)), _write(tmp_path, "b.json", sf_page(3, start=2000))],
+                   "--derive-last-page", "--paging", "salesforce", "--expect-pages", "2", name="sf_accounts", ) == 0
     assert json.loads((tmp_path / "raw" / "sf_accounts.json").read_text())["meta"]["reached_last_page"] is True
-    assert run_cli(tmp_path, [_write(tmp_path, "c.json", zi_page(1, 2, 2)), _write(tmp_path, "d.json", zi_page(2, 2, 1))],
-                   "--derive-last-page", "--paging", "zoominfo", name="zoominfo_scoops") == 0
+    assert run_cli(tmp_path, [_write(tmp_path, "c.json", zi_page(1, 2)), _write(tmp_path, "d.json", zi_page(2, 1))],
+                   "--derive-last-page", "--paging", "zoominfo", "--page-size", "2", name="zoominfo_scoops") == 0
     assert json.loads((tmp_path / "raw" / "zoominfo_scoops.json").read_text())["meta"]["reached_last_page"] is True
 
 
@@ -324,7 +375,7 @@ def test_cli_derive_cannot_be_combined_with_a_manual_flag(tmp_path, capsys):
 
 
 def test_cli_derive_never_defaults_to_true(tmp_path, capsys):
-    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--derive-last-page") == 2
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--derive-last-page", "--expect-pages", "1") == 2
     assert not (tmp_path / "raw").exists()
 
 
@@ -350,3 +401,194 @@ def test_cli_binary_page_and_manifest_exit_2(tmp_path, capsys):
     with pytest.raises(mp.MergeError):
         mp.read_manifest(tmp_path / "m2.json")
     assert "Traceback" not in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- manifest consistency checks (review N1)
+def nk(ids, nxt):
+    return {"data": [{"id": i} for i in ids], "links": {"next": nxt}}
+
+
+def test_nooks_good_three_page_manifest():
+    assert dl([nk(["a", "b"], "c1"), nk(["c", "d"], "c2"), nk(["e"], None)], expect_pages=3) is True
+
+
+def test_nooks_next_null_in_the_middle_is_an_error():
+    with pytest.raises(mp.MergeError, match="page 1 of 3 has no next cursor"):
+        dl([nk(["a"], None), nk(["b"], "c"), nk(["c"], None)])
+
+
+def test_nooks_duplicated_terminal_page_is_an_error():
+    with pytest.raises(mp.MergeError):
+        dl([nk(["a"], "c"), nk(["b"], None), nk(["b"], None)])
+
+
+def test_nooks_overlapping_pages_are_an_error_without_relying_on_order():
+    with pytest.raises(mp.MergeError, match="id repeated on page 2"):
+        dl([nk(["a", "c"], "x"), nk(["c", "d"], None)])
+
+
+def test_descending_ids_pass_by_default_and_fail_only_with_strict_order():
+    pages = [nk(["m", "n"], "x"), nk(["a", "b"], None)]               # unverified server order: not rejected by default
+    assert dl(pages) is True
+    with pytest.raises(mp.MergeError, match="strictly ascending"):
+        dl(pages, strict_order=True)
+
+
+def test_mixed_case_ids_are_not_falsely_rejected_by_default():
+    assert dl([nk(["0B", "0a"], "x"), nk(["0C"], None)]) is True
+    assert dl([sf_page(2000, start=0), sf_page(1, start=2000)], "salesforce") is True
+
+
+def test_missing_middle_page_is_caught_only_by_expect_pages():
+    pages = [nk(["a"], "c1"), nk(["c"], None)]                         # page 2 of 3 never made it into the manifest
+    assert dl(pages) is True                          # undetectable from the pages alone
+    with pytest.raises(mp.MergeError, match="--expect-pages says 3"):
+        dl(pages, expect_pages=3)
+
+
+def test_salesforce_short_middle_page_is_an_error():
+    with pytest.raises(mp.MergeError, match="page 1 of 2 holds 1000 rows, not 2000"):
+        dl([sf_page(1000), sf_page(500, start=1000)], "salesforce")
+
+
+def test_salesforce_duplicate_ids_are_an_error_and_order_only_with_strict_order():
+    with pytest.raises(mp.MergeError, match="id repeated on page 2"):
+        dl([sf_page(2000), sf_page(5, start=0)], "salesforce")
+    pages = [sf_page(2000, start=2000), sf_page(5, start=0)]          # descending but distinct
+    assert dl(pages, "salesforce") is True
+    with pytest.raises(mp.MergeError, match="strictly ascending"):
+        dl(pages, "salesforce", strict_order=True)
+
+
+def test_salesforce_single_short_page_with_expect_pages():
+    assert dl([sf_page(7)], "salesforce", expect_pages=1) is True
+    with pytest.raises(mp.MergeError):
+        dl([sf_page(7)], "salesforce", expect_pages=2)
+
+
+def test_cli_expect_pages_and_meta_json(tmp_path):
+    entries = [{"path": str(PAGES / "nooks_page_more.json")}, {"path": str(PAGES / "nooks_page_last.json")}]
+    assert run_cli(tmp_path, entries, "--derive-last-page", "--expect-pages", "3", "--page-size", "2") == 2
+    assert not (tmp_path / "raw").exists()
+    (tmp_path / "meta.json").write_text(json.dumps({"window_days": 7, "searched_address_hashes": ["abc"],
+                                                    "reached_last_page": "SPOOF", "query": "SPOOF"}))
+    assert run_cli(tmp_path, entries, "--derive-last-page", "--expect-pages", "2", "--page-size", "2", "--meta-json",
+                   str(tmp_path / "meta.json")) == 0
+    meta = json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]
+    assert meta["window_days"] == 7 and meta["searched_address_hashes"] == ["abc"]
+    assert meta["reached_last_page"] is True and meta["query"] == "owner=<id>"      # computed keys are never overridden
+
+
+def test_cli_expect_pages_without_derive_still_checks(tmp_path):
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--expect-pages", "2") == 2
+
+
+def test_cli_bad_meta_json(tmp_path):
+    (tmp_path / "meta.json").write_text("[1]")
+    assert run_cli(tmp_path, [{"path": str(PAGES / "bare_list.json")}], "--meta-json", str(tmp_path / "meta.json")) == 2
+
+
+# ---------------------------------------------------------------- expect-pages mandatory, cursor continuity, page size (review round 3)
+import base64 as _b64                                                      # noqa: E402
+from urllib.parse import quote as _quote                                   # noqa: E402
+
+
+def cur(row_id):
+    raw = _b64.b64encode(json.dumps({"id": row_id, "v": 1}).encode()).decode()
+    return f"/v1/calls?page%5Bafter%5D={_quote(raw, safe='')}&page_size=100"
+
+
+def test_expect_pages_is_mandatory_for_derive():
+    with pytest.raises(mp.MergeError, match="MANDATORY"):
+        mp.derive_last_page([nk(["a"], None)])
+    with pytest.raises(mp.MergeError, match="MANDATORY"):
+        mp.derive_last_page([sf_page(1)], "salesforce")
+    assert mp.derive_last_page([zi_page(1, 1)], "zoominfo", page_size=3) is True          # ZoomInfo: optional
+
+
+def test_cli_derive_without_expect_pages_exits_2(tmp_path, capsys):
+    assert run_cli(tmp_path, [{"path": str(PAGES / "nooks_page_last.json")}], "--derive-last-page") == 2
+    assert "MANDATORY" in capsys.readouterr().err and not (tmp_path / "raw").exists()
+
+
+def test_cursor_id_decodes_encoded_and_plain_cursors():
+    assert mp.cursor_id(cur("abc-1")) == "abc-1"
+    raw = _b64.b64encode(json.dumps({"id": "x9", "v": 1}).encode()).decode()
+    assert mp.cursor_id(raw) == "x9" and mp.cursor_id(_quote(raw, safe="")) == "x9"
+    for bad in (None, "", "/v1/calls?x=1", "not base64 !!", 5):
+        assert mp.cursor_id(bad) is None
+
+
+def test_cursor_continuity_passes_when_the_cursor_follows_the_last_row():
+    assert dl([nk(["a", "b"], cur("b")), nk(["c", "d"], cur("d")), nk(["e"], None)]) is True
+
+
+def test_cursor_pointing_past_a_missing_page_is_an_error():
+    with pytest.raises(mp.MergeError, match="next cursor points after id 'd'"):
+        dl([nk(["a", "b"], cur("d")), nk(["e"], None)])
+
+
+def test_undecodable_cursors_skip_the_continuity_check():
+    assert dl([nk(["a"], "opaque-1"), nk(["b"], None)]) is True
+
+
+def test_nooks_non_final_page_must_be_full():
+    pages = [nk([f"a{i}" for i in range(99)], "c1"), nk(["z"], None)]
+    with pytest.raises(mp.MergeError, match="holds 99 rows, not 100"):
+        dl(pages, page_size=100)
+    assert dl(pages, page_size=99) is True and dl(pages, page_size=None) is True
+
+
+def test_cli_strict_order_flag(tmp_path):
+    a = _write(tmp_path, "a.json", nk(["m", "n"], "c1"))
+    b = _write(tmp_path, "b.json", nk(["a"], None))
+    assert run_cli(tmp_path, [a, b], "--derive-last-page", "--expect-pages", "2", "--page-size", "2") == 0
+    assert run_cli(tmp_path, [a, b], "--derive-last-page", "--expect-pages", "2", "--page-size", "2", "--strict-order",
+                   name="other") == 2
+
+
+# ---------------------------------------------------------------- inline results: --verify-rows / --verify-ids-hash
+def _inline(tmp_path, rows):
+    return [_write(tmp_path, "inline.json", {"data": rows})]
+
+
+def test_ids_hash_is_order_independent_and_short():
+    assert mp.ids_hash(["b", "a", "c"]) == mp.ids_hash(["c", "a", "b"]) and len(mp.ids_hash(["a"])) == 12
+    assert mp.ids_hash(["a", "b"]) != mp.ids_hash(["a", "bb"])
+
+
+def test_verify_rows_and_hash_pass_for_a_faithful_copy(tmp_path):
+    rows = [{"id": f"R{i}", "x": 1} for i in range(5)]
+    h = mp.ids_hash([r["id"] for r in rows])
+    assert run_cli(tmp_path, _inline(tmp_path, rows), "--verify-rows", "5", "--verify-ids-hash", h, name="nooks_tasks") == 0
+
+
+def test_verify_rows_catches_a_lost_row(tmp_path, capsys):
+    rows = [{"id": f"R{i}"} for i in range(5)]
+    assert run_cli(tmp_path, _inline(tmp_path, rows[:4]), "--verify-rows", "5") == 2
+    assert "--verify-rows says 5 rows but the pages hold 4" in capsys.readouterr().err
+    assert not (tmp_path / "raw").exists()
+
+
+def test_verify_ids_hash_catches_a_mistyped_id(tmp_path, capsys):
+    seen = [f"R{i}" for i in range(5)]
+    saved = [{"id": "R0"}, {"id": "R1"}, {"id": "R2"}, {"id": "R3"}, {"id": "R4_typo"}]
+    assert run_cli(tmp_path, _inline(tmp_path, saved), "--verify-rows", "5", "--verify-ids-hash", mp.ids_hash(seen)) == 2
+    assert "does not match the saved row ids" in capsys.readouterr().err and not (tmp_path / "raw").exists()
+
+
+def test_verify_counts_rows_before_deduplication(tmp_path):
+    rows = [{"id": "A"}, {"id": "A"}, {"id": "B"}]
+    assert run_cli(tmp_path, _inline(tmp_path, rows), "--verify-rows", "3", "--verify-ids-hash",
+                   mp.ids_hash(["A", "A", "B"])) == 0
+
+
+def test_verify_hash_is_case_and_space_tolerant(tmp_path):
+    rows = [{"id": "A"}]
+    assert run_cli(tmp_path, _inline(tmp_path, rows), "--verify-ids-hash", " " + mp.ids_hash(["A"]).upper() + " ") == 0
+
+
+def test_internal_id_list_never_reaches_the_dump(tmp_path):
+    run_cli(tmp_path, _inline(tmp_path, [{"id": "A"}]), "--verify-rows", "1")
+    meta = json.loads((tmp_path / "raw" / "nooks_calls.json").read_text())["meta"]
+    assert "_ids" not in json.dumps(meta)

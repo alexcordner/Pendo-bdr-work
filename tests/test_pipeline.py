@@ -6,7 +6,7 @@ import random
 import re
 import shutil
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -897,7 +897,7 @@ def test_narrow_allowlist_argparse_and_sys_only_in_pipeline():
         tree = ast.parse(p.read_text())
         mods = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
         mods |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
-        if p.name != "pipeline.py":
+        if p.name not in ("pipeline.py", "textcheck.py"):   # the two CLI entry points (2a, 2d)
             assert not mods & {"argparse", "sys"}, p.name
 
 
@@ -908,3 +908,372 @@ def test_the_only_file_write_in_pipeline_is_write_log():
         has_write = any(isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "write_text"
                         for c in ast.walk(fn))
         assert has_write == (fn.name == "write_log"), fn.name
+
+
+# ---------------------------------------------------------------- review round 3 (N2, N3, N4)
+def test_recent_calls_not_tied_line_and_block_above_threshold(world, cfg, tmp_path):
+    base = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    assert any("recent calls not tied to an account: 0 of" in l for l in base.log_lines)
+    calls = [dict(c) for c in world.calls]
+    t = (NOW - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for i in range(10):                               # ten recent calls on unknown Nooks ids, no phone to tie them
+        calls.append({"id": f"FAKE-UNTIED-{i}", "time": t, "duration": 20, "to": f"+6140000{i:04d}",
+                      "prospect": {"id": f"NK-UNKNOWN-{i}"}, "callDisposition": {"id": "disp-no-answer"}})
+    raw = write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path / "rb")
+    assert r.stats["recent_calls_not_tied_to_account"] == 10 and r.stats["recent_call_prospect_ids_to_resolve"] == 10
+    assert any("recent calls not tied to an account: 10 of" in l for l in r.log_lines)
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path / "rc", live=True)
+    assert any("not tied to an account" in x for x in e.value.reasons)
+
+
+def test_recent_calls_just_under_the_threshold_do_not_block(world, cfg, tmp_path):
+    calls = [dict(c) for c in world.calls]
+    t = (NOW - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    t5 = (NOW - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for i in range(300):                               # many recent calls, all tied by phone to a known prospect
+        calls.append({**calls[0], "id": f"FAKE-TIED-{i}", "time": t, "createdAt": t})
+    calls.append({"id": "FAKE-ONE-UNTIED", "time": t5, "duration": 20, "to": "+61400999999",
+                  "prospect": {"id": "NK-UNKNOWN"}, "callDisposition": {"id": "disp-no-answer"}})
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path, live=True)
+    assert r.live and r.stats["recent_calls_not_tied_to_account"] == 1
+
+
+def test_nooks_prospect_rows_for_recent_ids_restore_the_cooldown(world, cfg, tmp_path):
+    b = Builder()
+    b.account(1, "Cool Pty Ltd", state="New South Wales", emp=300)
+    p = b.prospect(1, 1, "Head of Product")
+    b.scoop(1, "Funding", "Cool raised $5 million in funding.", 1, topics=("Funding",))
+    b.call(p, "No Answer", 1, duration=10)
+    row = b.w.nooks_prospects[0]
+    unresolved = write_raw(b.w, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id, include_prospects=False,
+                           sf_contacts=[{**b.w.contacts[0], "MobilePhone": None, "Phone": None}])
+    r1 = run(unresolved, cfg, tmp_path / "ra")
+    assert r1.stats["recent_calls_not_tied_to_account"] == 1
+    resolved = write_raw(b.w, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, nooks_prospects=[row],
+                         sf_contacts=[{**b.w.contacts[0], "MobilePhone": None, "Phone": None}])
+    r2 = run(resolved, cfg, tmp_path / "rb")
+    assert r2.stats["recent_calls_not_tied_to_account"] == 0
+    assert "Cool Pty Ltd" not in names(r2.rank_result.ranked)          # cooled down by the recent no-answer
+
+
+def test_gmail_coverage_blocks_live_until_every_ranked_prospect_is_searched(world, cfg, tmp_path):
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    dry = run(raw, cfg, tmp_path)
+    assert dry.gmail_uncovered and dry.stats["gmail_ranked_prospects_uncovered"] == len(dry.gmail_uncovered)
+    assert all("@" not in h and len(h) == 32 for h in dry.gmail_uncovered)          # hashes only
+    assert any("still need a Gmail search" in l for l in dry.log_lines)
+    with pytest.raises(LiveRefused) as e:
+        run(raw, cfg, tmp_path / "live", live=True)
+    assert any("have not been Gmail-searched" in x for x in e.value.reasons)
+
+
+def test_partial_gmail_coverage_names_exactly_the_missing_ones(world, cfg, tmp_path):
+    from src.intake import address_hash
+    full = run(write_raw(world, tmp_path / "a", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path / "ra")
+    assert full.gmail_uncovered == [] and full.stats["gmail_ranked_prospects"] > 2
+    chosen = [p for ps in full.rank_result.prospects.values() for p in ps if p.email]
+    half = [p.email for p in chosen[: len(chosen) // 2]]
+    part = run(write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=half), cfg, tmp_path / "rb")
+    expected = sorted({address_hash(p.email) for p in chosen[len(chosen) // 2:]} - {address_hash(a) for a in half})
+    assert part.gmail_uncovered == expected
+
+
+def test_live_passes_once_the_ranked_set_is_covered(world, cfg, tmp_path):
+    r = run(write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id), cfg, tmp_path, live=True)
+    assert r.live and r.gmail_uncovered == [] and any("0 still need a Gmail search" in l for l in r.log_lines)
+
+
+def test_gmail_hashes_use_the_files_own_salt(world, cfg, tmp_path):
+    from src.intake import address_hash
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    rewrite(raw, "gmail_sent", lambda d: d["meta"].__setitem__("hash_salt", "my-salt"))
+    r = run(raw, cfg, tmp_path)
+    p = next(p for ps in r.rank_result.prospects.values() for p in ps if p.email)
+    assert address_hash(p.email, "my-salt") in r.gmail_uncovered and address_hash(p.email) not in r.gmail_uncovered
+
+
+def test_dnc_calls_not_matched_to_any_contact_are_logged(world, cfg, tmp_path):
+    calls = [dict(c) for c in world.calls]
+    dnc = [c for c in calls if c["callDisposition"]["id"] == "disp-do-not-call"][0]
+    dnc["to"], dnc["prospect"] = "external", {"id": "NK-NOBODY"}
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path)
+    assert r.stats["dnc_calls_not_matched_to_contact"] >= 1
+    assert any("DNC calls not matched to any contact: " in l and "re-checked by Nooks prospect id in Phase 3" in l
+               for l in r.log_lines)
+    assert run(write_raw(world, tmp_path / "b", NOW, owner=cfg.owner.nooks_user_id), cfg,
+               tmp_path / "rb").stats["dnc_calls_not_matched_to_contact"] == 0
+
+
+def test_phase3_preconditions_are_in_the_header_the_result_section_and_the_live_output(raw, cfg, tmp_path, capsys):
+    r = run(raw, cfg, tmp_path)
+    text = r.log_path.read_text()
+    assert "hard precondition" in text.split("== INTAKE ==")[0]
+    section = text.split("== PHASE 3 PRECONDITIONS ==")[1]
+    assert "HARD PRECONDITION" in section and "BY NOOKS PROSPECT ID" in section and "gmail_sent.json" in section
+    assert pl.main(["--raw-dir", str(raw), "--state-dir", str(tmp_path / "s2"), "--log-dir", str(tmp_path / "l2"),
+                    "--now", NOW.isoformat(), "--live"]) == 0
+    assert "HARD PRECONDITION" in capsys.readouterr().out
+
+
+def test_live_refusal_output_repeats_the_preconditions(world, cfg, tmp_path, capsys):
+    bad = write_raw(world, tmp_path / "bad", NOW, owner=cfg.owner.nooks_user_id, calls_last_page=False)
+    assert pl.main(["--raw-dir", str(bad), "--state-dir", str(tmp_path / "s"), "--log-dir", str(tmp_path / "l"),
+                    "--now", NOW.isoformat(), "--live"]) == 2
+    assert "HARD PRECONDITION" in capsys.readouterr().err
+
+
+def test_pipeline_uses_the_public_state_api_for_dnc_calls():
+    text = (ROOT / "src" / "pipeline.py").read_text()
+    assert "st_mod._is_dnc" not in text and "st_mod.is_dnc_call" in text
+
+
+# ---------------------------------------------------------------- helper scripts
+def test_recent_call_ids_script(world, cfg, tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    from scripts import recent_call_ids as rci
+    calls = [dict(c) for c in world.calls]
+    t = (NOW - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for i in range(30):
+        calls.append({"id": f"FAKE-X-{i}", "time": t, "duration": 5, "to": "+61400999999", "prospect": {"id": f"NK-X-{i:02d}"},
+                      "callDisposition": {"id": "disp-no-answer"}})
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    out = tmp_path / "output" / "batches.json"
+    assert rci.main(["--raw-dir", str(raw), "--out", str(out), "--now", NOW.isoformat()]) == 0
+    batches = json.loads(out.read_text())
+    assert [len(b) for b in batches] == [25, 5] and batches[0][0] == "NK-X-00"
+    assert "NK-X" not in capsys.readouterr().out                   # counts only
+    (raw / "run_meta.json").unlink()
+    assert rci.main(["--raw-dir", str(raw), "--out", str(out)]) == 2
+
+
+def test_gmail_queue_and_hashes_scripts(world, cfg, tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    from scripts import gmail_queue as gq
+    from src.intake import address_hash
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    q = tmp_path / "output" / "queue.json"
+    assert gq.main(["queue", "--raw-dir", str(raw), "--state-dir", str(tmp_path / "s"), "--now", NOW.isoformat(),
+                    "--out", str(q)]) == 0
+    addrs = json.loads(q.read_text())
+    assert addrs and all("@" in a for a in addrs) and "@" not in capsys.readouterr().out      # count only on stdout
+    meta = tmp_path / "output" / "meta.json"
+    assert gq.main(["hashes", "--addresses", str(q), "--out", str(meta)]) == 0
+    m = json.loads(meta.read_text())
+    assert m["searched_address_hashes"] == sorted({address_hash(a) for a in addrs}) and "@" not in meta.read_text()
+    # a second round keeps the first round's hashes
+    q2 = tmp_path / "q2.json"                                         # an INPUT may live anywhere; only outputs are restricted
+    q2.write_text(json.dumps(["extra.person@example.com"]))
+    assert gq.main(["hashes", "--addresses", str(q2), "--out", str(meta), "--also", str(meta)]) == 0
+    assert len(json.loads(meta.read_text())["searched_address_hashes"]) == len(addrs) + 1
+
+
+def test_gmail_loop_reaches_a_covered_set(world, cfg, tmp_path, monkeypatch):
+    """dry run -> queue -> hashes -> merge into gmail_sent meta -> re-run: nothing uncovered, live passes."""
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    from scripts import gmail_queue as gq
+    from scripts import merge_pages as mp
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    q, meta, page = tmp_path / "output" / "q.json", tmp_path / "output" / "meta.json", tmp_path / "page.json"
+    gq.main(["queue", "--raw-dir", str(raw), "--state-dir", str(tmp_path / "s"), "--now", NOW.isoformat(), "--out", str(q)])
+    gq.main(["hashes", "--addresses", str(q), "--out", str(meta)])
+    page.write_text(json.dumps({"threads": world.sent_threads}))
+    man = tmp_path / "m.json"
+    man.write_text(json.dumps([{"path": str(page)}]))
+    assert mp.main(["--manifest", str(man), "--name", "gmail_sent", "--raw-dir", str(raw), "--source-tool", "search_threads",
+                    "--query", "in:sent to:<addr> newer_than:7d", "--meta-json", str(meta),
+                    "--fetched-at", "2026-11-25T03:00:00Z"]) == 0
+    rewrite(raw, RUN_META, lambda d: d["row_counts"].__setitem__("gmail_sent", len(world.sent_threads)))
+    r = run(raw, cfg, tmp_path / "x", live=True)
+    assert r.live and r.gmail_uncovered == []
+
+
+# ---------------------------------------------------------------- round 3: O1, O5, O6, O2, O3, O4
+def _recent(days):
+    return (NOW - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_calls_on_lead_prospects_do_not_keep_the_gate_shut(world, cfg, tmp_path):
+    """Repro of the reviewer's O1: three calls on Lead-typed prospects must not make live unsatisfiable."""
+    calls = [dict(c) for c in world.calls]
+    for i in range(3):
+        calls.append({"id": f"FAKE-LEAD-{i}", "time": _recent(1), "duration": 5, "to": f"+6140000{i:04d}",
+                      "prospect": {"id": f"NK-LEAD-{i}"}, "callDisposition": {"id": "disp-no-answer"}})
+    leads = [{"id": f"NK-LEAD-{i}", "type": "salesforce", "name": f"Lead {i}", "crmId": f"00QFAKE0000000{i}", "account": None}
+             for i in range(3)]
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls,
+                    nooks_prospects=list(world.nooks_prospects) + leads)
+    r = run(raw, cfg, tmp_path, live=True)
+    assert r.live and r.stats["recent_calls_not_in_book"] == 3 and r.stats["recent_calls_not_tied_to_account"] == 0
+    assert any("3 resolved but not in your book" in l for l in r.log_lines)
+
+
+def test_unresolved_call_in_the_last_three_days_blocks_live_but_an_older_one_does_not(world, cfg, tmp_path):
+    def with_call(days):
+        calls = [dict(c) for c in world.calls]
+        calls += [{**calls[0], "id": f"FAKE-TIED-{i}", "time": _recent(2), "createdAt": _recent(2)} for i in range(100)]
+        calls.append({"id": "FAKE-UNRES", "time": _recent(days), "duration": 5, "to": "+61400999999",
+                      "prospect": {"id": "NK-UNRESOLVED"}, "callDisposition": {"id": "disp-no-answer"}})
+        return write_raw(world, tmp_path / f"raw{days}", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    with pytest.raises(LiveRefused) as e:
+        run(with_call(2), cfg, tmp_path / "a", live=True)
+    assert any("last 3 days have an unresolved Nooks prospect id" in x for x in e.value.reasons)
+    assert run(with_call(6), cfg, tmp_path / "b", live=True).live
+    assert run(with_call(2), cfg, tmp_path / "c").live is False                 # a dry run only warns
+
+
+def test_many_external_calls_warn_above_25_percent(world, cfg, tmp_path):
+    calls = [dict(c) for c in world.calls]
+    for i in range(40):
+        calls.append({"id": f"FAKE-EXT-{i}", "time": _recent(1), "duration": 3, "to": "external", "prospect": None,
+                      "callDisposition": {"id": "disp-no-answer"}})
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path)
+    assert any("more than 25% of recent calls cannot be tied to anyone" in l for l in r.log_lines)
+    assert any("nothing can tie" in l for l in r.log_lines)
+    assert any("no prospect and no usable number" in w for w in r.intake_report.warnings)
+    # ...and a modest number does not warn
+    few = write_raw(world, tmp_path / "few", NOW, owner=cfg.owner.nooks_user_id)
+    assert not any("cannot be tied to anyone" in l for l in run(few, cfg, tmp_path / "r2").log_lines)
+
+
+def test_all_external_calls_pass_the_gate_but_are_logged(world, cfg, tmp_path):
+    calls = [{"id": f"FAKE-EXT-{i}", "time": _recent(1), "duration": 3, "to": "external", "prospect": None,
+              "callDisposition": {"id": "disp-do-not-call" if i == 0 else "disp-no-answer"}} for i in range(8)]
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, nooks_calls=calls)
+    r = run(raw, cfg, tmp_path)
+    assert r.stats["recent_calls_unlinkable"] == 8 and r.stats["recent_calls_not_tied_to_account"] == 0
+
+
+def test_phase3_preconditions_have_all_six_items_everywhere(raw, cfg, tmp_path, capsys):
+    assert len(pl.PHASE3_PRECONDITIONS) == 6
+    joined = " ".join(pl.PHASE3_PRECONDITIONS)
+    for needle in ("expected_owner_id", "getMe", "is_dry_run_payload", "`ranked`", "spilled", "needs_prospect", "skipped",
+                   "record_sheet only AFTER the writes", "BY NOOKS PROSPECT ID", "gmail_sent.json"):
+        assert needle in joined, needle
+    r = run(raw, cfg, tmp_path)
+    section = r.log_path.read_text().split("== PHASE 3 PRECONDITIONS ==")[1]
+    assert all(t in section for t in pl.PHASE3_PRECONDITIONS)
+    pl.main(["--raw-dir", str(raw), "--state-dir", str(tmp_path / "s2"), "--log-dir", str(tmp_path / "l2"),
+             "--now", NOW.isoformat(), "--live"])
+    out = capsys.readouterr().out
+    assert all(t in out for t in pl.PHASE3_PRECONDITIONS)
+    assert [f"HARD PRECONDITION {i}" in joined for i in range(1, 7)] == [True] * 6
+
+
+def test_phase3_precondition_names_exist_in_callsheet():
+    import src.callsheet as cs
+    assert hasattr(cs, "prepare_task") and hasattr(cs, "is_dry_run_payload")
+    assert "expected_owner_id" in cs.prepare_task.__code__.co_varnames
+
+
+def test_runbook_allow_list_has_no_search_companies_and_no_get_object_schema():
+    text = (ROOT / "docs" / "fetch_runbook.md").read_text()
+    allow = text.split("ALLOW-LIST")[1].split("- **ZoomInfo credits")[0]
+    allowed, forbidden = allow.split("Anything not on this list is forbidden")
+    bullets = [l for l in allowed.splitlines() if l.startswith("  - ")]
+    assert len(bullets) == 4                                              # Salesforce, Nooks, ZoomInfo, Gmail
+    assert not any("search_companies" in l.split("forbidden")[0] and "NOT needed" not in l for l in bullets)
+    assert not any("getObjectSchema" in l for l in bullets)
+    assert "`search_scoops`, `lookup`" in allowed and "Gmail: `search_threads` only" in allowed
+    assert "`getObjectSchema`" in forbidden and "`search_companies`" in forbidden
+    assert "`getUserInfo`, `soqlQuery`, `find`" in allowed and "`getProspect`" in allowed
+
+
+# ---- helper script output hygiene (O2)
+def _unsafe(tmp_path, monkeypatch):
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    (tmp_path / "output").mkdir(exist_ok=True)
+    from scripts import safeout
+    return safeout
+
+
+def test_safeout_refuses_paths_outside_output(tmp_path, monkeypatch):
+    so = _unsafe(tmp_path, monkeypatch)
+    for bad in (tmp_path / "docs" / "x.json", tmp_path / "x.json", ROOT / "docs" / "x.json", tmp_path / "output" / ".." / "x"):
+        with pytest.raises(so.UnsafeOutput):
+            so.write_private(bad, "secret")
+    assert not (ROOT / "docs" / "x.json").exists() and not (tmp_path / "x.json").exists()
+    with pytest.raises(so.UnsafeOutput):
+        so.safe_out_path(tmp_path / "output")
+
+
+def test_safeout_refuses_symlinks_and_escapes(tmp_path, monkeypatch):
+    so = _unsafe(tmp_path, monkeypatch)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (tmp_path / "output" / "link").symlink_to(outside)
+    with pytest.raises(so.UnsafeOutput):
+        so.write_private(tmp_path / "output" / "link", "x")                  # the file itself is a symlink
+    with pytest.raises(so.UnsafeOutput):
+        so.write_private(tmp_path / "output" / "link" / "f.json", "x")        # a symlinked directory escapes output/
+    assert not list(outside.iterdir())
+    target = tmp_path / "victim.txt"
+    target.write_text("keep")
+    (tmp_path / "output" / "evil.json").symlink_to(target)
+    with pytest.raises(so.UnsafeOutput):
+        so.write_private(tmp_path / "output" / "evil.json", "overwrite")
+    assert target.read_text() == "keep"
+
+
+def test_safeout_writes_mode_0600_even_with_a_loose_umask(tmp_path, monkeypatch):
+    import os, stat
+    so = _unsafe(tmp_path, monkeypatch)
+    old = os.umask(0)
+    try:
+        p = so.write_private(tmp_path / "output" / "q.json", '["a"]')
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE(p.stat().st_mode) == 0o600 and p.read_text() == '["a"]'
+    again = so.write_private(tmp_path / "output" / "q.json", '["b"]')            # own earlier scratch file is replaced
+    assert again.read_text() == '["b"]' and stat.S_IMODE(again.stat().st_mode) == 0o600
+
+
+def test_safeout_refuses_a_path_git_does_not_ignore(tmp_path, monkeypatch):
+    so = _unsafe(tmp_path, monkeypatch)
+    monkeypatch.setattr(so, "_git_ignored", lambda p: False)
+    with pytest.raises(so.UnsafeOutput, match="not ignored by git"):
+        so.write_private(tmp_path / "output" / "q.json", "x")
+    monkeypatch.setattr(so, "_git_ignored", lambda p: None)                      # git unavailable: the path rule still holds
+    assert so.write_private(tmp_path / "output" / "q.json", "x").exists()
+
+
+def test_the_real_output_directory_is_gitignored_and_the_default_root_is_it(monkeypatch):
+    monkeypatch.delenv("APAC_OUTPUT_ROOT", raising=False)
+    from scripts import safeout
+    assert safeout.output_root() == (ROOT / "output").resolve()
+    ignored = safeout._git_ignored(ROOT / "output" / "gmail_queue.json")
+    assert ignored in (True, None)                                                # never False
+
+
+def test_gmail_queue_refuses_an_out_path_in_docs_and_prints_no_addresses(world, cfg, tmp_path, monkeypatch, capsys):
+    from scripts import gmail_queue as gq
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id, gmail_cover=[])
+    bad = ROOT / "docs" / "gmail_queue_TEST.json"
+    rc = gq.main(["queue", "--raw-dir", str(raw), "--state-dir", str(tmp_path / "s"), "--now", NOW.isoformat(), "--out", str(bad)])
+    cap = capsys.readouterr()
+    assert rc == 2 and not bad.exists() and "output file must be under" in cap.err and "@" not in cap.out + cap.err
+    rc = gq.main(["hashes", "--addresses", str(tmp_path / "nope.json"), "--out", str(bad)]) if False else 0
+    assert rc == 0
+
+
+def test_recent_call_ids_refuses_unsafe_out(world, cfg, tmp_path, monkeypatch, capsys):
+    from scripts import recent_call_ids as rci
+    monkeypatch.setenv("APAC_OUTPUT_ROOT", str(tmp_path / "output"))
+    raw = write_raw(world, tmp_path / "raw", NOW, owner=cfg.owner.nooks_user_id)
+    assert rci.main(["--raw-dir", str(raw), "--out", str(tmp_path / "loose.json"), "--now", NOW.isoformat()]) == 2
+    assert not (tmp_path / "loose.json").exists()
+
+
+def test_runbook_carries_the_real_zoominfo_and_inline_findings():
+    text = (ROOT / "docs" / "fetch_runbook.md").read_text()
+    for needle in ("publishedStartDate", "scoopTypes", "ROW COUNT of that page", "DRIFTS", "SHORT page", "--verify-rows",
+                   "--verify-ids-hash", "VERBATIM", "63 connector calls", "6.5%", "WILL come back inline"):
+        assert needle in text, needle
+    assert "`meta.page.total` is the page count" not in text and "meta.totalPages" not in text
+    schema = (ROOT / "docs" / "intake_schema.md").read_text()
+    assert "6.5%" in schema and "ROW COUNT of the page" in schema

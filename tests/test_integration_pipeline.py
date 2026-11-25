@@ -1467,8 +1467,8 @@ def test_l_no_network_or_process_imports(path):
     allowed = {"__future__", "collections", "copy", "dataclasses", "datetime", "enum", "functools", "hashlib",
                "json", "logging", "math", "os", "pathlib", "re", "tempfile", "typing", "unicodedata", "yaml",
                "zoneinfo", "src", "itertools", "operator", "string"}
-    if path.name == "pipeline.py":      # 2a: only the command line entry point may use argparse / sys
-        allowed = allowed | {"argparse", "sys"}
+    # Narrow per-module exceptions (argv, stdin, exit code for a CLI entry point). Every other module keeps the strict list.
+    allowed |= {"textcheck.py": {"argparse", "sys"}, "pipeline.py": {"argparse", "sys"}}.get(path.name, set())
     assert mods <= allowed, (path.name, sorted(mods - allowed))
 
 
