@@ -253,7 +253,7 @@ def _sort_key(a: Account, prio: dict[str, int]):
 # ---------------------------------------------------------------- main entry
 def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dict],
                        zoominfo_rows: Iterable[dict], config: Config,
-                       touched: Mapping[str, date], today: date,
+                       touched: Mapping[str, date] | None = None, today: date | None = None,
                        blocked_account_ids: set[str] = frozenset(),
                        cooldown_days: int | None = None,
                        cooldown_until: Mapping[str, date] | None = None,
@@ -264,7 +264,9 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     the account may be called again, from 1c state: ``state.cooldown_until`` / ``cooldown_until_by``).
     When ``cooldown_until`` is given (even as ``{}``), ``touched`` is IGNORED for cooldown
     purposes, so an email-only touch never drops an account (emails do not start call cooldowns).
-    ``touched`` + ``cooldown_days`` is the legacy path, kept for tests and callers without state.
+    ``touched`` + ``cooldown_days`` is the legacy path, kept for tests and callers without state;
+    ``touched`` is OPTIONAL (default None = no touches) and ``today`` may be omitted when ``call_date``
+    is given (one of the two is required, else ValueError).
     An account is dropped while ``cooldown_until`` is after the reference date; equal is eligible.
     ``call_date`` is the first date the account would be called (account-local semantics are the
     caller's job, 2c passes it). The reference date is ``call_date`` when given, else ``today``;
@@ -280,7 +282,9 @@ def build_account_list(sf_rows: Iterable[dict], nooks_account_rows: Iterable[dic
     cooldown = config.limits.cooldown_days_no_answer if cooldown_days is None else cooldown_days
     # Salesforce ids may arrive as 15 or 18 chars: key everything on the canonical form (the raw
     # key is kept too, so ZoomInfo/Nooks ids are unaffected).
-    touched = _with_normalised_keys(touched)
+    if today is None and call_date is None:
+        raise ValueError("build_account_list needs today or call_date (the cooldown reference date)")
+    touched = _with_normalised_keys(touched or {})
     use_until = cooldown_until is not None      # state-based cooldown: touched is then ignored
     cooldown_until = _with_normalised_keys(cooldown_until or {})
     if use_until:

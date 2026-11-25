@@ -787,3 +787,39 @@ def test_docstring_says_ids_are_normalised():
 def test_cooldown_until_accepts_18char_key_and_iso(config):
     res = build(sf=[sf_row(SF15)], cooldown_until={SF18: (TODAY + timedelta(days=2)).isoformat()}, config=config)
     assert res.stats == {"recently_touched": 1}
+
+
+# ------------------------------------------------------------ N3: touched is optional
+def test_touched_is_optional_with_cooldown_until(config):
+    thu = date(2026, 11, 26)
+    res = build_account_list([sf_row("S1")], [], [], config, today=TODAY, cooldown_until={"S1": thu})
+    assert res.stats == {"recently_touched": 1} and not res.accounts
+
+
+def test_touched_omitted_means_no_touches(config):
+    res = build_account_list([sf_row("S1")], [], [], config, today=TODAY)
+    assert len(res.accounts) == 1 and not res.dropped
+
+
+def test_touched_none_equals_empty_dict(config):
+    a = build_account_list([sf_row("S1")], [], [], config, None, TODAY)
+    b = build_account_list([sf_row("S1")], [], [], config, {}, TODAY)
+    assert [x.sf_account_id for x in a.accounts] == [x.sf_account_id for x in b.accounts] and a.stats == b.stats
+
+
+def test_touched_still_works_positionally_and_by_keyword(config):
+    touched_day = TODAY - timedelta(days=config.limits.cooldown_days_no_answer - 1)
+    pos = build_account_list([sf_row("S1")], [], [], config, {"S1": touched_day}, TODAY)
+    kw = build_account_list([sf_row("S1")], [], [], config, touched={"S1": touched_day}, today=TODAY)
+    assert pos.stats == kw.stats == {"recently_touched": 1}
+
+
+def test_call_date_alone_is_enough_as_reference(config):
+    thu = date(2026, 11, 26)
+    res = build_account_list([sf_row("S1")], [], [], config, cooldown_until={"S1": thu}, call_date=thu)
+    assert len(res.accounts) == 1
+
+
+def test_today_and_call_date_both_missing_is_a_clear_error(config):
+    with pytest.raises(ValueError, match="today or call_date"):
+        build_account_list([sf_row("S1")], [], [], config)

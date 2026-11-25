@@ -53,3 +53,7 @@ Their timezone already starts at the HQ state (loader rule). To exclude them lat
 - `filters.drop_if_no_domain` is false in config and not applied here.
 - Known gap (M2, not fixed): ZoomInfo-only noise outside the CBD pattern ("Bondi Florist", "Fakeville Plumbing")
   passes as `zoominfo_only` low confidence; the ranker should rank those low.
+
+## Optional `touched` (N3)
+`build_account_list(sf, nooks, zoominfo, config, touched=None, today=None, ...)`: `touched` is optional (None = no touches, the state-based path never needs it) and ignored whenever `cooldown_until` is passed. `today` may be omitted when `call_date` is given; if both are missing it raises `ValueError("... today or call_date ...")`. Existing positional calls `(..., config, touched, today, ...)` are unchanged.
+

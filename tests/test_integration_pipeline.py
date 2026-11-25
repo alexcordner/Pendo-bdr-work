@@ -840,23 +840,18 @@ def test_c_no_double_counting_over_a_week_of_run_times(world, tmp_path):
         dropped_touched = {d.name for d in out.accounts.dropped if d.reason == "recently_touched"}
         for x in out.result.ranked + out.result.spilled + out.result.needs_prospect:
             assert x.account.name not in dropped_touched
-            n = x.score_breakdown.get("cooldown_penalty", 0)
-            assert n in (0, -30.0)
-            if n:
-                penalised += 1
-                assert "In cooldown" in x.reasons
-    # With the named world (no early-zone cooldowns) the penalty never fires; the early-zone case is pinned in
-    # test_known_gap_n2_* (review_1g N2).
+            assert "cooldown_penalty" not in x.score_breakdown       # removed in 1f N2: skip, never penalise
+            assert "In cooldown" not in x.reasons
     assert penalised == 0
 
 
-def test_c_ranker_penalty_alone_is_applied_once_and_reported(world, tmp_path):
+def test_c_ranker_skips_an_account_whose_cooldown_is_active(world, tmp_path):
+    """1f N2: an active cooldown (on the account's own zone call date) is a skip with a reason, not a penalty."""
     out = run(world, tmp_path)
     a = next(x.account for x in out.result.ranked if x.account.name == name_of(world, 1))
     r = ranker.rank_accounts([a], out.signals, out.prospects, {sf18(1): date(2026, 12, 1), sf15(1): date(2026, 12, 1)},
                              set(), out.cfg, NOW)
-    ra = r.ranked[0]
-    assert ra.score_breakdown["cooldown_penalty"] == -30.0 and "In cooldown" in ra.reasons
+    assert not r.ranked and r.skipped[0].skipped_reason == "In cooldown until 2026-12-01 (account-local)"
 
 
 def test_c_night_run_uses_the_first_call_date_not_the_run_date(world, tmp_path):
@@ -1596,7 +1591,7 @@ def test_m_ranker_uses_the_single_signals_combination_formula():
     assert sig_mod.combined_strength(s3) == 0.64
     cfg = load_config()
     acct = Account("FAKE-X", "X", employees=500, timezone="Australia/Sydney")
-    _, b = ranker.score_account(acct, s3, False, False, cfg, date(2026, 11, 26))
+    _, b = ranker.score_account(acct, s3, False, cfg, date(2026, 11, 26))
     assert b["trigger_strength"] == round(cfg.signals.weights.trigger_strength * 0.64, 2)
     assert not hasattr(ranker, "EXTRA_SIGNAL_BONUS")
 
@@ -1674,18 +1669,18 @@ def test_n_1c_L2_malformed_local_date_falls_back_to_the_account_zone(tmp_path):
     assert any("malformed last_call_date" in w for w in bad.load_warnings)
 
 
-def test_n_1e_max_age_days_still_drives_ranker_recency(world, tmp_path):
-    """signals_notes says config.signals.max_age_days 'caps nothing today'. It still sets ranker recency: an
-    exec move 60 days old (allowed up to 90 by signals) scores zero recency points but full trigger points."""
+def test_n_1e_ranker_recency_uses_the_per_kind_limit(world, tmp_path):
+    """RESOLVED (1f N5): ranker recency uses signals.max_age_for(best kind): an exec move 60 days old (limit 90) keeps
+    partial recency points; config.signals.max_age_days (45) is only the fallback for a kind with no entry."""
     out = run(world, tmp_path)
     a = next(x.account for x in out.result.ranked if x.account.name == name_of(world, 1))
     sig = Signal(a.sf_account_id, SignalKind.EXEC_MOVE, sig_mod.signal_strength(SignalKind.EXEC_MOVE, 60),
                  "zoominfo_scoop:OLD", NOW - timedelta(days=60), "old", a.zoominfo_id)
     r = ranker.rank_accounts([a], {a.sf_account_id: [sig]}, out.prospects, {}, set(), out.cfg, NOW)
     bd = r.ranked[0].score_breakdown
-    assert bd["recency"] == 0.0 and bd["trigger_strength"] > 0
+    assert bd["recency"] > 0 and bd["trigger_strength"] > 0
     assert out.cfg.signals.max_age_days == 45
-    assert sig_mod.max_age_for(SignalKind.EXEC_MOVE, out.cfg) == 90        # per-kind table wins inside signals
+    assert sig_mod.max_age_for(SignalKind.EXEC_MOVE, out.cfg) == 90
 
 
 def test_n_1f_unmatched_titles_still_unmatched(world, tmp_path, cfg):
@@ -1800,12 +1795,10 @@ def test_contract_accounts_without_a_salesforce_id_are_counted_not_silent(tmp_pa
     assert st.report["record_sheet"] == {"recorded": 1, "dropped_no_id": 2}
 
 
-def test_known_gap_n2_early_zone_account_in_cooldown_is_penalised_not_skipped(tmp_path):
-    """NEW after the merge (review_1g N2), pinned as current behaviour, NOT fixed. accounts gets ONE call_date (Sydney's
-    first usable day). On a Thu 16:28 run that is Friday, so a Perth account whose cooldown ends Friday is KEPT by accounts;
-    the ranker then gives Perth its own first usable day (Thursday 13:30 AWST), sees the cooldown (-30, 'In cooldown'),
-    but still ranks it and gives it a Thursday slot, i.e. a task inside its cooldown. When this is fixed (skip with a
-    reason, or per-zone call_date in accounts) flip this test."""
+def test_n2_early_zone_account_in_cooldown_is_skipped_not_scheduled(tmp_path):
+    """FIXED (review_1g N2, 1f-final). accounts gets ONE call_date (Sydney's first usable day: Friday on a Thu 16:28 run), so
+    a Perth account whose cooldown ends Friday is KEPT by accounts. The ranker judges the cooldown on the account's OWN
+    zone call date (Perth: Thursday) and SKIPS it ('In cooldown until ...'), so no task falls inside a cooldown."""
     b = Builder()
     b.account(1, "Perth Cool Pty Ltd", state="Western Australia", emp=200)
     p = b.prospect(1, 1, HEAD_PROD)
@@ -1818,10 +1811,12 @@ def test_known_gap_n2_early_zone_account_in_cooldown_is_penalised_not_skipped(tm
     out = run(b.w, tmp_path, now=datetime(2026, 11, 26, 5, 28, tzinfo=UTC))
     assert out.cooldown[sf15(1)] == date(2026, 11, 27)
     got = {x.account.name: x for x in out.result.ranked}
-    perth, syd = got["Perth Cool Pty Ltd"], got["Syd Cool Pty Ltd"]
-    assert syd.local_call_time.date() == date(2026, 11, 27) and "In cooldown" not in syd.reasons
-    assert perth.local_call_time.date() == date(2026, 11, 26) and "In cooldown" in perth.reasons
-    assert perth.score_breakdown["cooldown_penalty"] == -30.0
+    assert "Perth Cool Pty Ltd" not in got
+    assert got["Syd Cool Pty Ltd"].local_call_time.date() == date(2026, 11, 27)
+    sk = {x.account.name: x.skipped_reason for x in out.result.skipped}
+    assert sk["Perth Cool Pty Ltd"] == "In cooldown until 2026-11-27 (account-local)"
+    assert all(x.local_call_time.date() >= date(2026, 11, 27) for x in out.result.ranked + out.result.spilled
+               if x.account.name.endswith("Cool Pty Ltd"))
 
 
 # ----------------------------------------------------------------------------- state gate / dry run wiring

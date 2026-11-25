@@ -42,8 +42,8 @@ def run(accounts, sigs=None, prospects=(), cool=None, last=None, cfg=None, now=N
     return rank_accounts(accounts, sigs or {}, list(prospects), cool or {}, last or set(), cfg, now)
 
 
-def score_of(cfg, a, sigs=(), prospect=True, cool=False, call_date=CALL_DATE):
-    return score_account(a, list(sigs), prospect, cool, cfg, call_date)
+def score_of(cfg, a, sigs=(), prospect=True, call_date=CALL_DATE):
+    return score_account(a, list(sigs), prospect, cfg, call_date)
 
 
 # ------------------------------------------------------------ score components in isolation
@@ -122,10 +122,14 @@ def test_named_prospect_points(config):
     assert yes["named_prospect_with_phone"] == 15 and no["named_prospect_with_phone"] == 0
 
 
-def test_cooldown_penalty_applied_and_clamped_at_zero(config):
-    s, b = score_of(config, acct(employees=None), [], prospect=False, cool=True)
-    assert b["cooldown_penalty"] == -30
-    assert s == 0 and b["clamp_adjustment"] > 0
+def test_score_clamped_at_zero(config):
+    s, b = score_of(config, acct(employees=5, non_anz_billing_anz_hq=True), [], prospect=False)
+    assert s == 0 and b["clamp_adjustment"] == 3 and sum(b.values()) == 0
+
+
+def test_no_cooldown_component_in_breakdown(config):
+    _, b = score_of(config, acct(), [sig()])
+    assert "cooldown_penalty" not in b
 
 
 def test_sdr_boost_points(config):
@@ -145,7 +149,7 @@ def test_flagged_group_penalty(config):
 
 @pytest.mark.parametrize("kw", [dict(), dict(is_sdr_target=True), dict(non_anz_billing_anz_hq=True)])
 def test_breakdown_sums_to_score(config, kw):
-    s, b = score_of(config, acct(**kw), [sig(strength=0.7, days=4)], cool=False)
+    s, b = score_of(config, acct(**kw), [sig(strength=0.7, days=4)])
     assert sum(b.values()) == pytest.approx(s)
 
 
@@ -162,11 +166,24 @@ def test_no_clamp_key_when_in_range(config):
 
 
 # ------------------------------------------------------------ cooldown / last sheet via rank
-def test_cooldown_active_in_rank(config):
-    p = [pros()]
-    plain = run([acct()], {}, p, cfg=config).ranked[0].score
-    cooled = run([acct()], {}, p, cool={"FAKE-A1": date(2026, 11, 30)}, cfg=config).ranked[0]
-    assert cooled.score == plain - 30 and "In cooldown" in cooled.reasons
+def skipped_reason_of(r, i="FAKE-A1"):
+    return next(x.skipped_reason for x in r.skipped if x.account.sf_account_id == i)
+
+
+def test_cooldown_active_is_skipped_with_reason(config):
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 30)}, cfg=config)
+    assert not r.ranked and not r.needs_prospect and not r.spilled
+    assert skipped_reason_of(r) == "In cooldown until 2026-11-30 (account-local)"
+
+
+def test_cooldown_skip_also_applies_to_needs_prospect_accounts(config):
+    r = run([acct()], {}, [], cool={"FAKE-A1": date(2026, 11, 30)}, cfg=config)
+    assert not r.needs_prospect and skipped_reason_of(r).startswith("In cooldown until")
+
+
+def test_cooldown_skip_not_ranked_even_with_strong_signal(config):
+    r = run([acct()], {"FAKE-A1": [sig()]}, [pros()], cool={"FAKE-A1": date(2026, 11, 30)}, cfg=config)
+    assert not r.ranked and r.prospects == {}
 
 
 def test_cooldown_expired_no_penalty(config):
@@ -206,8 +223,8 @@ def test_cooldown_first_callable_day_is_callable_even_when_utc_date_is_earlier(c
 def test_cooldown_day_after_call_date_still_active(config):
     now = datetime(2026, 12, 1, 9, 0, tzinfo=timezone.utc)
     plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
-    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 12, 3)}, cfg=config, now=now).ranked[0]
-    assert r.score == plain - 30
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 12, 3)}, cfg=config, now=now)
+    assert not r.ranked and skipped_reason_of(r) == "In cooldown until 2026-12-03 (account-local)"
 
 
 def test_cooldown_utc_date_earlier_than_local(config):
@@ -221,8 +238,8 @@ def test_cooldown_utc_date_earlier_than_local(config):
 def test_cooldown_datetime_value_converted_not_typeerror(config):
     now = datetime(2026, 11, 25, 23, 0, tzinfo=timezone.utc)
     plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0].score
-    r = run([acct()], {}, [pros()], cool={"FAKE-A1": datetime(2026, 11, 30, 5, 0)}, cfg=config, now=now).ranked[0]
-    assert r.score == plain - 30
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": datetime(2026, 11, 30, 5, 0)}, cfg=config, now=now)
+    assert skipped_reason_of(r) == "In cooldown until 2026-11-30 (account-local)"
 
 
 def test_cooldown_bad_type_valueerror(config):
@@ -233,8 +250,8 @@ def test_cooldown_bad_type_valueerror(config):
 def test_cooldown_keyed_by_nooks_id(config):
     a = acct(nooks_account_id="NK-5")
     plain = run([a], {}, [pros()], cfg=config).ranked[0].score
-    r = run([a], {}, [pros()], cool={"NK-5": date(2026, 12, 20)}, cfg=config).ranked[0]
-    assert r.score == plain - 30
+    r = run([a], {}, [pros()], cool={"NK-5": date(2026, 12, 20)}, cfg=config)
+    assert not r.ranked and skipped_reason_of(r).startswith("In cooldown")
 
 
 # ------------------------------------------------------------ SDR boost is not a filter
@@ -808,7 +825,7 @@ def test_ceiling_key_absent_when_it_does_not_bite(config):
 
 
 def test_ceiling_then_clamp_breakdown_sums(config):
-    s, b = score_of(config, acct(confidence="low", employees=None, is_sdr_target=True), [], prospect=False, cool=True)
+    s, b = score_of(config, acct(confidence="low", employees=None, is_sdr_target=True, non_anz_billing_anz_hq=True), [], prospect=False)
     assert sum(b.values()) == pytest.approx(s) and 0 <= s <= 60
 
 
@@ -855,12 +872,29 @@ def test_age_uses_account_local_date_per_timezone(config):
 
 
 # ------------------------------------------------------------ L8 cooldown safety net
-def test_cooldown_penalty_is_a_safety_net_when_account_reaches_ranker(config):
-    # 1d normally drops recently touched accounts first; if one gets through the penalty still applies.
-    plain = run([acct()], {}, [pros()], cfg=config).ranked[0]
-    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 12, 20)}, cfg=config).ranked[0]
-    assert r.score_breakdown["cooldown_penalty"] == -30 and r.score == plain.score - 30
-    assert "In cooldown" in r.reasons
+def test_N2_cooldown_judged_on_own_zone_call_date(config):
+    # Thu 16:28 Sydney: Sydney's first usable day is Fri 27, Perth's is still Thu 26 (13:28 AWST).
+    now = datetime(2026, 11, 26, 5, 28, tzinfo=timezone.utc)
+    accts = [acct("S", name="Syd"), acct("P", name="Perth", tz="Australia/Perth")]
+    ps = [pros("S"), pros("P")]
+    both = {"FAKE-S": date(2026, 11, 27), "FAKE-P": date(2026, 11, 27)}      # both cooldowns end Fri 27
+    r = run(accts, {}, ps, cool=both, cfg=config, now=now)
+    assert [x.account.name for x in r.ranked] == ["Syd"]                    # Sydney calls Fri: allowed
+    assert r.ranked[0].local_call_time.date() == date(2026, 11, 27)
+    assert skipped_reason_of(r, "FAKE-P") == "In cooldown until 2026-11-27 (account-local)"   # Perth would call Thu
+    assert not any(x.account.name == "Perth" for x in r.ranked + r.spilled + r.needs_prospect)
+
+
+def test_N2_no_task_inside_cooldown_for_any_zone(config):
+    now = datetime(2026, 11, 26, 5, 28, tzinfo=timezone.utc)
+    accts = [acct(f"{z}{i}", name=f"{z}{i}", tz=tz) for z, tz in (("S", "Australia/Sydney"), ("P", "Australia/Perth"),
+                                                              ("B", "Australia/Brisbane"), ("D", "Australia/Darwin"))
+             for i in range(3)]
+    cool = {a.sf_account_id: date(2026, 11, 27) for a in accts}
+    r = run(accts, {}, [pros(a.sf_account_id[5:]) for a in accts], cool=cool, cfg=config, now=now)
+    for x in r.ranked + r.spilled:
+        assert x.local_call_time.date() >= date(2026, 11, 27), x.account.name
+    assert r.ranked                                                          # Sydney still calls Friday
 
 
 def test_needs_prospect_sorted_best_first_and_deterministic(config):
@@ -904,13 +938,12 @@ def test_N1_thu_1628_nobody_is_spilled(config):
     assert not any("Spilled" in rr for x in r.ranked for rr in x.reasons)
 
 
-def test_N1_wed_1629_cooldown_thu_not_penalised(config):
+def test_N1_wed_1629_cooldown_thu_not_skipped(config):
     now = datetime(2026, 11, 25, 5, 29, tzinfo=timezone.utc)     # Wed 16:29 Sydney, 1 min left: unusable
-    plain = run([acct()], {}, [pros()], cfg=config, now=now).ranked[0]
-    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 26)}, cfg=config, now=now).ranked[0]
-    assert r.local_call_time.date() == date(2026, 11, 26) and r.score == plain.score
-    r2 = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 27)}, cfg=config, now=now).ranked[0]
-    assert r2.score == plain.score - 30
+    r = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 26)}, cfg=config, now=now)
+    assert r.ranked[0].local_call_time.date() == date(2026, 11, 26) and not r.skipped
+    r2 = run([acct()], {}, [pros()], cool={"FAKE-A1": date(2026, 11, 27)}, cfg=config, now=now)
+    assert not r2.ranked and skipped_reason_of(r2) == "In cooldown until 2026-11-27 (account-local)"
 
 
 def test_N1_different_zones_may_have_different_first_days(config):
@@ -1026,9 +1059,8 @@ def test_signal_keys_normalised(config, acct_id, key_id):
 
 @pytest.mark.parametrize("acct_id,key_id", [(ID18, ID15), (ID15, ID18)])
 def test_cooldown_keys_normalised(config, acct_id, key_id):
-    plain = run([sfacct(acct_id)], {}, [sfpros(acct_id)], cfg=config).ranked[0].score
-    r = run([sfacct(acct_id)], {}, [sfpros(acct_id)], cool={key_id: date(2026, 12, 20)}, cfg=config).ranked[0]
-    assert r.score == plain - 30
+    r = run([sfacct(acct_id)], {}, [sfpros(acct_id)], cool={key_id: date(2026, 12, 20)}, cfg=config)
+    assert not r.ranked and r.skipped[0].skipped_reason == "In cooldown until 2026-12-20 (account-local)"
 
 
 @pytest.mark.parametrize("acct_id,key_id", [(ID18, ID15), (ID15, ID18)])
@@ -1071,10 +1103,9 @@ def test_fake_ids_pass_through(config):
 
 
 def test_cooldown_two_spellings_later_date_wins(config):
-    plain = run([sfacct(ID18)], {}, [sfpros(ID18)], cfg=config).ranked[0].score
     r = run([sfacct(ID18)], {}, [sfpros(ID18)], cool={ID15: date(2026, 12, 20), ID18: date(2026, 11, 1)},
-            cfg=config).ranked[0]
-    assert r.score == plain - 30
+            cfg=config)
+    assert not r.ranked and r.skipped[0].skipped_reason == "In cooldown until 2026-12-20 (account-local)"
 
 
 # ------------------------------------------------------------ L7 summarise names every bucket
@@ -1121,3 +1152,50 @@ def test_summarise_top_n_configurable_default_15(config):
 def test_summarise_no_bucket_sections_when_empty(config):
     text = summarise(_mixed(config))
     assert "SKIPPED" not in text and "NEEDS PROSPECT" not in text and "SPILLED" not in text
+
+
+# ------------------------------------------------------------ N5 per-kind recency horizon
+def test_N5_exec_move_60_days_old_still_earns_recency(config):
+    s = sig(kind=SignalKind.EXEC_MOVE, days=60)
+    _, b = score_of(config, acct(), [s])
+    assert b["recency"] == pytest.approx(15 * (1 - 60 / 90), abs=0.01)     # limit 90, not config 45
+
+
+def test_N5_exec_move_beyond_its_own_limit_is_zero(config):
+    _, b = score_of(config, acct(), [sig(kind=SignalKind.EXEC_MOVE, days=91)])
+    assert b["recency"] == 0
+
+
+def test_N5_funding_uses_its_45_day_limit(config):
+    _, b = score_of(config, acct(), [sig(days=30)])
+    assert b["recency"] == pytest.approx(15 * (1 - 30 / 45), abs=0.01)
+    _, b = score_of(config, acct(), [sig(days=46)])
+    assert b["recency"] == 0
+
+
+def test_N5_partnership_uses_its_30_day_limit(config):
+    _, b = score_of(config, acct(), [sig(kind=SignalKind.PARTNERSHIP, days=15)])
+    assert b["recency"] == pytest.approx(7.5, abs=0.01)
+    _, b = score_of(config, acct(), [sig(kind=SignalKind.PARTNERSHIP, days=31)])
+    assert b["recency"] == 0
+
+
+def test_N5_limit_comes_from_the_best_signal_kind(config):
+    best = sig(kind=SignalKind.EXEC_MOVE, strength=0.9, days=60)
+    other = sig(kind=SignalKind.PARTNERSHIP, strength=0.2, days=1)
+    _, b = score_of(config, acct(), [best, other])
+    assert b["recency"] == pytest.approx(15 * (1 - 60 / 90), abs=0.01)
+
+
+def test_N5_config_max_age_days_is_only_the_fallback(config, monkeypatch):
+    from src import signals as sm
+    monkeypatch.delitem(sm.KIND_MAX_AGE_DAYS, SignalKind.FUNDING)
+    _, b = score_of(config, acct(), [sig(days=9)])
+    assert b["recency"] == pytest.approx(15 * (1 - 9 / config.signals.max_age_days), abs=0.01)
+
+
+def test_N5_breakdown_still_sums_and_is_deterministic(config):
+    sigs = [sig(kind=SignalKind.EXEC_MOVE, days=60), sig(strength=0.5, days=3)]
+    s1, b1 = score_of(config, acct(is_sdr_target=True), sigs)
+    s2, b2 = score_of(config, acct(is_sdr_target=True), list(reversed(sigs)))
+    assert (s1, b1) == (s2, b2) and sum(b1.values()) == pytest.approx(s1)

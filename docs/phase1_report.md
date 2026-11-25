@@ -158,7 +158,9 @@ Ranked 14 accounts; skipped 6; needs prospect 3; spilled 1.
 ## Known limitations
 
 - No live data has touched any of it. Every real-shape assumption is the 1a connector notes; UNVERIFIED items stay UNVERIFIED (Gmail sent-date key, intent row shape and topic names, real ZoomInfo topics).
-- N2 (below, not fixed): on a late Thursday run an early-zone account (Perth, Brisbane, Darwin, Adelaide) whose cooldown ends Friday is kept by accounts, penalised -30 by the ranker, and still given a Thursday slot.
+- N2 RESOLVED (1f-final): on a late Thursday run an early-zone account (Perth, Brisbane, Darwin, Adelaide) whose cooldown ends Friday passes accounts, but the ranker judges the cooldown on the account's own zone call date and SKIPS it ('In cooldown until <date> (account-local)'); the -30 cooldown penalty was removed.
+- N5 RESOLVED (1f-final): ranker recency now uses the best signal's per-kind limit (`signals.max_age_for`), so an exec move 46-90 days old keeps recency points; `config.signals.max_age_days` is only the fallback.
+- N3 RESOLVED (1f-final): `accounts.build_account_list(touched=None, today=None, ...)` makes `touched` optional.
 - Accounts with no Salesforce row (ZoomInfo-only, Nooks-only) have no timezone, so they cannot be ranked, and everything in state is keyed by Salesforce id, so they could not be hard-skipped or cooled down even if they could. Their scoops are matched and kept but unused.
 - Low-confidence accounts (flagged, ZoomInfo-only, Nooks-only) are capped at a score of 60; clean accounts can score up to 100.
 - Public holidays (AU states, NZ) are not modelled. Windows and the 3-minute slot are defaults.
