@@ -50,3 +50,10 @@ A malformed stored `last_*_date` falls back to the UTC date of the stored instan
 - **Performance.** `record_calls` copies the State once per call with a field-level copy (no deepcopy). 20,000 calls in pages of 1,000 take about 0.5 s. Pass all calls at once or pages of 1,000 or more.
 - **None ids.** Accounts with no usable id are counted (`record_sheet` `dropped_no_id`, `record_calls` `no_account`, `record_sent_emails` `no_account`) and logged as a warning. They still cannot be hard-skipped or cooled down because everything is keyed by Salesforce id.
 - Salesforce ids are normalised on every function that takes one: 15- and 18-character forms reach the same account.
+
+## Prospect ids are case-insensitive for Do Not Call
+- Nooks prospect ids are compared as stripped, CASEFOLDED keys (`casefold`, not `lower`: it is the stricter Unicode fold, e.g. `ß` == `ss`, so it only ever merges more ids, which fails closed). `state.dnc_prospect_ids` holds these keys; `is_blocked`, `mark_do_not_call`, `record_calls` and `do_not_call_prospects` all use them.
+- Old files with mixed-case ids are merged on load. Saving such a file is not treated as a shrink (the guard counts canonical keys on disk).
+- Linking a call to a prospect by id is case-insensitive too; history stays keyed by the prospect's own `nooks_id`.
+- Salesforce ids and `sfc:` keys are unaffected (they use `normalise_sf_id`, not this fold).
+- `is_dnc_call(call, config)` is the public way to ask "is this a Do Not Call disposition?"; do not call `state._is_dnc`.
