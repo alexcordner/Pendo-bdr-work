@@ -313,6 +313,7 @@ class ResearchPacket:
     email_ok: bool                           # False for personal / missing / opted-out email (never the address)
     email_reason: str                        # ok | personal_email | no_email | opted_out | do_not_call
     facts_note: str                          # empty when two or more facts are available and none excluded
+    must_not_phrases: list[str] = field(default_factory=list)   # literal phrases textcheck rejects (from signal notes)
 
     @property
     def fact_count(self) -> int:
@@ -333,6 +334,7 @@ class ResearchPacket:
             "available_facts": [f.to_dict() for f in self.available_facts], "fact_count": self.fact_count,
             "facts_note": self.facts_note, "must_not_claim": list(self.must_not_claim),
             "email_ok": self.email_ok, "email_reason": self.email_reason,
+            "must_not_phrases": list(self.must_not_phrases),
         }
 
 
@@ -551,6 +553,29 @@ def _packet_signal(sig: Signal, call_date: date | None, now: datetime | None, co
         notes=_notes(sig))
 
 
+# What a text must NOT say about a trigger whose evidence carries a warning note (signals.signal_notes). Literal
+# phrases for textcheck's must_not_phrases; a phrase the scoop text itself contains is left out (the scoop says it).
+NOTE_BANNED_PHRASES: dict[str, tuple[str, ...]] = {
+    "physical or unclear product launch": ("app launch", "new app", "new platform", "digital product launch", "digital launch"),
+    "financial or property product launch": ("app launch", "new app", "new platform", "digital product launch",
+                                             "digital launch", "product launch", "new product"),
+    "debt facility": ("funding round", "equity round", "capital raise", "raised", "series a", "series b", "series c"),
+    "reported talks": ("has acquired", "have acquired", "acquired", "completed the acquisition", "congrats on acquiring",
+                       "congratulations on acquiring", "congrats on the acquisition", "congratulations on the acquisition"),
+    "acquirer of a minority stake": ("acquired", "takeover", "acquisition of the company", "full acquisition"),
+}
+
+
+def _banned_for(notes: Sequence[str], evidence: str) -> list[str]:
+    ev = evidence.casefold()
+    out: list[str] = []
+    for note in notes:
+        for prefix, phrases in NOTE_BANNED_PHRASES.items():
+            if note.startswith(prefix):
+                out += [p for p in phrases if p not in ev and p not in out]
+    return out
+
+
 def _location(a: Account) -> str | None:
     parts = [_clean(p) for p in (a.billing_city, a.billing_state or a.hq_state) if p]
     return ", ".join(parts) if parts else None
@@ -705,7 +730,8 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
         sdr_target=a.is_sdr_target,
         contact_history=summary, contact_history_source=history.source_label if summary else None,
         available_facts=facts, must_not_claim=claims, email_ok=e_reason == "ok", email_reason=e_reason,
-        facts_note=" ".join(notes))
+        facts_note=" ".join(notes),
+        must_not_phrases=_banned_for(caution, " ".join(p.evidence for _, p in usable)))
 
 
 def render_packet_text(p: ResearchPacket) -> str:

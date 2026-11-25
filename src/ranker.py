@@ -408,6 +408,13 @@ def score_account(account: Account, sigs: list[Signal], has_prospect: bool,
 _FLAG_HINTS = {"noise_location": "check this is a real company"}
 
 
+
+def _log_name(name: str | None) -> str:
+    """First name only: reasons end up in the run log, and a surname is not needed to tell who was chosen."""
+    first = (name or "").split()[0] if (name or "").split() else ""
+    return first if first and not first.startswith("(") else (name or "the contact")
+
+
 def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect: Prospect | None,
              config: Config, call_date: date) -> list[str]:
     out = []
@@ -429,7 +436,7 @@ def _reasons(account: Account, sigs: list[Signal], best: Signal | None, prospect
         tier = tier_for(config, account.employees)
         out.append(f"{tier.replace('tier', 'Tier ')} fit ({account.employees} employees)" if tier
                    else f"Outside size tiers ({account.employees} employees)")
-    out.append(f"Prospect: {prospect.name} ({prospect.title})" if prospect else "No callable persona with a phone")
+    out.append(f"Prospect: {_log_name(prospect.name)} ({prospect.title})" if prospect else "No callable persona with a phone")
     if account.non_anz_billing_anz_hq:
         out.append("Non-ANZ billing, ANZ HQ (small penalty)")
     if account.timezone_guessed:
