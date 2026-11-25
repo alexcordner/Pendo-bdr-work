@@ -281,7 +281,7 @@ class SheetLine:
     can seal a line as genuine (``prepare_task`` refuses unsealed or copied lines)."""
 
     __slots__ = ("_entry", "rank", "call_no", "group", "run_date", "why_chosen", "flags", "packet", "_sealed",
-                 "__weakref__")
+                 "_snap", "__weakref__")
 
     def __init__(self, entry: SheetEntry, rank: int, call_no: int, group: str, run_date: date,
                  why_chosen: list[str], flags: list[str], packet: ResearchPacket):
@@ -294,6 +294,15 @@ class SheetLine:
         self.flags = flags
         self.packet = packet
         self._sealed = False
+        self._snap: dict | None = None       # due time / priority / window / rank / run_date frozen at seal time
+
+    def _seal(self, token) -> None:
+        """Called by build_sheet only. Freezes what the payload is built from, so mutating the shared
+        RankedAccount (score, time, window) afterwards cannot change a task."""
+        ra = self._entry.ranked
+        self._snap = {"due": ra.local_call_time, "priority": priority_for(ra.score), "window": ra.window,
+                      "rank": self.rank, "run_date": self.run_date}
+        self._sealed = token
 
     def __repr__(self) -> str:
         return (f"SheetLine(call_no={self.call_no!r}, rank={self.rank!r}, group={self.group!r}, "
@@ -725,7 +734,7 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
             ln = SheetLine(SheetEntry(ranked=ra, prospect=pr), pos, n, label, run_date, why,
                            _flags(ra, sigs, config, now) + _contact_flags(pr),
                            build_packet(ra, pr, sigs, config, history.get(pk), now))
-            ln._sealed = _SEAL
+            ln._seal(_SEAL)
             glines.append(ln)
             sheet.lines.append(ln)
         sheet.groups.append((label, glines))
@@ -906,17 +915,50 @@ class DryRunPayload(dict):
     """A payload built with ``dry_run=True``. Never write one to Nooks: check ``isinstance(p, DryRunPayload)``."""
 
 
-def _check_owner(owner_id: object, live: bool) -> str:
+def _check_owner(owner_id: object, live: bool, expected: str | None = None) -> str:
     if not isinstance(owner_id, str) or not owner_id.strip():
         raise SheetError("owner_id is required: a non-blank string")
     oid = owner_id.strip()
     if not ID_PATTERN.fullmatch(oid):
         raise SheetError("owner_id must match [A-Za-z0-9_-]{1,128}")
+    if expected is not None:
+        if not isinstance(expected, str) or not ID_PATTERN.fullmatch(expected.strip() if isinstance(expected, str) else ""):
+            raise SheetError("expected_owner_id must be a valid owner id string")
+        if oid.lower() == OWNER_ID_PLACEHOLDER.lower() and live:
+            raise SheetError("owner_id is still the placeholder: pass the real Nooks owner id (or dry_run=True)")
+        if live and oid != expected.strip():
+            raise SheetError("owner_id does not match expected_owner_id (the id Nooks getMe returned)")
+        return oid
     if live:
         low = oid.lower()
         if len(oid) < OWNER_ID_MIN_LEN or any(w in low for w in _PLACEHOLDER_WORDS):
             raise SheetError("owner_id looks like a placeholder: pass the real Nooks owner id (or dry_run=True)")
     return oid
+
+
+def _fold_id(value: object) -> str:
+    """Comparison form for Nooks ids (the same rule state.py stores, made stricter): NFKC, accents and
+    combining marks dropped, zero-width / BOM / NBSP removed, stripped, casefolded. Only ever merges more
+    ids together, which fails closed."""
+    t = unicodedata.normalize("NFKD", unicodedata.normalize("NFKC", str(value)).translate(_ZERO_WIDTH))
+    t = "".join(c for c in t if not unicodedata.combining(c)).replace("\u00a0", " ")
+    return t.strip().casefold()
+
+
+def is_dry_run_payload(payload: object) -> bool:
+    """True when ``payload`` is (or looks like) a dry-run payload, or is not a usable mapping at all.
+    Survives ``dict(p)``, ``{**p}``, ``p.copy()`` and a JSON round trip: it also checks the note prefix
+    and the placeholder owner id. The Phase 3 writer MUST refuse when this is True."""
+    if isinstance(payload, DryRunPayload):
+        return True
+    if not isinstance(payload, Mapping):
+        return True
+    note = payload.get("note")
+    owner = payload.get("ownerId")
+    if not isinstance(note, str) or not isinstance(owner, str):
+        return True
+    return (note.lstrip("\u200b\ufeff \u00a0\t\r\n").upper().startswith(DRY_RUN_PREFIX.strip())
+            or owner.strip().lower() == OWNER_ID_PLACEHOLDER.lower())
 
 
 def _blocked_code(reason: str) -> str:
@@ -955,16 +997,19 @@ def _resolve_prospect(line: SheetLine, resolved: Prospect) -> Prospect:
 def _check_line(line: SheetLine) -> None:
     """The line must be one build_sheet made, still consistent with itself."""
     name = line.account_name
-    if line._sealed is not _SEAL:
+    if line._sealed is not _SEAL or not isinstance(line._snap, dict):
         raise SheetError(f"{name}: not a sheet line made by build_sheet (hand-built or copied)")
+    snap = line._snap
     if isinstance(line.rank, bool) or not isinstance(line.rank, int) or line.rank < 1:
         raise SheetError(f"{name}: rank must be an int >= 1")
     if type(line.run_date) is not date:
         raise SheetError(f"{name}: run_date must be a date")
+    if line.rank != snap["rank"] or line.run_date != snap["run_date"]:
+        raise SheetError(f"{name}: sheet line changed after build (rank / run date)")
     ra = line.ranked
-    if ra.skipped_reason or ra.local_call_time is None or ra.window is None:
+    if ra.skipped_reason or snap["due"] is None or snap["window"] is None:
         raise SheetError(f"{name}: not a scheduled callable account")
-    if ra.local_call_time.tzinfo is None:
+    if snap["due"].tzinfo is None:
         raise SheetError("local_call_time must be timezone-aware")
     pr = line.entry.prospect
     if pr is None:
@@ -976,7 +1021,8 @@ def _check_line(line: SheetLine) -> None:
 
 
 def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, opener_fields: Mapping[str, str],
-                 owner_id: str, *, dry_run: bool = False, now: datetime | None = None) -> dict:
+                 owner_id: str, *, dry_run: bool = False, now: datetime | None = None,
+                 expected_owner_id: str | None = None) -> dict:
     """THE way to build a Nooks task-create ``data`` dict. Pure: no I/O.
 
     Live (``dry_run is False``, the default) requires: a real owner id (placeholder-looking ids refused), a
@@ -988,17 +1034,21 @@ def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, ope
     entry, scheduled, not skipped); due time not already passed; the resolved Nooks id is trimmed and the SF
     ids normalised BEFORE any comparison; both SF contact ids must be present and equal (fail closed); the
     Do Not Call / opt-out check (``state.is_blocked(.., 'any')``) runs on the resolved prospect with the
-    Nooks id in its exact, lower and upper case forms (plus a fully case-insensitive scan of the DNC id set) AND on the sheet contact, raising ``BlockedError`` with
+    Nooks id in its exact, lower and upper case forms (plus a scan of the DNC id set with both sides folded: NFKC, accents, zero-width, casefold) AND on the sheet contact, raising ``BlockedError`` with
     a fixed message and a short code (never the raw reason, which can hold a phone number); opener fields are
     validated (real text, no email / phone, ``NOTE_MAX_CHARS`` cap); the payload is built from exactly the id
-    that was checked."""
+    that was checked, with due time, priority, window, rank and run date taken from the snapshot frozen when
+    ``build_sheet`` sealed the line (later changes to the shared RankedAccount cannot alter it).
+
+    ``expected_owner_id``: the owner id Phase 3 resolved at run time (Nooks getMe). Phase 3 MUST pass it: live
+    then requires an exact match and the placeholder-word blocklist is skipped (a real id may contain 'test')."""
     if not isinstance(line, SheetLine):
         raise SheetError("payloads are built from sheet lines only")
     if dry_run is not True and dry_run is not False:
         raise SheetError("dry_run must be exactly True or False")
     live = dry_run is False
     name = line.account_name
-    oid = _check_owner(owner_id, live)
+    oid = _check_owner(owner_id, live, expected_owner_id)
     if not isinstance(state, State):
         raise SheetError(f"{name}: state must be a State (got {type(state).__name__})")
     if live and not dnc_is_rebuilt(state):
@@ -1010,16 +1060,18 @@ def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, ope
         raise ValueError("now must be a timezone-aware datetime")
     _check_line(line)
     ra = line.ranked
-    if now is not None and ra.local_call_time <= now:
-        raise SheetError(f"{name}: due time {ra.local_call_time.isoformat()} has already passed")
+    snap = line._snap
+    due = snap["due"]
+    if now is not None and due <= now:
+        raise SheetError(f"{name}: due time {due.isoformat()} has already passed")
     checked = _resolve_prospect(line, resolved_prospect)
     candidates = [("resolved prospect", checked)]
     for variant in (checked.nooks_id.lower(), checked.nooks_id.upper()):
         if variant != checked.nooks_id:
             candidates.append(("resolved prospect", replace(checked, nooks_id=variant)))
     candidates.append(("sheet contact", line.entry.prospect))
-    lowered = checked.nooks_id.lower()
-    if any(isinstance(i, str) and i.strip().lower() == lowered for i in state.dnc_prospect_ids):
+    folded = _fold_id(checked.nooks_id)
+    if any(_fold_id(i) == folded for i in state.dnc_prospect_ids if isinstance(i, str)):
         raise BlockedError(f"{name}: resolved prospect blocked: Do Not Call / opt-out [dnc_prospect_id]")
     for who, p in candidates:
         blocked, reason = is_blocked(p, state, "any")
@@ -1027,13 +1079,13 @@ def prepare_task(line: SheetLine, resolved_prospect: Prospect, state: State, ope
             raise BlockedError(f"{name}: {who} blocked: Do Not Call / opt-out [{_blocked_code(reason)}]")
     f = {k: _field_text(k, opener_fields.get(k), name) for k in OPENER_FIELDS}
     note = "\n".join([
-        ("" if live else DRY_RUN_PREFIX) + task_tag(line.run_date, line.rank),
+        ("" if live else DRY_RUN_PREFIX) + task_tag(snap["run_date"], snap["rank"]),
         f"OPENER: {f['opener']}", f"FACT 1: {f['fact_1']}", f"FACT 2: {f['fact_2']}",
         f"GATEKEEPER: {f['gatekeeper']}", f"TRIGGER: {f['trigger']}"])
     if len(note) > NOTE_MAX_CHARS:
         raise SheetError(f"{name}: note is {len(note)} characters, over the {NOTE_MAX_CHARS} cap (not truncated)")
-    payload = {"action": "call", "dueAt": ra.local_call_time.isoformat(), "ownerId": oid,
-               "prospectId": checked.nooks_id, "priority": priority_for(ra.score), "note": note}
+    payload = {"action": "call", "dueAt": due.isoformat(), "ownerId": oid,
+               "prospectId": checked.nooks_id, "priority": snap["priority"], "note": note}
     return payload if live else DryRunPayload(payload)
 
 

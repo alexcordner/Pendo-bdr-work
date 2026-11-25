@@ -1599,3 +1599,144 @@ def test_r11_zero_limit_ok(config, parts):
     s = cs.build_sheet(RankResult(skipped=many_skipped(3)), accts, signals, prospects, config, NOW)
     t = cs.render_sheet_text(s, bucket_limit=0)
     assert "and 3 more" in t and "Skip 000" not in t
+
+
+# ================================================================ final lows (N2-N5)
+# ---- N2: snapshot at seal time
+def test_n2_mutating_score_time_window_after_build_does_not_change_payload(sheet):
+    ln = sheet.lines[0]
+    before = prep(ln, now=ln.local_call_time - timedelta(minutes=1))
+    due = ln.local_call_time
+    ln.ranked.score = 0.0 if ln.ranked.score > 50 else 99.0
+    ln.ranked.local_call_time = due + timedelta(days=3)
+    ln.ranked.window = "afternoon" if ln.ranked.window == "morning" else "morning"
+    after = prep(ln, now=due - timedelta(minutes=1))
+    assert after == before and after["dueAt"] == due.isoformat()
+
+
+def test_n2_priority_frozen(sheet):
+    ln = sheet.lines[0]
+    prio = prep(ln)["priority"]
+    ln.ranked.score = 1.0 if prio in ("high", "urgent") else 99.0
+    assert prep(ln)["priority"] == prio
+
+
+def test_n2_past_check_uses_snapshot_due(sheet):
+    ln = sheet.lines[0]
+    due = ln.local_call_time
+    ln.ranked.local_call_time = due + timedelta(days=30)      # would hide a past due time if read live
+    with pytest.raises(cs.SheetError, match="already passed"):
+        prep(ln, now=due + timedelta(minutes=1))
+
+
+def test_n2_rank_and_run_date_must_match_snapshot(sheet):
+    ln = sheet.lines[0]
+    ln.rank += 4
+    with pytest.raises(cs.SheetError, match="changed after build"):
+        prep(ln)
+    ln.rank -= 4
+    ln.run_date = ln.run_date + timedelta(days=1)
+    with pytest.raises(cs.SheetError, match="changed after build"):
+        prep(ln)
+
+
+def test_n2_snapshot_exists_for_every_built_line(sheet):
+    for ln in sheet.lines:
+        assert set(ln._snap) == {"due", "priority", "window", "rank", "run_date"}
+
+
+# ---- N3: same folding both sides
+@pytest.mark.parametrize("entry", ["id-1​", "﻿id-1", "ID-1", " Id-1 ", "id-1 ", "İD-1", "ｉｄ-1"])
+def test_n3_folded_state_entries_still_match(sheet, entry):
+    st = healthy(); st.dnc_prospect_ids.add(entry)
+    with pytest.raises(cs.BlockedError, match="dnc_prospect_id"):
+        prep(sheet.lines[0], nid="id-1", state=st)
+
+
+def test_n3_resolved_side_folded_too(sheet):
+    st = healthy(); st.dnc_prospect_ids.add("id-1")           # what state.py stores: stripped + casefolded
+    for nid in ("ID-1", " Id-1 ", "iD-1"):
+        with pytest.raises(cs.BlockedError):
+            prep(sheet.lines[0], nid=nid, state=st)
+
+
+def test_n3_unrelated_ids_not_blocked(sheet):
+    st = healthy(); st.dnc_prospect_ids.update({"id-2", "other", "İD-11"})
+    assert prep(sheet.lines[0], nid="id-1", state=st)["prospectId"] == "id-1"
+
+
+def test_n3_main_check_is_state_is_blocked_by_casefolded_id(sheet):
+    from src.state import _pid, is_blocked
+    st = healthy(); st.dnc_prospect_ids.add(_pid("Abc-9"))
+    ln = sheet.lines[0]
+    assert is_blocked(replace(ln.prospect, nooks_id="ABC-9"), st)[0] is True
+    with pytest.raises(cs.BlockedError):
+        prep(ln, nid="ABC-9", state=st)
+
+
+# ---- N4: expected_owner_id
+REAL_OWNER = "Rt7Test4Owner9Kp2Wd5Hs6Jc1xy"          # a real-looking id that contains 'test'
+
+
+def test_n4_blocklist_still_refuses_without_expected(sheet):
+    with pytest.raises(cs.SheetError, match="placeholder"):
+        prep(sheet.lines[0], owner_id=REAL_OWNER)
+
+
+def test_n4_expected_owner_allows_id_with_blocklisted_word(sheet):
+    p = cs.prepare_task(sheet.lines[0], replace(sheet.lines[0].prospect, nooks_id=NID), healthy(), OPENER, REAL_OWNER,
+                        now=sheet.lines[0].local_call_time - timedelta(minutes=1), expected_owner_id=REAL_OWNER)
+    assert p["ownerId"] == REAL_OWNER
+
+
+@pytest.mark.parametrize("got", [OWNER, REAL_OWNER.lower(), REAL_OWNER + "x", REAL_OWNER[:-1]])
+def test_n4_mismatch_refused(sheet, got):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError, match="expected_owner_id"):
+        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), healthy(), OPENER, got,
+                        now=ln.local_call_time - timedelta(minutes=1), expected_owner_id=REAL_OWNER)
+
+
+@pytest.mark.parametrize("exp", ["", "has space", 5, "bad!"])
+def test_n4_bad_expected_value(sheet, exp):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError):
+        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), healthy(), OPENER, OWNER,
+                        now=ln.local_call_time - timedelta(minutes=1), expected_owner_id=exp)
+
+
+def test_n4_placeholder_never_passes_even_if_expected(sheet):
+    ln = sheet.lines[0]
+    with pytest.raises(cs.SheetError, match="placeholder"):
+        cs.prepare_task(ln, replace(ln.prospect, nooks_id=NID), healthy(), OPENER, cs.OWNER_ID_PLACEHOLDER,
+                        now=ln.local_call_time - timedelta(minutes=1), expected_owner_id=cs.OWNER_ID_PLACEHOLDER)
+
+
+def test_n4_expected_none_keeps_old_behaviour(sheet):
+    assert prep(sheet.lines[0], expected_owner_id=None)["ownerId"] == OWNER
+
+
+# ---- N5: is_dry_run_payload
+def test_n5_detects_dry_run_through_copies(sheet):
+    p = prep(sheet.lines[0], owner_id=cs.OWNER_ID_PLACEHOLDER, dry_run=True)
+    for q in (p, dict(p), {**p}, p.copy(), json.loads(json.dumps(p)), copy.deepcopy(p)):
+        assert cs.is_dry_run_payload(q) is True
+
+
+def test_n5_live_payload_is_not_dry_run(sheet):
+    p = prep(sheet.lines[0])
+    for q in (p, dict(p), {**p}, p.copy(), json.loads(json.dumps(p))):
+        assert cs.is_dry_run_payload(q) is False
+
+
+def test_n5_note_prefix_or_placeholder_owner_alone_is_enough(sheet):
+    live = prep(sheet.lines[0])
+    assert cs.is_dry_run_payload(dict(live, note="[DRY RUN] " + live["note"])) is True
+    assert cs.is_dry_run_payload(dict(live, note="  ​[dry run] x")) is True
+    assert cs.is_dry_run_payload(dict(live, ownerId=cs.OWNER_ID_PLACEHOLDER)) is True
+    assert cs.is_dry_run_payload(dict(live, ownerId="owner_id_placeholder")) is True
+
+
+@pytest.mark.parametrize("bad", [None, "x", 5, [], {}, {"note": 5, "ownerId": "a"}, {"note": "n"}, {"ownerId": "a"}])
+def test_n5_unusable_payload_counts_as_dry(bad):
+    assert cs.is_dry_run_payload(bad) is True
