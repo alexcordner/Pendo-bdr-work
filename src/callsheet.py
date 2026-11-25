@@ -61,6 +61,65 @@ MUST_NOT_CLAIM = (
 )
 
 
+# ---------------------------------------------------------------- personal email (free / ISP mail)
+# Configurable. A domain is personal when its FIRST label is a provider label AND the rest is a known suffix
+# (gmail.com, yahoo.com.au, bigpond.net.au, internode.on.net, xtra.co.nz ...), or when it is an exact domain
+# in PERSONAL_EMAIL_EXACT. 'live.acme.com' is NOT personal (the rest must be a mail-provider suffix).
+PERSONAL_EMAIL_PROVIDERS = frozenset({
+    "gmail", "googlemail", "outlook", "hotmail", "live", "msn", "yahoo", "ymail", "rocketmail", "icloud", "me", "mac",
+    "protonmail", "proton", "pm", "aol", "gmx", "zoho", "fastmail", "bigpond", "bigpond", "telstra", "optusnet", "tpg",
+    "iinet", "internode", "aapt", "westnet", "dodo", "exetel", "ozemail", "netspace", "xtra", "orcon", "slingshot",
+    "vodafone", "spark", "clear", "paradise", "hey", "tutanota"})
+PERSONAL_EMAIL_SUFFIXES = frozenset({
+    "com", "net", "org", "me", "co", "com.au", "net.au", "org.au", "id.au", "co.nz", "net.nz", "org.nz", "co.uk",
+    "on.net", "com.sg", "co.in", "ca"})
+PERSONAL_EMAIL_EXACT = frozenset({"proton.me", "pm.me", "me.com", "mac.com", "icloud.com", "gmail.com", "hey.com"})
+
+
+def _email_domain(email: object) -> str | None:
+    if not isinstance(email, str):
+        return None
+    t = email.strip().strip("<>").strip()
+    if "@" not in t:
+        return None
+    dom = unicodedata.normalize("NFKC", t.rsplit("@", 1)[1]).translate(_ZERO_WIDTH).strip().strip(">").strip().lower().rstrip(".")
+    return dom or None
+
+
+def is_personal_email(email: object) -> bool:
+    """Deterministic free/ISP-mailbox check on an email address. Never returns or prints the address."""
+    dom = _email_domain(email)
+    if not dom:
+        return False
+    if dom in PERSONAL_EMAIL_EXACT:
+        return True
+    label, _, rest = dom.partition(".")
+    return label in PERSONAL_EMAIL_PROVIDERS and rest in PERSONAL_EMAIL_SUFFIXES
+
+
+def email_reason(prospect: Prospect | None) -> str:
+    """'ok' | 'personal_email' | 'no_email' | 'opted_out' | 'do_not_call' (first that applies)."""
+    if prospect is None:
+        return "no_email"
+    if prospect.do_not_call:
+        return "do_not_call"
+    if prospect.opted_out_email:
+        return "opted_out"
+    if not (isinstance(prospect.email, str) and "@" in prospect.email):
+        return "no_email"
+    if is_personal_email(prospect.email):
+        return "personal_email"
+    return "ok"
+
+
+_EMAIL_REASON_TEXT = {
+    "personal_email": "contact email is personal: call only, no email draft",
+    "no_email": "no email address on file: call only, no email draft",
+    "opted_out": "contact has opted out of email: call only, no email draft",
+    "do_not_call": "contact is do-not-contact: no call, no email",
+}
+
+
 class SheetError(ValueError):
     """Refusal to build a sheet entry or payload (never silently degrade)."""
 
@@ -247,6 +306,8 @@ class ResearchPacket:
     contact_history_source: str | None
     available_facts: list[FactItem]
     must_not_claim: list[str]
+    email_ok: bool                           # False for personal / missing / opted-out email (never the address)
+    email_reason: str                        # ok | personal_email | no_email | opted_out | do_not_call
     facts_note: str                          # empty when two or more facts are available and none excluded
 
     @property
@@ -267,6 +328,7 @@ class ResearchPacket:
             "contact_history_source": self.contact_history_source,
             "available_facts": [f.to_dict() for f in self.available_facts], "fact_count": self.fact_count,
             "facts_note": self.facts_note, "must_not_claim": list(self.must_not_claim),
+            "email_ok": self.email_ok, "email_reason": self.email_reason,
         }
 
 
@@ -548,7 +610,22 @@ def _flags(ranked: RankedAccount, sigs: list[Signal], config: Config, now: datet
 
 
 def _contact_flags(pr: Prospect) -> list[str]:
-    return ["no contact id"] if not (pr.nooks_id or pr.sf_contact_id) else []
+    out = ["no contact id"] if not (pr.nooks_id or pr.sf_contact_id) else []
+    reason = email_reason(pr)
+    if reason in ("personal_email", "no_email", "opted_out"):
+        out.append(reason)
+    return out
+
+
+def email_draft_allowed(line: "SheetLine", resolved_prospect: Prospect | None = None) -> bool:
+    """Phase 3: may an email draft be made for this sheet contact? False for a personal (free / ISP) mailbox,
+    a missing email, an email opt-out or do-not-contact. When the resolved Nooks prospect is given its email
+    is held to the same rule too. Never exposes the address."""
+    if not isinstance(line, SheetLine):
+        return False
+    if email_reason(line.entry.prospect) != "ok":
+        return False
+    return resolved_prospect is None or email_reason(resolved_prospect) == "ok"
 
 
 # ---------------------------------------------------------------- research packet
@@ -587,6 +664,10 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
         notes.append(f"{_plural(excluded, 'signal')} left out of the facts (future-dated or older than its limit): "
                      "do not quote it.")
     usable = [(s, p) for s, p in zip(sigs, psigs) if p.status in ("ok", "undated")]
+    e_reason = email_reason(prospect)
+    claims = list(MUST_NOT_CLAIM)
+    if e_reason != "ok":
+        claims.append(f"Do not suggest or draft an email to this contact ({_EMAIL_REASON_TEXT[e_reason]}).")
     return ResearchPacket(
         account_key=account_key(a), account_name=_clean(a.name), website=_clean(a.website) if a.website else None,
         industry=industry, state=_clean(a.billing_state or a.hq_state) if (a.billing_state or a.hq_state) else None,
@@ -601,7 +682,8 @@ def build_packet(ranked: RankedAccount, prospect: Prospect, sigs: list[Signal], 
         ambiguity_flags=[sigmod.AMBIGUOUS_NOTE for s in sigs if sigmod.is_ambiguous(s)],
         sdr_target=a.is_sdr_target,
         contact_history=summary, contact_history_source=history.source_label if summary else None,
-        available_facts=facts, must_not_claim=list(MUST_NOT_CLAIM), facts_note=" ".join(notes))
+        available_facts=facts, must_not_claim=claims, email_ok=e_reason == "ok", email_reason=e_reason,
+        facts_note=" ".join(notes))
 
 
 def render_packet_text(p: ResearchPacket) -> str:
@@ -659,6 +741,53 @@ def _bucket(items: Sequence[RankedAccount], reason_of) -> list[BucketItem]:
     return [BucketItem(_clean(r.account.name), _clean(reason_of(r))) for r in items]
 
 
+_DUP_NOTE = re.compile(r"possible_duplicate:\s*shares a key with\s+(?P<name>.+?)\s+\(ids:\s*(?P<ids>[^)]*)\)")
+
+
+def _unrepr(raw: str) -> str | None:
+    """Undo ``repr(str)`` for the account builder's note ('Name' or \"O'Neil Co\"), without eval."""
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "'\"":
+        inner = raw[1:-1]
+        return re.sub(r"\\(['\"\\])", r"\1", inner)
+    return raw or None
+
+
+def _dup_targets(a: Account) -> list[tuple[str | None, set[str]]]:
+    """(name, ids) of the other account(s) named by this account's 'possible_duplicate' notes. Parsed
+    defensively from the account builder's note text; anything unparseable is ignored (no collapse)."""
+    if "possible_duplicate" not in a.flags and not any("possible_duplicate" in n for n in a.notes):
+        return []
+    out = []
+    for n in a.notes:
+        m = _DUP_NOTE.search(n)
+        if not m:
+            continue
+        raw = m.group("name")
+        name = _unrepr(raw)
+        ids = {normalise_sf_id(x) or x.strip() for x in m.group("ids").split(",") if x.strip() and x.strip().lower() != "none"}
+        out.append((name, {i for i in ids if i}))
+    return out
+
+
+def _account_ids(a: Account) -> set[str]:
+    return {i for i in (normalise_sf_id(a.sf_account_id), normalise_sf_id(a.zoominfo_id),
+                        normalise_sf_id(a.nooks_account_id)) if i}
+
+
+def _names_other(a: Account, b: Account) -> bool:
+    """True when a's possible_duplicate note names b (by id overlap, else by exact name)."""
+    for name, ids in _dup_targets(a):
+        if (ids and ids & _account_ids(b)) or (name and name.casefold() == b.name.casefold()):
+            return True
+    return False
+
+
+def probable_duplicates(a: Account, b: Account) -> bool:
+    """True when the account builder flagged a and b as probably the same company (either note names the other)."""
+    return a is not b and (_names_other(a, b) or _names_other(b, a))
+
+
 def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by_account: Mapping[str, list[Signal]],
                 prospects: Sequence[Prospect], config: Config, now: datetime, *, limit: int | None = None,
                 history: Mapping[str, ContactHistory] | None = None) -> Sheet:
@@ -706,6 +835,19 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
             sheet.dropped.append(BucketItem(name, "chosen prospect is do-not-call / opted out"))
             continue
         picked.append((pos, ra, chosen))
+    # Collapse probable duplicates BEFORE the limit: keep the higher-scoring account of a flagged pair (picked is
+    # in score order), mention the other on the kept line, never put both on the sheet.
+    kept: list[tuple[int, RankedAccount, Prospect]] = []
+    also: dict[int, list[str]] = {}
+    for item in picked:
+        twin = next((k for k in kept if probable_duplicates(item[1].account, k[1].account)), None)
+        if twin is None:
+            kept.append(item)
+            continue
+        also.setdefault(twin[0], []).append(_clean(item[1].account.name))
+        sheet.dropped.append(BucketItem(_clean(item[1].account.name),
+                                        f"probable duplicate of {_clean(twin[1].account.name)} (kept the higher score)"))
+    picked = kept
     if limit is not None:
         picked = picked[:limit]
 
@@ -731,6 +873,11 @@ def build_sheet(rank_result: RankResult, accounts: Sequence[Account], signals_by
             why = build_why(ra, sigs, config, now)
             pk = account_key(ra.account)
             why.insert(0, f"Prospect: {_who(pr.name)}, {_clean(pr.title) if pr.title else 'title unknown'}")
+            reason = email_reason(pr)
+            if reason in ("personal_email", "no_email", "opted_out"):
+                why.append(f"Flag: {_EMAIL_REASON_TEXT[reason]}")
+            for other in also.get(pos, []):
+                why.append(f"also on your list as {other}: probable same company")
             ln = SheetLine(SheetEntry(ranked=ra, prospect=pr), pos, n, label, run_date, why,
                            _flags(ra, sigs, config, now) + _contact_flags(pr),
                            build_packet(ra, pr, sigs, config, history.get(pk), now))
@@ -781,6 +928,9 @@ def _skip_counts(sheet: Sheet, esc=lambda s: s) -> list[str]:
     return ["Top skip reasons: " + "; ".join(f"{esc(k)} ({v})" for k, v in list(sheet.skipped_reason_counts.items())[:5])]
 
 
+_FLAG_DISPLAY = {"personal_email": _EMAIL_REASON_TEXT["personal_email"]}
+
+
 def _check_limit(bucket_limit) -> None:
     if bucket_limit is not None and (isinstance(bucket_limit, bool) or not isinstance(bucket_limit, int)
                                      or bucket_limit < 0):
@@ -805,7 +955,7 @@ def render_sheet_text(sheet: Sheet, bucket_limit: int | None = BUCKET_LIST_LIMIT
             row = (f"{ln.call_no:>2}. {_when(ln):<14} {_short(ln.account_name, 34):<34} "
                    f"{_who(pr.name)}, {_short(_clean(pr.title or '?'), 28)} | score {ln.score:.0f} (#{ln.rank}) | {_short(why, 120)}")
             if ln.flags:
-                row += " | flags: " + ", ".join(ln.flags)
+                row += " | flags: " + ", ".join(_FLAG_DISPLAY.get(f, f) for f in ln.flags)
             L.append(row)
     extra = []
     for title, items in _bucket_data(sheet):
